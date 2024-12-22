@@ -1,6 +1,6 @@
 ﻿namespace FTSS_API.Payload;
 
-public class ApiRespone
+public class ApiResponse
 {
     public string status { get; set; }
  
