@@ -15,9 +15,4 @@
       <ProjectReference Include="..\FTSS_Repository\FTSS_Repository.csproj" />
     </ItemGroup>
 
-    <ItemGroup>
-      <Folder Include="Service\Implement\" />
-      <Folder Include="Service\Interface\" />
-    </ItemGroup>
-
 </Project>

@@ -1,23 +1,30 @@
 ﻿using System.Text;
+using FTSS_API.Service.Implement.Implement;
+using FTSS_Model.Context;
+using FTSS_Repository.Implement;
+using FTSS_Repository.Interface;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using MRC_API.Utils;
 
 namespace FTSS_API;
 
 public static class DependencyInjection
 {
-    // public static IServiceCollection AddUnitOfWork(this IServiceCollection services)
-    // {
-    //     services.AddScoped<IUnitOfWork<MrcContext>, UnitOfWork<MrcContext>>();
-    //     return services;
-    // }
+    public static IServiceCollection AddUnitOfWork(this IServiceCollection services)
+    {
+        services.AddScoped<IUnitOfWork<MyDbContext>, UnitOfWork<MyDbContext>>();
+        return services;
+    }
 
-    // public static IServiceCollection AddDatabase(this IServiceCollection services)
-    // {
-    //     services.AddDbContext<MrcContext>(options => options.UseSqlServer(GetConnectionString()));
-    //     return services;
-    // }
+    public static IServiceCollection AddDatabase(this IServiceCollection services)
+    {
+        services.AddDbContext<MyDbContext>(options => options.UseSqlServer(GetConnectionString()));
+        return services;
+    }
 
     private static string CreateClientId(IConfiguration configuration)
     {
@@ -30,28 +37,26 @@ public static class DependencyInjection
         return clientSecret;
     }
 
-    // public static IServiceCollection AddCustomServices(this IServiceCollection services)
-    // {
-    //     services.AddScoped<IUserService, UserService>();
-    //     services.AddScoped<ICategoryService, CategoryService>();
-    //     services.AddScoped<IProductService, ProductService>();
-    //     services.AddScoped<IBookingService, BookingService>();
-    //     services.AddScoped<IVNPayService, VNPayService>();
-    //     services.AddScoped<IOrderService, OrderService>();
-    //     services.AddScoped<IServiceService, ServiceService>();
-    //     services.AddScoped<IGoogleAuthenticationService, GoogleAuthenticationService>();
-    //     services.AddScoped<ICartService, CartService>();
-    //     services.AddScoped<IEmailSender, EmailSender>();
-    //     services.AddScoped<IPayService, PayService>();
-    //     services.AddScoped<AzureDatabaseService>();
-    //     services.AddScoped<PaymentUltils.Utils>();
-    //     services.AddScoped<HtmlSanitizerUtils>();
-    //     services.AddScoped<INewsService, NewsService>();
-    //     services.AddScoped<IBookingService, BookingService>();
-    //     services.AddScoped<IFormService, FormService>();
-    //     services.AddScoped<IDashBoardService, DashBoardService>();
-    //     return services;
-    // }
+    public static IServiceCollection AddCustomServices(this IServiceCollection services)
+    {
+        services.AddScoped<IUserService, UserService>();
+        // services.AddScoped<ICategoryService, CategoryService>();
+        // services.AddScoped<IProductService, ProductService>();
+   
+        // services.AddScoped<IVNPayService, VNPayService>();
+        // services.AddScoped<IOrderService, OrderService>();
+     
+        // services.AddScoped<IGoogleAuthenticationService, GoogleAuthenticationService>();
+        // services.AddScoped<ICartService, CartService>();
+        services.AddScoped<IEmailSender, EmailSender>();
+        // services.AddScoped<IPayService, PayService>();
+        //
+        // services.AddScoped<PaymentUltils.Utils>();
+        services.AddScoped<HtmlSanitizerUtils>();
+   
+        
+        return services;
+    }
     public static IServiceCollection AddHttpClientServices(this IServiceCollection services)
     {
         services.AddHttpClient(); // Registers HttpClient
