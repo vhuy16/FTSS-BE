@@ -3,10 +3,10 @@ name: Build and Deploy .NET Application to Plesk via FTP
 on:
   push:
     branches:
-      - main
+      - main # Thay đổi nhánh nếu cần
 
 jobs:
-  build-test-deploy:
+  build-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
@@ -14,36 +14,26 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v3
 
-    # 2. Liệt kê nội dung thư mục để kiểm tra
-    - name: List current directory
-      run: ls -R
-
-    # 3. Cài đặt .NET SDK
+    # 2. Cài đặt .NET SDK
     - name: Setup .NET
       uses: actions/setup-dotnet@v3
       with:
-        dotnet-version: 8.0
+        dotnet-version: 8.0 # Thay đổi phiên bản .NET nếu cần
 
-    # 4. Restore dependencies
-    - name: Restore dependencies
-      run: dotnet restore FTSS-BE/FTSS/FTSS.sln
-
-    
-
-    # 6. Build dự án .NET
+    # 3. Build dự án .NET
     - name: Build project
-      run: dotnet publish FTSS-BE/FTSS/FTSS.sln -c Release -o ./publish
+      run: dotnet publish -c Release -o ./publish
 
-    # 7. Triển khai mã nguồn qua FTP
+    # 4. Triển khai mã nguồn qua FTP
     - name: Deploy via FTP
       uses: SamKirkland/FTP-Deploy-Action@4.3.0
       with:
-         server: ${{ secrets.FTP_HOST }}
-         username: ${{ secrets.FTP_USERNAME }}
-         password: ${{ secrets.FTP_PASSWORD }}
+         server: ${{ secrets.FTP_HOST }} # Địa chỉ FTP
+         username: ${{ secrets.FTP_USERNAME }} # Tên người dùng FTP
+         password: ${{ secrets.FTP_PASSWORD }} # Mật khẩu FTP
          local-dir: ./publish/
-         server-dir: ${{ secrets.FTP_TARGET_DIR }}
+         server-dir: ${{ secrets.FTP_TARGET_DIR }} # Thư mục đích trên server
          exclude: |
-          **/*.pdb
-          **/*.config
+          **/*.pdb   # Loại trừ file PDB (debug)
+          **/*.config # Nếu không muốn upload config file
          log-level: verbose
