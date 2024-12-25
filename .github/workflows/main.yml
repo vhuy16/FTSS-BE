@@ -22,7 +22,7 @@ jobs:
 
     # 3. Build dự án .NET
     - name: Build project
-      run: dotnet publish -c Release -o ./publish
+      run:  dotnet publish FTSS-BE/FTSS/FTSS.sln -c Release -o ./publish
 
     # 4. Triển khai mã nguồn qua FTP
     - name: Deploy via FTP
