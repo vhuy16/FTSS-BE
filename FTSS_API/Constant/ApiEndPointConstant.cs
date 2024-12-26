@@ -12,7 +12,7 @@ public static class ApiEndPointConstant
     public static class User
     {
         public const string UserEndPoint = ApiEndpoint + "/user";
-        public const string Register = UserEndPoint + "/register";
+        public const string Register = UserEndPoint + "/registers";
         public const string Login = UserEndPoint + "/login";
         public const string LoginCustomer = UserEndPoint + "/login-customer";
         public const string DeleteUser = UserEndPoint + "/{id}";
