@@ -75,6 +75,7 @@ public class UserService : BaseService<UserService>, IUserService
             ModifyDate = TimeUtils.GetCurrentSEATime(),
             Role = RoleEnum.Customer.GetDescriptionFromEnum(),
             Status = UserStatusEnum.Unavailable.GetDescriptionFromEnum(),
+            Address = createNewAccountRequest.Address,
             PhoneNumber = createNewAccountRequest.PhoneNumber,
             Gender = createNewAccountRequest.Gender.GetDescriptionFromEnum()
           };
@@ -95,7 +96,8 @@ public class UserService : BaseService<UserService>, IUserService
                 Email = newUser.Email,
                 FullName = newUser.FullName,
                 Gender = EnumUtil.ParseEnum<GenderEnum>(newUser.Gender),
-                PhoneNumber = newUser.PhoneNumber
+                PhoneNumber = newUser.PhoneNumber,
+                Address = newUser.Address,
               };
 
                 string otp = OtpUltil.GenerateOtp();
@@ -197,9 +199,11 @@ public class UserService : BaseService<UserService>, IUserService
                 {
                     UserId = user.Id,
                     Email = user.Email,
+                    Username = user.UserName,
                     FullName = user.FullName,
                     Gender = user.Gender,
-                    PhoneNumber = user.PhoneNumber
+                    PhoneNumber = user.PhoneNumber,
+                    Address = user.Address,
                 }
             };
         }
@@ -239,10 +243,12 @@ public class UserService : BaseService<UserService>, IUserService
             {
                 UserId = u.Id,
                 FullName = u.FullName,
+                Username = u.UserName,
                 Email = u.Email,
                 PhoneNumber = u.PhoneNumber,
                 Gender = u.Gender,
-                Role = u.Role
+                Role = u.Role,
+                Address = u.Address,
             },
             predicate: u => u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()),
             page: page,
@@ -285,11 +291,13 @@ public class UserService : BaseService<UserService>, IUserService
             selector: u => new GetUserResponse()
             {
                 UserId = u.Id,
+                Username = u.UserName,
                 Email = u.Email,
                 FullName = u.FullName,
                 PhoneNumber = u.PhoneNumber,
                 Gender = u.Gender,
                 Role = u.Role,
+                Address = u.Address,
             },
             predicate: u => u.Id.Equals(userId.Value) && u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()));
 
@@ -318,9 +326,12 @@ public class UserService : BaseService<UserService>, IUserService
             {
                 UserId = u.Id,
                 Email = u.Email,
+                Username = u.UserName,
                 FullName = u.FullName,
                 PhoneNumber = u.PhoneNumber,
-                Gender = u.Gender
+                Gender = u.Gender,
+                Role = u.Role,
+                Address = u.Address,
             },
             predicate: u => u.Id.Equals(id) && u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()));
 
@@ -371,6 +382,7 @@ public class UserService : BaseService<UserService>, IUserService
         user.PhoneNumber = string.IsNullOrEmpty(updateUserRequest.PhoneNumber) ? user.PhoneNumber : updateUserRequest.PhoneNumber;
         user.Gender = updateUserRequest.Gender.HasValue ? updateUserRequest.Gender.GetDescriptionFromEnum() : user.Gender.GetDescriptionFromEnum();
         user.ModifyDate = TimeUtils.GetCurrentSEATime();
+        user.Address = string.IsNullOrEmpty(updateUserRequest.Address) ? user.Address : updateUserRequest.Address;
 
         _unitOfWork.GetRepository<User>().UpdateAsync(user);
 
