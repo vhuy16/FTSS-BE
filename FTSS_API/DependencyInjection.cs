@@ -1,5 +1,7 @@
 ﻿using System.Text;
+using FTSS_API.Service.Implement;
 using FTSS_API.Service.Implement.Implement;
+using FTSS_API.Service.Interface;
 using FTSS_Model.Context;
 using FTSS_Repository.Implement;
 using FTSS_Repository.Interface;
@@ -40,12 +42,13 @@ public static class DependencyInjection
     public static IServiceCollection AddCustomServices(this IServiceCollection services)
     {
         services.AddScoped<IUserService, UserService>();
-        // services.AddScoped<ICategoryService, CategoryService>();
+        services.AddScoped<ICategoryService, CategoryService>();
+        services.AddScoped<ISubCategoryService, SubCategoryService>();
         // services.AddScoped<IProductService, ProductService>();
-   
+
         // services.AddScoped<IVNPayService, VNPayService>();
         // services.AddScoped<IOrderService, OrderService>();
-     
+
         // services.AddScoped<IGoogleAuthenticationService, GoogleAuthenticationService>();
         // services.AddScoped<ICartService, CartService>();
         services.AddScoped<IEmailSender, EmailSender>();

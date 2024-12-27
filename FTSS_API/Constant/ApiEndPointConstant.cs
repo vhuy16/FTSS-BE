@@ -26,4 +26,13 @@ public static class ApiEndPointConstant
         public const string VerifyForgotPassword = UserEndPoint + "/verify-forgot-password";
         public const string ChangePassword = UserEndPoint + "/change-password";
     }
+    public static class Category
+    {
+        public const string CategoryEndPoint = ApiEndpoint + "/category";
+        public const string CreateNewCategory = CategoryEndPoint;
+        public const string GetAllCategory = CategoryEndPoint;
+        public const string GetCategory = CategoryEndPoint + "/{id}";
+        public const string UpdateCategory = CategoryEndPoint + "/{id}";
+        public const string DeleteCategory = CategoryEndPoint + "/{id}";
+    }
 }
