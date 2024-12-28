@@ -15,7 +15,7 @@ public partial class MyDbContext : DbContext
         : base(options)
     {
     }
-    public virtual DbSet<Otp> Otps { get; set; }
+
     public virtual DbSet<Cart> Carts { get; set; }
 
     public virtual DbSet<CartItem> CartItems { get; set; }
@@ -40,6 +40,8 @@ public partial class MyDbContext : DbContext
 
     public virtual DbSet<OrderDetail> OrderDetails { get; set; }
 
+    public virtual DbSet<Otp> Otps { get; set; }
+
     public virtual DbSet<Payment> Payments { get; set; }
 
     public virtual DbSet<Product> Products { get; set; }
@@ -58,17 +60,19 @@ public partial class MyDbContext : DbContext
 
     public virtual DbSet<Voucher> Vouchers { get; set; }
 
-    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder){}
-// #warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see https://go.microsoft.com/fwlink/?LinkId=723263.
-//         => optionsBuilder.UseSqlServer("Server=QUANGHUY\\QHUY;Database=FTSS;User Id=sa;Password=12345;TrustServerCertificate=True");
+    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+#warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see https://go.microsoft.com/fwlink/?LinkId=723263.
+        => optionsBuilder.UseSqlServer("Server=137.59.106.46;database=FTSS;user=ftss_admin;password=admin@1234;TrustServerCertificate=True");
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.HasDefaultSchema("ftss_admin");
+
         modelBuilder.Entity<Cart>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__Cart__3213E83F0C62F6B8");
+            entity.HasKey(e => e.Id).HasName("PK__Cart__3213E83F564EAB11");
 
-            entity.ToTable("Cart");
+            entity.ToTable("Cart", "dbo");
 
             entity.Property(e => e.Id)
                 .HasDefaultValueSql("(newid())")
@@ -96,9 +100,9 @@ public partial class MyDbContext : DbContext
 
         modelBuilder.Entity<CartItem>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__CartItem__3213E83F1D197DF2");
+            entity.HasKey(e => e.Id).HasName("PK__CartItem__3213E83FDB4EF904");
 
-            entity.ToTable("CartItem");
+            entity.ToTable("CartItem", "dbo");
 
             entity.Property(e => e.Id)
                 .HasDefaultValueSql("(newid())")
@@ -123,19 +127,19 @@ public partial class MyDbContext : DbContext
             entity.HasOne(d => d.Cart).WithMany(p => p.CartItems)
                 .HasForeignKey(d => d.CartId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK__CartItem__cartId__5EBF139D");
+                .HasConstraintName("FK__CartItem__cartId__0A9D95DB");
 
             entity.HasOne(d => d.Product).WithMany(p => p.CartItems)
                 .HasForeignKey(d => d.ProductId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK__CartItem__produc__5DCAEF64");
+                .HasConstraintName("FK__CartItem__produc__0B91BA14");
         });
 
         modelBuilder.Entity<Category>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__Category__3213E83FABBB5B7D");
+            entity.HasKey(e => e.Id).HasName("PK__Category__3213E83FAD7360EB");
 
-            entity.ToTable("Category");
+            entity.ToTable("Category", "dbo");
 
             entity.Property(e => e.Id)
                 .HasDefaultValueSql("(newid())")
@@ -157,9 +161,9 @@ public partial class MyDbContext : DbContext
 
         modelBuilder.Entity<Image>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__Image__3213E83F93AF64CE");
+            entity.HasKey(e => e.Id).HasName("PK__Image__3213E83FDB3ABF5A");
 
-            entity.ToTable("Image");
+            entity.ToTable("Image", "dbo");
 
             entity.Property(e => e.Id)
                 .HasDefaultValueSql("(newid())")
@@ -185,14 +189,14 @@ public partial class MyDbContext : DbContext
             entity.HasOne(d => d.Product).WithMany(p => p.Images)
                 .HasForeignKey(d => d.ProductId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK__Image__productId__6D0D32F4");
+                .HasConstraintName("FK__Image__productId__0C85DE4D");
         });
 
         modelBuilder.Entity<Issue>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__Issue__3213E83F6570BFB4");
+            entity.HasKey(e => e.Id).HasName("PK__Issue__3213E83FBB9268A5");
 
-            entity.ToTable("Issue");
+            entity.ToTable("Issue", "dbo");
 
             entity.Property(e => e.Id)
                 .HasDefaultValueSql("(newid())")
@@ -219,9 +223,9 @@ public partial class MyDbContext : DbContext
 
         modelBuilder.Entity<IssueCategory>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__IssueCat__3213E83FC72972A7");
+            entity.HasKey(e => e.Id).HasName("PK__IssueCat__3213E83FF17EE3DC");
 
-            entity.ToTable("IssueCategory");
+            entity.ToTable("IssueCategory", "dbo");
 
             entity.Property(e => e.Id)
                 .HasDefaultValueSql("(newid())")
@@ -243,9 +247,9 @@ public partial class MyDbContext : DbContext
 
         modelBuilder.Entity<IssueProduct>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__IssuePro__3213E83F57A60470");
+            entity.HasKey(e => e.Id).HasName("PK__IssuePro__3213E83F1395F1F5");
 
-            entity.ToTable("IssueProduct");
+            entity.ToTable("IssueProduct", "dbo");
 
             entity.Property(e => e.Id)
                 .HasDefaultValueSql("(newid())")
@@ -263,19 +267,19 @@ public partial class MyDbContext : DbContext
             entity.HasOne(d => d.Issue).WithMany(p => p.IssueProducts)
                 .HasForeignKey(d => d.IssueId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK__IssueProd__issue__05D8E0BE");
+                .HasConstraintName("FK__IssueProd__issue__0E6E26BF");
 
             entity.HasOne(d => d.Product).WithMany(p => p.IssueProducts)
                 .HasForeignKey(d => d.ProductId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK__IssueProd__produ__04E4BC85");
+                .HasConstraintName("FK__IssueProd__produ__0F624AF8");
         });
 
         modelBuilder.Entity<MaintenanceSchedule>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__Maintena__3213E83FC4839623");
+            entity.HasKey(e => e.Id).HasName("PK__Maintena__3213E83F5638FA89");
 
-            entity.ToTable("MaintenanceSchedule");
+            entity.ToTable("MaintenanceSchedule", "dbo");
 
             entity.Property(e => e.Id)
                 .HasDefaultValueSql("(newid())")
@@ -296,9 +300,9 @@ public partial class MyDbContext : DbContext
 
         modelBuilder.Entity<MaintenanceTask>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__Maintena__3213E83FCE21436C");
+            entity.HasKey(e => e.Id).HasName("PK__Maintena__3213E83F1BC07285");
 
-            entity.ToTable("MaintenanceTask");
+            entity.ToTable("MaintenanceTask", "dbo");
 
             entity.Property(e => e.Id)
                 .HasDefaultValueSql("(newid())")
@@ -322,14 +326,14 @@ public partial class MyDbContext : DbContext
             entity.HasOne(d => d.MaintenanceSchedule).WithMany(p => p.MaintenanceTasks)
                 .HasForeignKey(d => d.MaintenanceScheduleId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK__Maintenan__maint__4316F928");
+                .HasConstraintName("FK__Maintenan__maint__114A936A");
         });
 
         modelBuilder.Entity<Model3D>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__Model3D__3213E83F2A782F71");
+            entity.HasKey(e => e.Id).HasName("PK__Model3D__3213E83FC6C2522F");
 
-            entity.ToTable("Model3D");
+            entity.ToTable("Model3D", "dbo");
 
             entity.Property(e => e.Id)
                 .HasDefaultValueSql("(newid())")
@@ -350,9 +354,9 @@ public partial class MyDbContext : DbContext
 
         modelBuilder.Entity<Order>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__Order__3213E83F92D6C47E");
+            entity.HasKey(e => e.Id).HasName("PK__Order__3213E83F7F61BE3E");
 
-            entity.ToTable("Order");
+            entity.ToTable("Order", "dbo");
 
             entity.Property(e => e.Id)
                 .HasDefaultValueSql("(newid())")
@@ -388,9 +392,9 @@ public partial class MyDbContext : DbContext
 
         modelBuilder.Entity<OrderDetail>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__OrderDet__3213E83FEA9FE343");
+            entity.HasKey(e => e.Id).HasName("PK__OrderDet__3213E83F0E3F7310");
 
-            entity.ToTable("OrderDetail");
+            entity.ToTable("OrderDetail", "dbo");
 
             entity.Property(e => e.Id)
                 .HasDefaultValueSql("(newid())")
@@ -405,19 +409,30 @@ public partial class MyDbContext : DbContext
             entity.HasOne(d => d.Order).WithMany(p => p.OrderDetails)
                 .HasForeignKey(d => d.OrderId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK__OrderDeta__order__6754599E");
+                .HasConstraintName("FK__OrderDeta__order__14270015");
 
             entity.HasOne(d => d.Product).WithMany(p => p.OrderDetails)
                 .HasForeignKey(d => d.ProductId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK__OrderDeta__produ__68487DD7");
+                .HasConstraintName("FK__OrderDeta__produ__151B244E");
+        });
+
+        modelBuilder.Entity<Otp>(entity =>
+        {
+            entity.ToTable("Otps", "dbo");
+
+            entity.HasIndex(e => e.UserId, "IX_Otps_UserId");
+
+            entity.Property(e => e.Id).ValueGeneratedNever();
+
+            entity.HasOne(d => d.User).WithMany(p => p.Otps).HasForeignKey(d => d.UserId);
         });
 
         modelBuilder.Entity<Payment>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__Payment__3213E83F303D8858");
+            entity.HasKey(e => e.Id).HasName("PK__Payment__3213E83FE3F83109");
 
-            entity.ToTable("Payment");
+            entity.ToTable("Payment", "dbo");
 
             entity.Property(e => e.Id)
                 .HasDefaultValueSql("(newid())")
@@ -440,19 +455,18 @@ public partial class MyDbContext : DbContext
             entity.HasOne(d => d.Order).WithMany(p => p.Payments)
                 .HasForeignKey(d => d.OrderId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK__Payment__orderId__787EE5A0");
+                .HasConstraintName("FK__Payment__orderId__17036CC0");
         });
 
         modelBuilder.Entity<Product>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__Product__3213E83F7FF555F8");
+            entity.HasKey(e => e.Id).HasName("PK__Product__3213E83F4D0F84D3");
 
-            entity.ToTable("Product");
+            entity.ToTable("Product", "dbo");
 
             entity.Property(e => e.Id)
                 .HasDefaultValueSql("(newid())")
                 .HasColumnName("id");
-            entity.Property(e => e.CategoryId).HasColumnName("categoryId");
             entity.Property(e => e.CreateDate)
                 .HasColumnType("datetime")
                 .HasColumnName("createDate");
@@ -464,6 +478,9 @@ public partial class MyDbContext : DbContext
             entity.Property(e => e.ModifyDate)
                 .HasColumnType("datetime")
                 .HasColumnName("modifyDate");
+            entity.Property(e => e.Price)
+                .HasColumnType("decimal(18, 0)")
+                .HasColumnName("price");
             entity.Property(e => e.ProductName)
                 .HasMaxLength(255)
                 .HasColumnName("productName");
@@ -474,22 +491,22 @@ public partial class MyDbContext : DbContext
             entity.Property(e => e.Status)
                 .HasMaxLength(50)
                 .HasColumnName("status");
-
-            entity.HasOne(d => d.Category).WithMany(p => p.Products)
-                .HasForeignKey(d => d.CategoryId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK__Product__categor__5070F446");
+            entity.Property(e => e.SubCategoryId).HasColumnName("SubCategoryID");
 
             entity.HasOne(d => d.Model3D).WithMany(p => p.Products)
                 .HasForeignKey(d => d.Model3Did)
                 .HasConstraintName("FK_Product_Model3D");
+
+            entity.HasOne(d => d.SubCategory).WithMany(p => p.Products)
+                .HasForeignKey(d => d.SubCategoryId)
+                .HasConstraintName("FK_Product_SubCategory");
         });
 
         modelBuilder.Entity<SetupPackage>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__SetupPac__3213E83FD295E5F3");
+            entity.HasKey(e => e.Id).HasName("PK__SetupPac__3213E83FBCABB90F");
 
-            entity.ToTable("SetupPackage");
+            entity.ToTable("SetupPackage", "dbo");
 
             entity.Property(e => e.Id)
                 .HasDefaultValueSql("(newid())")
@@ -512,9 +529,9 @@ public partial class MyDbContext : DbContext
 
         modelBuilder.Entity<SetupPackageDetail>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__SetupPac__3213E83F96E32B1D");
+            entity.HasKey(e => e.Id).HasName("PK__SetupPac__3213E83FBD9416A9");
 
-            entity.ToTable("SetupPackageDetail");
+            entity.ToTable("SetupPackageDetail", "dbo");
 
             entity.Property(e => e.Id)
                 .HasDefaultValueSql("(newid())")
@@ -529,19 +546,19 @@ public partial class MyDbContext : DbContext
             entity.HasOne(d => d.Product).WithMany(p => p.SetupPackageDetails)
                 .HasForeignKey(d => d.ProductId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK__SetupPack__produ__1332DBDC");
+                .HasConstraintName("FK__SetupPack__produ__19DFD96B");
 
             entity.HasOne(d => d.SetupPackage).WithMany(p => p.SetupPackageDetails)
                 .HasForeignKey(d => d.SetupPackageId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK__SetupPack__setup__14270015");
+                .HasConstraintName("FK__SetupPack__setup__1AD3FDA4");
         });
 
         modelBuilder.Entity<Shipment>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__Shipment__3213E83F5C6D460A");
+            entity.HasKey(e => e.Id).HasName("PK__Shipment__3213E83F4E16A7E1");
 
-            entity.ToTable("Shipment");
+            entity.ToTable("Shipment", "dbo");
 
             entity.Property(e => e.Id)
                 .HasDefaultValueSql("(newid())")
@@ -571,14 +588,14 @@ public partial class MyDbContext : DbContext
             entity.HasOne(d => d.Order).WithMany(p => p.Shipments)
                 .HasForeignKey(d => d.OrderId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK__Shipment__orderI__74AE54BC");
+                .HasConstraintName("FK__Shipment__orderI__1BC821DD");
         });
 
         modelBuilder.Entity<Solution>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__Solution__3213E83FC9A9C4B7");
+            entity.HasKey(e => e.Id).HasName("PK__Solution__3213E83FEDED9B85");
 
-            entity.ToTable("Solution");
+            entity.ToTable("Solution", "dbo");
 
             entity.Property(e => e.Id)
                 .HasDefaultValueSql("(newid())")
@@ -601,14 +618,14 @@ public partial class MyDbContext : DbContext
             entity.HasOne(d => d.Issue).WithMany(p => p.Solutions)
                 .HasForeignKey(d => d.IssueId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK__Solution__issueI__0A9D95DB");
+                .HasConstraintName("FK__Solution__issueI__1CBC4616");
         });
 
         modelBuilder.Entity<SubCategory>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__SubCateg__3213E83FA2ADCBD7");
+            entity.HasKey(e => e.Id).HasName("PK__SubCateg__3213E83FF273CA78");
 
-            entity.ToTable("SubCategory");
+            entity.ToTable("SubCategory", "dbo");
 
             entity.Property(e => e.Id)
                 .HasDefaultValueSql("(newid())")
@@ -631,14 +648,14 @@ public partial class MyDbContext : DbContext
             entity.HasOne(d => d.Category).WithMany(p => p.SubCategories)
                 .HasForeignKey(d => d.CategoryId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK__SubCatego__categ__4BAC3F29");
+                .HasConstraintName("FK_SubCategory_Category");
         });
 
         modelBuilder.Entity<User>(entity =>
         {
             entity.HasKey(e => e.Id).HasName("PK__User__3213E83FF34271D4");
 
-            entity.ToTable("User");
+            entity.ToTable("User", "dbo");
 
             entity.HasIndex(e => e.Email, "UQ__User__AB6E6164211BC737").IsUnique();
 
@@ -656,6 +673,12 @@ public partial class MyDbContext : DbContext
                 .HasMaxLength(255)
                 .IsUnicode(false)
                 .HasColumnName("email");
+            entity.Property(e => e.FullName)
+                .HasDefaultValue("")
+                .HasColumnName("fullName");
+            entity.Property(e => e.Gender)
+                .HasDefaultValue("")
+                .HasColumnName("gender");
             entity.Property(e => e.IsDelete)
                 .HasDefaultValue(false)
                 .HasColumnName("isDelete");
@@ -686,9 +709,9 @@ public partial class MyDbContext : DbContext
 
         modelBuilder.Entity<Voucher>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__Voucher__3213E83F7951091C");
+            entity.HasKey(e => e.Id).HasName("PK__Voucher__3213E83F2B4BD0F3");
 
-            entity.ToTable("Voucher");
+            entity.ToTable("Voucher", "dbo");
 
             entity.Property(e => e.Id)
                 .HasDefaultValueSql("(newid())")

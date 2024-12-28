@@ -1,8 +1,10 @@
-﻿namespace FTSS_Model.Entities;
+﻿using System;
+using System.Collections.Generic;
 
-public class Otp
+namespace FTSS_Model.Entities;
+
+public partial class Otp
 {
-    
     public Guid Id { get; set; }
 
     public Guid UserId { get; set; }

@@ -11,11 +11,11 @@ public partial class Product
 
     public string? Size { get; set; }
 
-    public string? Description { get; set; }
+    public string Description { get; set; } = null!;
+
+    public decimal Price { get; set; }
 
     public int? Quantity { get; set; }
-
-    public Guid CategoryId { get; set; }
 
     public Guid? Model3Did { get; set; }
 
@@ -27,9 +27,9 @@ public partial class Product
 
     public string? Status { get; set; }
 
-    public virtual ICollection<CartItem> CartItems { get; set; } = new List<CartItem>();
+    public Guid? SubCategoryId { get; set; }
 
-    public virtual Category Category { get; set; } = null!;
+    public virtual ICollection<CartItem> CartItems { get; set; } = new List<CartItem>();
 
     public virtual ICollection<Image> Images { get; set; } = new List<Image>();
 
@@ -40,4 +40,6 @@ public partial class Product
     public virtual ICollection<OrderDetail> OrderDetails { get; set; } = new List<OrderDetail>();
 
     public virtual ICollection<SetupPackageDetail> SetupPackageDetails { get; set; } = new List<SetupPackageDetail>();
+
+    public virtual SubCategory? SubCategory { get; set; }
 }
