@@ -1,4 +1,6 @@
-﻿namespace FTSS_API.Payload.Response.Category
+﻿using FTSS_API.Payload.Response.SubCategory;
+
+namespace FTSS_API.Payload.Response.Category
 {
     public class CategoryResponse
     {
@@ -16,7 +18,8 @@
 
         // Ngày chỉnh sửa gần nhất
         public DateTime? ModifyDate { get; set; }
+        public List<SubCategoryResponse> SubCategories { get; set; } = new List<SubCategoryResponse>();
 
-        
+
     }
 }

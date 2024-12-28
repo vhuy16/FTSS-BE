@@ -11,18 +11,16 @@ namespace FTSS_API.Controller
 {
     [ApiController]
     [Route(ApiEndPointConstant.Category.CategoryEndPoint)]
-    public class CategoryController : ControllerBase
+    public class CategoryController : BaseController<CategoryController>
     {
         private readonly ICategoryService _categoryService;
-        private readonly ILogger<CategoryController> _logger;
 
-        public CategoryController(ILogger<CategoryController> logger, ICategoryService categoryService)
+        public CategoryController(ILogger<CategoryController> logger, ICategoryService categoryService) : base(logger) 
         {
-            _logger = logger;
             _categoryService = categoryService;
         }
 
-        [HttpPost(ApiEndPointConstant.Category.CreateNewCategory)]
+        [HttpPost(ApiEndPointConstant.Category.CreateCategory)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status201Created)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
         [ProducesErrorResponseType(typeof(ProblemDetails))]
