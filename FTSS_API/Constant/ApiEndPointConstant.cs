@@ -29,10 +29,19 @@ public static class ApiEndPointConstant
     public static class Category
     {
         public const string CategoryEndPoint = ApiEndpoint + "/category";
-        public const string CreateNewCategory = CategoryEndPoint;
+        public const string CreateCategory = CategoryEndPoint;
         public const string GetAllCategory = CategoryEndPoint;
         public const string GetCategory = CategoryEndPoint + "/{id}";
         public const string UpdateCategory = CategoryEndPoint + "/{id}";
         public const string DeleteCategory = CategoryEndPoint + "/{id}";
+    }
+    public static class SubCategory
+    {
+        public const string SubCategoryEndPoint = ApiEndpoint + "/subcategory";
+        public const string CreateSubCategory = SubCategoryEndPoint;
+        public const string GetAllSubCategories = SubCategoryEndPoint;
+        public const string GetSubCategory = SubCategoryEndPoint + "/{id}";
+        public const string UpdateSubCategory = SubCategoryEndPoint + "/{id}";
+        public const string DeleteSubCategory = SubCategoryEndPoint + "/{id}";
     }
 }
