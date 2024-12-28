@@ -4,6 +4,7 @@ using FTSS_API.Controller;
 using FTSS_API.Payload;
 using FTSS_API.Payload.Request.Category;
 using FTSS_API.Payload.Response.Category;
+using FTSS_API.Payload.Response.SubCategory;
 using FTSS_API.Service.Interface;
 using FTSS_API.Utils;
 using FTSS_Model.Context;
@@ -47,20 +48,56 @@ namespace FTSS_API.Service.Implement
                 };
             }
 
+            // Đảm bảo rằng gọi đúng overload của SingleOrDefaultAsync
             var categoryExist = await _unitOfWork.GetRepository<FTSS_Model.Entities.Category>().SingleOrDefaultAsync(
-                predicate: c => c.CategoryName.Equals(request.CategoryName));
+                predicate: c => c.CategoryName.Equals(request.CategoryName) &&
+                        c.IsDelete == false);
+
+
 
             if (categoryExist != null)
             {
-                return new ApiResponse
+                // Nếu category tồn tại và bị đánh dấu là đã xóa, cho phép tạo mới category
+                if ((bool)categoryExist.IsDelete)
                 {
-                    status = StatusCodes.Status400BadRequest.ToString(),
-                    message = MessageConstant.CategoryMessage.CategoryExisted,
-                    data = null
-                };
+                    categoryExist.IsDelete = false; // Đánh dấu category không bị xóa nữa
+                    categoryExist.ModifyDate = TimeUtils.GetCurrentSEATime(); // Cập nhật ModifyDate
+
+                    // Cập nhật category đã tồn tại trong DB
+                    _unitOfWork.GetRepository<FTSS_Model.Entities.Category>().UpdateAsync(categoryExist);
+                    int isSuccessful = await _unitOfWork.CommitAsync(); // Commit thay đổi
+
+                    if (isSuccessful <= 0)  // Kiểm tra có thành công không
+                    {
+                        return new ApiResponse
+                        {
+                            status = StatusCodes.Status500InternalServerError.ToString(),
+                            message = "Failed to update existing category.",
+                            data = null
+                        };
+                    }
+
+                    return new ApiResponse
+                    {
+                        status = StatusCodes.Status200OK.ToString(),
+                        message = "Category reactivated successfully.",
+                        data = null
+                    };
+                }
+                else
+                {
+                    // Nếu category đã tồn tại và chưa bị xóa
+                    return new ApiResponse
+                    {
+                        status = StatusCodes.Status400BadRequest.ToString(),
+                        message = "Category already exists.",
+                        data = null
+                    };
+                }
             }
 
-            FTSS_Model.Entities.Category category = new FTSS_Model.Entities.Category
+            // Nếu không tìm thấy category đã tồn tại, tiến hành tạo mới
+            var category = new FTSS_Model.Entities.Category
             {
                 Id = Guid.NewGuid(),
                 CategoryName = request.CategoryName,
@@ -70,10 +107,11 @@ namespace FTSS_API.Service.Implement
                 IsDelete = false,
             };
 
+            // Thêm mới category vào database
             await _unitOfWork.GetRepository<FTSS_Model.Entities.Category>().InsertAsync(category);
-            bool isSuccessful = await _unitOfWork.CommitAsync() > 0;
+            int isSuccessfulCreate = await _unitOfWork.CommitAsync();  // Commit thay đổi
 
-            if (!isSuccessful)
+            if (isSuccessfulCreate <= 0)  // Kiểm tra có thành công không
             {
                 return new ApiResponse
                 {
@@ -108,19 +146,33 @@ namespace FTSS_API.Service.Implement
                 {
                     Id = c.Id,
                     CategoryName = c.CategoryName,
-                    Description= c.Description,
+                    Description = c.Description,
                     CreateDate = c.CreateDate,
                     ModifyDate = c.ModifyDate,
+                    // Dữ liệu SubCategory sẽ được ánh xạ tại đây
+                    SubCategories = c.SubCategories
+                        .Where(sub => sub.IsDelete != true)  // Lọc nếu cần
+                        .Select(sub => new SubCategoryResponse
+                        {
+                            Id = sub.Id,
+                            SubCategoryName = sub.SubCategoryName,
+                            CategoryId = sub.CategoryId,
+                            Description = sub.Description,
+                            CreateDate = sub.CreateDate,
+                            ModifyDate = sub.ModifyDate,
+                        }).ToList()
                 },
                 predicate: p => p.IsDelete.Equals(false) &&
                                 (string.IsNullOrEmpty(searchName) || p.CategoryName.Contains(searchName)),
                 orderBy: q => isAscending.HasValue
                     ? (isAscending.Value ? q.OrderBy(p => p.CategoryName) : q.OrderByDescending(p => p.CategoryName))
                     : q.OrderByDescending(p => p.CreateDate),
-            size: size,
+                size: size,
                 page: page);
+
             int totalItems = categories.Total;
             int totalPages = (int)Math.Ceiling((double)totalItems / size);
+
             if (categories == null || categories.Items.Count == 0)
             {
                 return new ApiResponse
@@ -146,6 +198,7 @@ namespace FTSS_API.Service.Implement
             };
         }
 
+
         public async Task<ApiResponse> GetCategory(Guid id)
         {
             var category = await _unitOfWork.GetRepository<FTSS_Model.Entities.Category>().SingleOrDefaultAsync(
@@ -155,7 +208,18 @@ namespace FTSS_API.Service.Implement
                     CategoryName = c.CategoryName,
                     Description = c.Description,
                     CreateDate = c.CreateDate,
-                    ModifyDate = c.ModifyDate
+                    ModifyDate = c.ModifyDate,
+                    SubCategories = c.SubCategories
+                        .Where(sub => sub.IsDelete != true)  // Lọc nếu cần
+                        .Select(sub => new SubCategoryResponse
+                        {
+                            Id = sub.Id,
+                            SubCategoryName = sub.SubCategoryName,
+                            CategoryId = sub.CategoryId,
+                            Description = sub.Description,
+                            CreateDate = sub.CreateDate,
+                            ModifyDate = sub.ModifyDate,
+                        }).ToList()
                 },
                 predicate: c => c.Id.Equals(id) &&
                                 c.IsDelete.Equals(false));
