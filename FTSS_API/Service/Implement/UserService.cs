@@ -52,8 +52,14 @@ public class UserService : BaseService<UserService>, IUserService
           }
 
           var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
-            predicate: m => m.UserName.Equals(createNewAccountRequest.UserName));
+              predicate: m => (m.UserName.Equals(createNewAccountRequest.UserName) && 
+                               m.Status.Equals(UserStatusEnum.Unavailable.ToString())) || 
+                              (m.Email.Equals(createNewAccountRequest.Email) && 
+                               m.Status.Equals(UserStatusEnum.Unavailable.ToString()))
 
+          );
+
+          
           if (user != null)
           {
             return new ApiResponse
