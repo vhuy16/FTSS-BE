@@ -615,6 +615,9 @@ namespace FTSS_Model.Entities
                         .HasColumnType("datetime")
                         .HasColumnName("modifyDate");
 
+                    b.Property<int?>("Price")
+                        .HasColumnType("int");
+
                     b.Property<string>("ProductName")
                         .IsRequired()
                         .HasMaxLength(255)
