@@ -40,7 +40,7 @@ builder.Services.AddSingleton<IHttpContextAccessor, HttpContextAccessor>();
 builder.Services.AddCors(options =>
 {
     options.AddPolicy(name: CorsConstant.PolicyName,
-        policy => { policy.WithOrigins("http://localhost:5173", "https://www.mrc.vn", "https://nhomchiaseyeuthuong.io.vn/", "https://mrc-web-mu.vercel.app", "https://mrc-project.vercel.app", "https://mrc-web-admin.vercel.app", "http://localhost:5174", "http://localhost:3000").AllowAnyHeader().AllowAnyMethod().AllowCredentials(); });
+        policy => { policy.WithOrigins( "http://localhost:3000").AllowAnyHeader().AllowAnyMethod().AllowCredentials(); });
 });
 
 // Configure Swagger/OpenAPI
@@ -48,6 +48,7 @@ builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new OpenApiInfo { Title = "Your API", Version = "v1" });
 
+    // Cấu hình bảo mật (JWT)
     var securityScheme = new OpenApiSecurityScheme
     {
         Name = "Authorization",
@@ -73,6 +74,12 @@ builder.Services.AddSwaggerGen(c =>
             new string[] { }
         },
     };
+    c.AddSecurityRequirement(securityRequirement);
+
+    // Đọc file XML comments
+    var xmlFile = $"{System.Reflection.Assembly.GetExecutingAssembly().GetName().Name}.xml";
+    var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
+    c.IncludeXmlComments(xmlPath);
     c.AddSecurityRequirement(securityRequirement);
     // c.MapType<OrderStatus>(() => new OpenApiSchema
     // {

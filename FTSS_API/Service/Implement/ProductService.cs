@@ -167,10 +167,7 @@ public class ProductService : BaseService<ProductService>, IProductService
         }
     }
 
-    private async Task<IEnumerable<string>> UploadFilesToDriver(List<IFormFile> imageLink)
-    {
-        throw new NotImplementedException();
-    }
+
 
     public async Task<ApiResponse> GetListProduct(int page, int size, bool? isAscending, string? SubcategoryName,
         string? productName,
@@ -201,6 +198,7 @@ public class ProductService : BaseService<ProductService>, IProductService
                 (string.IsNullOrEmpty(cateName) || p.ProductName.Contains(cateName)) && // Filter theo tên
                 (string.IsNullOrEmpty(SubcategoryName) || p.ProductName.Contains(SubcategoryName)) && // Filter theo tên
                 (string.IsNullOrEmpty(status) || p.Status.Equals(status)), // Filter theo trạng thái
+            
             orderBy: q => isAscending.HasValue
                 ? (isAscending.Value ? q.OrderBy(p => p.Price) : q.OrderByDescending(p => p.Price))
                 : q.OrderByDescending(p => p.CreateDate),
@@ -251,17 +249,17 @@ public class ProductService : BaseService<ProductService>, IProductService
                 Images = s.Images.Select(i => i.LinkImage).ToList(),
                 ProductName = s.ProductName,
                 Quantity = s.Quantity,
-
                 Price = s.Price,
-
                 Status = s.Status
             },
             include: i => i.Include(p => p.SubCategory)
                 .ThenInclude(p => p.Category),
             predicate: p =>
                 (string.IsNullOrEmpty(productName) || p.ProductName.Contains(productName)) &&
-                (string.IsNullOrEmpty(cateName) || p.ProductName.Contains(cateName)) && // Filter theo tên
-                (string.IsNullOrEmpty(SubcategoryName) || p.ProductName.Contains(SubcategoryName)), // Filter theo tên
+                (string.IsNullOrEmpty(cateName) || p.SubCategory.Category.CategoryName.Contains(cateName)) && // Filter theo Category
+                (string.IsNullOrEmpty(SubcategoryName) || p.SubCategory.SubCategoryName.Contains(SubcategoryName)) && // Filter theo SubCategory
+                (p.IsDelete == false) && // Chỉ lấy sản phẩm chưa bị xóa
+                (p.Status.Equals(ProductStatusEnum.Available.GetDescriptionFromEnum())), // Chỉ lấy sản phẩm có trạng thái available
             orderBy: q => isAscending.HasValue
                 ? (isAscending.Value ? q.OrderBy(p => p.Price) : q.OrderByDescending(p => p.Price))
                 : q.OrderByDescending(p => p.CreateDate),
