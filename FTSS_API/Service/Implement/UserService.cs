@@ -25,78 +25,77 @@ public class UserService : BaseService<UserService>, IUserService
         _emailService = emailSender;
     }
 
-           public async Task<ApiResponse> CreateNewAccount(CreateNewAccountRequest createNewAccountRequest)
+        public async Task<ApiResponse> CreateNewAccount(CreateNewAccountRequest createNewAccountRequest)
+{
+    _logger.LogInformation($"Creating new customer account for {createNewAccountRequest.UserName}");
+
+    string emailPattern = @"^[^@\s]+@[^@\s]+\.[^@\s]+$";
+    if (!Regex.IsMatch(createNewAccountRequest.Email, emailPattern))
+    {
+        return new ApiResponse
         {
-          _logger.LogInformation($"Creating new customer account for {createNewAccountRequest.UserName}");
+            status = StatusCodes.Status400BadRequest.ToString(),
+            message = MessageConstant.PatternMessage.EmailIncorrect,
+            data = null
+        };
+    }
 
-          string emailPattern = @"^[^@\s]+@[^@\s]+\.[^@\s]+$";
-          if (!Regex.IsMatch(createNewAccountRequest.Email, emailPattern))
-          {
-            return new ApiResponse
+    string phonePattern = @"^0\d{9}$";
+    if (!Regex.IsMatch(createNewAccountRequest.PhoneNumber, phonePattern))
+    {
+        return new ApiResponse
+        {
+            status = StatusCodes.Status400BadRequest.ToString(),
+            message = MessageConstant.PatternMessage.PhoneIncorrect,
+            data = null
+        };
+    }
+
+    var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
+        predicate: m => m.UserName.Equals(createNewAccountRequest.UserName) || m.Email.Equals(createNewAccountRequest.Email)
+    );
+
+    // Nếu tài khoản đã tồn tại với trạng thái khác "Unavailable", báo lỗi
+    if (user != null && user.Status != UserStatusEnum.Unavailable.GetDescriptionFromEnum())
+    {
+        return new ApiResponse
+        {
+            status = StatusCodes.Status400BadRequest.ToString(),
+            message = MessageConstant.UserMessage.AccountExisted,
+            data = null
+        };
+    }
+
+    // Nếu tài khoản tồn tại và có trạng thái "Unavailable", bỏ qua kiểm tra và tạo tài khoản mới
+    if (user != null && user.Status == UserStatusEnum.Unavailable.GetDescriptionFromEnum())
+    {
+        _logger.LogInformation($"Reactivating account for {createNewAccountRequest.UserName}");
+    }
+
+    User newUser = new User
+    {
+        UserName = createNewAccountRequest.UserName,
+        Password = PasswordUtil.HashPassword(createNewAccountRequest.Password),
+        FullName = createNewAccountRequest.FullName,
+        Email = createNewAccountRequest.Email,
+        CreateDate = TimeUtils.GetCurrentSEATime(),
+        ModifyDate = TimeUtils.GetCurrentSEATime(),
+        Role = RoleEnum.Customer.GetDescriptionFromEnum(),
+        Status = UserStatusEnum.Unavailable.GetDescriptionFromEnum(),
+        Address = createNewAccountRequest.Address,
+        PhoneNumber = createNewAccountRequest.PhoneNumber,
+        Gender = createNewAccountRequest.Gender.GetDescriptionFromEnum()
+    };
+
+    try
+    {
+        await _unitOfWork.GetRepository<User>().InsertAsync(newUser);
+        bool isSuccessfully = await _unitOfWork.CommitAsync() > 0;
+
+        if (isSuccessfully)
+        {
+            var createNewAccountResponse = new CreateNewAccountResponse
             {
-              status = StatusCodes.Status400BadRequest.ToString(),
-              message = MessageConstant.PatternMessage.EmailIncorrect,
-              data = null
-            };
-          }
-
-          string phonePattern = @"^0\d{9}$";
-          if (!Regex.IsMatch(createNewAccountRequest.PhoneNumber, phonePattern))
-          {
-            return new ApiResponse
-            {
-              status = StatusCodes.Status400BadRequest.ToString(),
-              message = MessageConstant.PatternMessage.PhoneIncorrect,
-              data = null
-            };
-          }
-
-          var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
-              predicate: m => (m.UserName.Equals(createNewAccountRequest.UserName) && 
-                               m.Status.Equals(UserStatusEnum.Unavailable.ToString())) || 
-                              (m.Email.Equals(createNewAccountRequest.Email) && 
-                               m.Status.Equals(UserStatusEnum.Unavailable.ToString()))
-
-          );
-
-          
-          if (user != null)
-          {
-            return new ApiResponse
-            {
-              status = StatusCodes.Status400BadRequest.ToString(),
-              message = MessageConstant.UserMessage.AccountExisted,
-              data = null
-            };
-          }
-
-          User newUser = new User
-          {
-
-            UserName = createNewAccountRequest.UserName,
-            Password = PasswordUtil.HashPassword(createNewAccountRequest.Password),
-            FullName = createNewAccountRequest.FullName,
-            Email = createNewAccountRequest.Email,
-            CreateDate = TimeUtils.GetCurrentSEATime(),
-            ModifyDate = TimeUtils.GetCurrentSEATime(),
-            Role = RoleEnum.Customer.GetDescriptionFromEnum(),
-            Status = UserStatusEnum.Unavailable.GetDescriptionFromEnum(),
-            Address = createNewAccountRequest.Address,
-            PhoneNumber = createNewAccountRequest.PhoneNumber,
-            Gender = createNewAccountRequest.Gender.GetDescriptionFromEnum()
-          };
-
-         try
-          {
-           await _unitOfWork.GetRepository<User>().InsertAsync(newUser);
-           
-            bool isSuccessfully = await _unitOfWork.CommitAsync() > 0;
-
-
-            if (isSuccessfully)
-            {
-              var createNewAccountResponse = new CreateNewAccountResponse
-              {
                 Id = newUser.Id,
                 Username = newUser.UserName,
                 Email = newUser.Email,
@@ -104,57 +103,53 @@ public class UserService : BaseService<UserService>, IUserService
                 Gender = EnumUtil.ParseEnum<GenderEnum>(newUser.Gender),
                 PhoneNumber = newUser.PhoneNumber,
                 Address = newUser.Address,
-              };
+            };
 
-                string otp = OtpUltil.GenerateOtp();
-                var otpRecord = new Otp
-                {
-                    Id = new Guid(),
-                    UserId = newUser.Id,
-                    OtpCode = otp,
-                    CreateDate = TimeUtils.GetCurrentSEATime(),
-                    ExpiresAt = TimeUtils.GetCurrentSEATime().AddMinutes(10),
-                    IsValid = true
-                };
+            string otp = OtpUltil.GenerateOtp();
+            var otpRecord = new Otp
+            {
+                Id = Guid.NewGuid(),  // Sử dụng Guid.NewGuid() để tạo một GUID duy nhất
+                UserId = newUser.Id,
+                OtpCode = otp,
+                CreateDate = TimeUtils.GetCurrentSEATime(),
+                ExpiresAt = TimeUtils.GetCurrentSEATime().AddMinutes(10),
+                IsValid = true
+            };
 
-              await _unitOfWork.GetRepository<Otp>().InsertAsync(otpRecord);
-               await _unitOfWork.CommitAsync();
+            await _unitOfWork.GetRepository<Otp>().InsertAsync(otpRecord);
+            await _unitOfWork.CommitAsync();
+            // Send OTP email
+            await _emailService.SendVerificationEmailAsync(newUser.Email, otp);
 
-               // Send OTP email
-                await _emailService.SendVerificationEmailAsync(newUser.Email, otp);
+            // Optionally, handle OTP expiration as discussed
+            ScheduleOtpCancellation(otpRecord.Id, TimeSpan.FromMinutes(10));
 
-                // Optionally, handle OTP expiration as discussed
-                 ScheduleOtpCancellation(otpRecord.Id, TimeSpan.FromMinutes(10));
-
-
-              return new ApiResponse
-              {
+            return new ApiResponse
+            {
                 status = StatusCodes.Status200OK.ToString(),
                 message = "Customer account created successfully",
                 data = createNewAccountResponse
-              };
-           }
-         }
-          catch (Exception ex)
-          {
-            _logger.LogError(ex, $"Error creating customer account for {createNewAccountRequest.UserName}");
-              return new ApiResponse
-             {
-                 status = StatusCodes.Status500InternalServerError.ToString(),
-                 message = "Failed to create customer account due to database error",
-                 data = null
-             };
-          }
-
-
-          return new ApiResponse
-          {
-              status = StatusCodes.Status500InternalServerError.ToString(),
-              message = "Failed to create customer account",
-              data = null
-          };
+            };
         }
-   
+    }
+    catch (Exception ex)
+    {
+        _logger.LogError(ex, $"Error creating customer account for {createNewAccountRequest.UserName}");
+        return new ApiResponse
+        {
+            status = StatusCodes.Status500InternalServerError.ToString(),
+            message = "Failed to create customer account due to database error",
+            data = null
+        };
+    }
+
+    return new ApiResponse
+    {
+        status = StatusCodes.Status500InternalServerError.ToString(),
+        message = "Failed to create customer account",
+        data = null
+    };
+}
 
 
     public async Task<ApiResponse> Login(LoginRequest loginRequest)
