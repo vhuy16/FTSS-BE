@@ -44,6 +44,7 @@ public static class DependencyInjection
     {
         services.AddScoped<IUserService, UserService>();
         services.AddScoped<ICategoryService, CategoryService>();
+        services.AddScoped<ISubCategoryService, SubCategoryService>();
         services.AddScoped<IProductService, ProductService>();
         services.AddScoped<GoogleUtils.GoogleDriveService>();
         // services.AddScoped<IVNPayService, VNPayService>();
