@@ -41,7 +41,7 @@ public static class DependencyInjection
     public static IServiceCollection AddCustomServices(this IServiceCollection services)
     {
         services.AddScoped<IUserService, UserService>();
-        // services.AddScoped<ICategoryService, CategoryService>();
+        services.AddScoped<ICategoryService, CategoryService>();
         services.AddScoped<IProductService, ProductService>();
         services.AddScoped<GoogleUtils.GoogleDriveService>();
         // services.AddScoped<IVNPayService, VNPayService>();
