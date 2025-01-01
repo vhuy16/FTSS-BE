@@ -12,7 +12,7 @@ public static class ApiEndPointConstant
     public static class User
     {
         public const string UserEndPoint = ApiEndpoint + "/user";
-        public const string Register = UserEndPoint + "/registers";
+        public const string Register = UserEndPoint + "/register";
         public const string Login = UserEndPoint + "/login";
         public const string LoginCustomer = UserEndPoint + "/login-customer";
         public const string DeleteUser = UserEndPoint + "/{id}";
@@ -43,5 +43,18 @@ public static class ApiEndPointConstant
         public const string GetSubCategory = SubCategoryEndPoint + "/{id}";
         public const string UpdateSubCategory = SubCategoryEndPoint + "/{id}";
         public const string DeleteSubCategory = SubCategoryEndPoint + "/{id}";
+    }
+    public static class Product
+    {
+        public const string ProductEndpoint = ApiEndpoint + "/product";
+        public const string CreateNewProduct = ProductEndpoint;
+        public const string GetListProducts = ProductEndpoint;
+        public const string GetAllProducts = ProductEndpoint + "/get-all-product";
+        public const string GetProductById = ProductEndpoint + "/{id}";
+        public const string GetListProductsByCategoryId = ProductEndpoint +"/{id}" + "/category";
+        public const string UpdateProduct = ProductEndpoint + "/{id}";
+        public const string EnableProduct = ProductEndpoint + "/enable-product" + "/{id}"  ;
+        public const string DeleteProduct = ProductEndpoint + "/{id}";
+        public const string UploadImg = "upload-img";
     }
 }

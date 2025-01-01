@@ -8,8 +8,11 @@ public partial class User
     public Guid Id { get; set; }
 
     public string UserName { get; set; } = null!;
-  
+
     public string FullName { get; set; } = null!;
+
+    public string Gender { get; set; } = null!;
+
     public string Email { get; set; } = null!;
 
     public string Password { get; set; } = null!;
@@ -19,7 +22,7 @@ public partial class User
     public string? PhoneNumber { get; set; }
 
     public string? Role { get; set; }
-    public string Gender { get; set; } = null!;
+
     public string? Status { get; set; }
 
     public DateTime? CreateDate { get; set; }
@@ -33,4 +36,6 @@ public partial class User
     public virtual ICollection<MaintenanceSchedule> MaintenanceSchedules { get; set; } = new List<MaintenanceSchedule>();
 
     public virtual ICollection<Order> Orders { get; set; } = new List<Order>();
+
+    public virtual ICollection<Otp> Otps { get; set; } = new List<Otp>();
 }

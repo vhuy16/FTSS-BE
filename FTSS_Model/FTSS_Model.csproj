@@ -8,6 +8,7 @@
 
     <ItemGroup>
       <PackageReference Include="AutoMapper" Version="13.0.1" />
+      <PackageReference Include="Google.Apis.Drive.v3" Version="1.68.0.3627" />
       <PackageReference Include="HtmlAgilityPack" Version="1.11.71" />
       <PackageReference Include="HtmlSanitizer" Version="8.1.870" />
       <PackageReference Include="MailKit" Version="4.9.0" />
@@ -23,6 +24,7 @@
         <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       </PackageReference>
       <PackageReference Include="MimeKit" Version="4.9.0" />
+      <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     </ItemGroup>
 
 </Project>

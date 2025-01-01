@@ -20,4 +20,6 @@ public partial class SubCategory
     public bool? IsDelete { get; set; }
 
     public virtual Category Category { get; set; } = null!;
+
+    public virtual ICollection<Product> Products { get; set; } = new List<Product>();
 }

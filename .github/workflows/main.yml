@@ -20,9 +20,9 @@ jobs:
       with:
         dotnet-version: 8.0 # Thay đổi phiên bản .NET nếu cần
 
-    # 3. Build dự án .NET
+    # 3. Build dự án .NET và tạo tài liệu Swagger XML
     - name: Build project
-      run: dotnet publish -c Release -o ./publish
+      run: dotnet publish -c Release -o ./publish /p:DocumentationFile=./publish/FTSS_API.xml
 
     # 4. Triển khai mã nguồn qua FTP
     - name: Deploy via FTP
