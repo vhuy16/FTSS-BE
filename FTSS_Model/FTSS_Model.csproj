@@ -25,6 +25,7 @@
       </PackageReference>
       <PackageReference Include="MimeKit" Version="4.9.0" />
       <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+      <PackageReference Include="Supabase" Version="1.1.1" />
     </ItemGroup>
 
 </Project>

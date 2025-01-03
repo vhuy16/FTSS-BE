@@ -4,6 +4,7 @@ using FTSS_API.Middlewares;
 using FTSS_API.Payload.Request.Email;
 using Microsoft.OpenApi.Any;
 using Microsoft.OpenApi.Models;
+using Supabase;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -25,6 +26,15 @@ builder.Services.AddJwtValidation();
 builder.Services.Configure<EmailSettings>(builder.Configuration.GetSection("EmailSettings"));
 
 builder.Services.AddHttpClientServices();
+builder.Services.AddScoped<Supabase.Client>(_ =>
+    new Supabase.Client(
+        builder.Configuration["Supabase:Url"],
+        builder.Configuration["Supabase:ApiKey"],
+        new SupabaseOptions
+        {
+            AutoRefreshToken = true,
+            AutoConnectRealtime = true,
+        }));
 builder.Services.AddSingleton<IHttpContextAccessor, HttpContextAccessor>();
 
 // builder.Services.AddCors(options =>

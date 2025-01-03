@@ -18,17 +18,20 @@ public class ProductService : BaseService<ProductService>, IProductService
 {
     private readonly HtmlSanitizerUtils _sanitizer;
     private readonly GoogleUtils.GoogleDriveService _driveService;
+    private readonly SupabaseUltils _supabaseImageService;
 
     public ProductService(IUnitOfWork<MyDbContext> unitOfWork, ILogger<ProductService> logger, IMapper mapper,
         IHttpContextAccessor httpContextAccessor, HtmlSanitizerUtils htmlSanitizer,
-        GoogleUtils.GoogleDriveService driveService) : base(unitOfWork, logger, mapper,
+        GoogleUtils.GoogleDriveService driveService, SupabaseUltils supabaseImageService) : base(unitOfWork, logger,
+        mapper,
         httpContextAccessor)
     {
         _sanitizer = htmlSanitizer;
         _driveService = driveService;
+        _supabaseImageService = supabaseImageService;
     }
 
-    public async Task<ApiResponse> CreateProduct(CreateProductRequest createProductRequest)
+    public async Task<ApiResponse> CreateProduct(CreateProductRequest createProductRequest, Supabase.Client client)
     {
         // Check SubCategory ID
         var subCategory = await _unitOfWork.GetRepository<SubCategory>()
@@ -103,17 +106,30 @@ public class ProductService : BaseService<ProductService>, IProductService
         // Upload and associate images
         if (createProductRequest.ImageLink != null && createProductRequest.ImageLink.Any())
         {
-            var imageUrls = _driveService.UploadToGoogleDriveAsync(createProductRequest.ImageLink);
-            foreach (var imageUrl in imageUrls)
+            // Tạo một danh sách chứa IFormFile từ ImageLink
+            var images = createProductRequest.ImageLink;
+
+            try
             {
-                product.Images.Add(new Image
+                // Tải danh sách ảnh lên Supabase và nhận về danh sách URL
+                var imageUrls = await _supabaseImageService.SendImagesAsync(images, client);
+
+                foreach (var imageUrl in imageUrls)
                 {
-                    Id = Guid.NewGuid(),
-                    ProductId = product.Id,
-                    CreateDate = TimeUtils.GetCurrentSEATime(),
-                    ModifyDate = TimeUtils.GetCurrentSEATime(),
-                    LinkImage = imageUrl
-                });
+                    // Thêm từng ảnh vào danh sách sản phẩm
+                    product.Images.Add(new Image
+                    {
+                        Id = Guid.NewGuid(),
+                        ProductId = product.Id,
+                        CreateDate = TimeUtils.GetCurrentSEATime(),
+                        ModifyDate = TimeUtils.GetCurrentSEATime(),
+                        LinkImage = imageUrl
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Đã xảy ra lỗi khi tải ảnh lên Supabase: {ex.Message}");
             }
         }
 
@@ -168,7 +184,6 @@ public class ProductService : BaseService<ProductService>, IProductService
     }
 
 
-
     public async Task<ApiResponse> GetListProduct(int page, int size, bool? isAscending, string? SubcategoryName,
         string? productName,
         string? cateName,
@@ -198,7 +213,6 @@ public class ProductService : BaseService<ProductService>, IProductService
                 (string.IsNullOrEmpty(cateName) || p.ProductName.Contains(cateName)) && // Filter theo tên
                 (string.IsNullOrEmpty(SubcategoryName) || p.ProductName.Contains(SubcategoryName)) && // Filter theo tên
                 (string.IsNullOrEmpty(status) || p.Status.Equals(status)), // Filter theo trạng thái
-            
             orderBy: q => isAscending.HasValue
                 ? (isAscending.Value ? q.OrderBy(p => p.Price) : q.OrderByDescending(p => p.Price))
                 : q.OrderByDescending(p => p.CreateDate),
@@ -256,10 +270,13 @@ public class ProductService : BaseService<ProductService>, IProductService
                 .ThenInclude(p => p.Category),
             predicate: p =>
                 (string.IsNullOrEmpty(productName) || p.ProductName.Contains(productName)) &&
-                (string.IsNullOrEmpty(cateName) || p.SubCategory.Category.CategoryName.Contains(cateName)) && // Filter theo Category
-                (string.IsNullOrEmpty(SubcategoryName) || p.SubCategory.SubCategoryName.Contains(SubcategoryName)) && // Filter theo SubCategory
+                (string.IsNullOrEmpty(cateName) ||
+                 p.SubCategory.Category.CategoryName.Contains(cateName)) && // Filter theo Category
+                (string.IsNullOrEmpty(SubcategoryName) ||
+                 p.SubCategory.SubCategoryName.Contains(SubcategoryName)) && // Filter theo SubCategory
                 (p.IsDelete == false) && // Chỉ lấy sản phẩm chưa bị xóa
-                (p.Status.Equals(ProductStatusEnum.Available.GetDescriptionFromEnum())), // Chỉ lấy sản phẩm có trạng thái available
+                (p.Status.Equals(ProductStatusEnum.Available
+                    .GetDescriptionFromEnum())), // Chỉ lấy sản phẩm có trạng thái available
             orderBy: q => isAscending.HasValue
                 ? (isAscending.Value ? q.OrderBy(p => p.Price) : q.OrderByDescending(p => p.Price))
                 : q.OrderByDescending(p => p.CreateDate),
@@ -304,8 +321,8 @@ public class ProductService : BaseService<ProductService>, IProductService
         {
             return new ApiResponse
             {
-                status = StatusCodes.Status404NotFound.ToString(),
-                message = MessageConstant.CategoryMessage.CategoryNotExist,
+                status = StatusCodes.Status200OK.ToString(),
+                message = "Subcategory không tồn tại",
                 data = null
             };
         }
@@ -360,7 +377,8 @@ public class ProductService : BaseService<ProductService>, IProductService
         };
     }
 
-    public async Task<ApiResponse> UpdateProduct(Guid productId, UpdateProductRequest updateProductRequest)
+    public async Task<ApiResponse> UpdateProduct(Guid productId, UpdateProductRequest updateProductRequest,
+        Supabase.Client client)
     {
         var existingProduct = await _unitOfWork.GetRepository<Product>()
             .SingleOrDefaultAsync(predicate: p => p.Id.Equals(productId));
@@ -460,21 +478,33 @@ public class ProductService : BaseService<ProductService>, IProductService
                 _unitOfWork.GetRepository<Image>().DeleteAsync(img);
             }
 
-            var imageUrls = _driveService.UploadToGoogleDriveAsync(updateProductRequest.ImageLink);
-            foreach (var imageUrl in imageUrls)
+            if (updateProductRequest.ImageLink != null && updateProductRequest.ImageLink.Any())
             {
-                var newImage = new Image
+                var images = updateProductRequest.ImageLink;
+
+                var imageUrls = await _supabaseImageService.SendImagesAsync(images, client);
+
+                foreach (var imageUrl in imageUrls)
                 {
-                    Id = Guid.NewGuid(),
-                    ProductId = existingProduct.Id,
-                    CreateDate = TimeUtils.GetCurrentSEATime(),
-                    ModifyDate = TimeUtils.GetCurrentSEATime(),
-                    LinkImage = imageUrl
-                };
-                existingProduct.Images.Add(newImage);
-                await _unitOfWork.GetRepository<Image>().InsertAsync(newImage);
+                    // Tạo đối tượng Image mới
+                    var newImage = new Image
+                    {
+                        Id = Guid.NewGuid(),
+                        ProductId = existingProduct.Id,
+                        CreateDate = TimeUtils.GetCurrentSEATime(),
+                        ModifyDate = TimeUtils.GetCurrentSEATime(),
+                        LinkImage = imageUrl
+                    };
+
+                    // Thêm vào danh sách ảnh của sản phẩm hiện có
+                    existingProduct.Images.Add(newImage);
+
+                    // Thêm mới vào cơ sở dữ liệu
+                    await _unitOfWork.GetRepository<Image>().InsertAsync(newImage);
+                }
             }
         }
+
 
         // Commit changes
         _unitOfWork.GetRepository<Product>().UpdateAsync(existingProduct);
@@ -482,7 +512,7 @@ public class ProductService : BaseService<ProductService>, IProductService
 
         if (isSuccessful)
         {
-            var category = await _unitOfWork.GetRepository<Category>()
+            var subCategory = await _unitOfWork.GetRepository<SubCategory>()
                 .SingleOrDefaultAsync(predicate: c => c.Id.Equals(existingProduct.SubCategoryId));
             return new ApiResponse
             {
@@ -495,7 +525,7 @@ public class ProductService : BaseService<ProductService>, IProductService
                     Images = existingProduct.Images.Select(i => i.LinkImage).ToList(),
                     ProductName = existingProduct.ProductName,
                     Quantity = existingProduct.Quantity,
-                    CategoryName = category.CategoryName,
+                    SubCategoryName = subCategory.SubCategoryName,
                     Price = existingProduct.Price
                 }
             };
@@ -517,7 +547,8 @@ public class ProductService : BaseService<ProductService>, IProductService
         }
 
         // Find product
-        var existingProduct = await _unitOfWork.GetRepository<Product>().SingleOrDefaultAsync(predicate: p => p.Id.Equals(productId) && p.Status.Equals(ProductStatusEnum.Available.GetDescriptionFromEnum()));
+        var existingProduct = await _unitOfWork.GetRepository<Product>().SingleOrDefaultAsync(predicate: p =>
+            p.Id.Equals(productId) && p.Status.Equals(ProductStatusEnum.Available.GetDescriptionFromEnum()));
         if (existingProduct == null)
         {
             return false;
