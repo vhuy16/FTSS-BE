@@ -24,14 +24,14 @@ public class ProductController : BaseController<ProductController>
     [HttpPost(ApiEndPointConstant.Product.CreateNewProduct)]
     [ProducesResponseType(typeof(GetProductResponse), StatusCodes.Status200OK)]
     [ProducesErrorResponseType(typeof(ProblemDetails))]
-    public async Task<IActionResult> CreateProduct([FromForm] CreateProductRequest createProductRequest)
+    public async Task<IActionResult> CreateProduct([FromForm] CreateProductRequest createProductRequest, [FromServices] Supabase.Client client)
     {
         if (createProductRequest == null)
         {
             return BadRequest("Product request cannot be null.");
         }
 
-        var response = await _productService.CreateProduct(createProductRequest);
+        var response = await _productService.CreateProduct(createProductRequest, client);
 
         if (response.status == StatusCodes.Status201Created.ToString())
         {
@@ -190,14 +190,14 @@ public class ProductController : BaseController<ProductController>
     [HttpPut(ApiEndPointConstant.Product.UpdateProduct)]
     [ProducesResponseType(typeof(bool), StatusCodes.Status200OK)]
     [ProducesErrorResponseType(typeof(ProblemDetails))]
-    public async Task<IActionResult> UpdateProduct([FromRoute] Guid id, [FromForm] UpdateProductRequest updateProductRequest)
+    public async Task<IActionResult> UpdateProduct([FromRoute] Guid id, [FromForm] UpdateProductRequest updateProductRequest, [FromServices] Supabase.Client client)
     {
         if (updateProductRequest == null)
         {
             return BadRequest("Product request cannot be null.");
         }
 
-        var response = await _productService.UpdateProduct(id, updateProductRequest);
+        var response = await _productService.UpdateProduct(id, updateProductRequest, client);
 
         if (response.status == StatusCodes.Status200OK.ToString())
         {

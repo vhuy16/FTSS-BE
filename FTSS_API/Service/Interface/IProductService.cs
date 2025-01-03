@@ -5,7 +5,7 @@ namespace FTSS_API.Service.Implement.Implement;
 
 public interface IProductService
 {
-    Task<ApiResponse> CreateProduct(CreateProductRequest createProductRequest);
+    Task<ApiResponse> CreateProduct(CreateProductRequest createProductRequest, Supabase.Client client);
 
     Task<ApiResponse> GetListProduct(int page, int size, bool? isAscending, string? SubcategoryName,
         string? productName,
@@ -22,7 +22,7 @@ public interface IProductService
         decimal? maxPrice);
     Task<ApiResponse> GetListProductByCategoryId(Guid CateID, int page, int size);
 //Task<bool> UpdateProduct(Guid ProID, UpdateProductRequest updateProductRequest);
-    Task<ApiResponse> UpdateProduct(Guid productId, UpdateProductRequest updateProductRequest);
+    Task<ApiResponse> UpdateProduct(Guid productId, UpdateProductRequest updateProductRequest, Supabase.Client client);
     Task<bool> DeleteProduct(Guid productId);
     Task<ApiResponse> GetProductById(Guid productId);
 
