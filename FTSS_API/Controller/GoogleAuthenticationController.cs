@@ -7,7 +7,6 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.Google;
 using Microsoft.AspNetCore.Mvc;
 
-
 namespace FTSS_API.Controller;
 [ApiController]
 [Route(ApiEndPointConstant.GoogleAuthentication.GoogleAuthenticationEndpoint)]
@@ -22,16 +21,19 @@ public class GoogleAuthenticationController : BaseController<GoogleAuthenticatio
         _googleAuthenticationService = googleAuthenticationService;
     }
 
-
+    /// <summary>
+    /// Thực hiện đăng nhập bằng tài khoản Google.
+    /// </summary>
     [HttpGet(ApiEndPointConstant.GoogleAuthentication.GoogleLogin)]
     public IActionResult Login()
     {
-        // var props = new AuthenticationProperties { RedirectUri = $"https://mrc.vn/auth/callback" };
         var props = new AuthenticationProperties { RedirectUri = $"api/v1/google-auth/signin-google/" };
         return Challenge(props, GoogleDefaults.AuthenticationScheme);
     }
 
-
+    /// <summary>
+    /// Xác thực và tạo tài khoản thông qua Google.
+    /// </summary>
     [HttpGet(ApiEndPointConstant.GoogleAuthentication.GoogleSignIn)]
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
     public async Task<IActionResult> SignInAndSignUpByGoogle()
@@ -57,10 +59,12 @@ public class GoogleAuthenticationController : BaseController<GoogleAuthenticatio
         });
     }
 
+    /// <summary>
+    /// Đăng xuất tài khoản Google.
+    /// </summary>
     [HttpPost("logout")]
     public async Task<IActionResult> Logout()
     {
-     
         await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
 
         return Ok(new ApiResponse()
@@ -70,4 +74,4 @@ public class GoogleAuthenticationController : BaseController<GoogleAuthenticatio
             data = null
         });
     }
-} 
+}
