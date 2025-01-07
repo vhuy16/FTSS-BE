@@ -425,10 +425,17 @@ public class UserService : BaseService<UserService>, IUserService
         return token;
     }
 
-    public Task<bool> GetAccountByEmail(string email)
+    public async Task<bool> GetAccountByEmail(string email)
     {
-        throw new NotImplementedException();
+        if (email == null) throw new BadHttpRequestException("Email cannot be null");
+
+        var account = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
+            predicate: p => p.Email.Equals(email)
+        );
+        return account != null;
     }
+
+    #region verifyOtp
 
     public async Task<bool> VerifyOtp(Guid UserId, string otpCheck)
     {
@@ -452,10 +459,79 @@ public class UserService : BaseService<UserService>, IUserService
 
         return false;
     }
+    
 
-    public Task<ApiResponse> CreateNewUserAccountByGoogle(GoogleAuthResponse response)
+    #endregion
+    public async Task<ApiResponse> CreateNewUserAccountByGoogle(GoogleAuthResponse request)
     {
-        throw new NotImplementedException();
+        // Check if the user already exists
+        var existingUser = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
+            predicate: u => u.Email.Equals(request.Email) &&
+                            u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()));
+
+        if (existingUser != null)
+        {
+            return new ApiResponse
+            {
+                status = StatusCodes.Status400BadRequest.ToString(),
+                message = "User account already exists.",
+                data = new CreateNewAccountResponse
+                {
+                    Email = existingUser.Email,
+                    FullName = existingUser.FullName
+                }
+            };
+        }
+
+        var newUser = new User()
+        {
+            Id = Guid.NewGuid(),
+            Email = request.Email,
+            FullName = request.FullName,
+            UserName = request.Email.Split("@")[0],
+            Role = RoleEnum.Customer.GetDescriptionFromEnum(),
+            Status = UserStatusEnum.Available.GetDescriptionFromEnum(),
+            Password = PasswordUtil.HashPassword("12345678"),
+            CreateDate = TimeUtils.GetCurrentSEATime(),
+            ModifyDate = TimeUtils.GetCurrentSEATime()
+        };
+
+        await _unitOfWork.GetRepository<User>().InsertAsync(newUser);
+
+        // // Cart newCart = new Cart()
+        // // {
+        // //     Id = Guid.NewGuid(),
+        // //     UserId = newUser.Id,
+        // //     Status = StatusEnum.Available.GetDescriptionFromEnum(),
+        // //     InsDate = TimeUtils.GetCurrentSEATime(),
+        // //     UpDate = TimeUtils.GetCurrentSEATime()
+        // // };
+        //
+        // await _unitOfWork.GetRepository<Cart>().InsertAsync(newCart);
+
+        bool isSuccessful = await _unitOfWork.CommitAsync() > 0;
+        if (isSuccessful)
+        {
+            return new ApiResponse
+            {
+                status = StatusCodes.Status201Created.ToString(),
+                message = "User account created successfully.",
+                data = new CreateNewAccountResponse
+                {
+                    Email = newUser.Email,
+                    FullName = newUser.FullName
+                }
+            };
+        }
+        else
+        {
+            return new ApiResponse
+            {
+                status = StatusCodes.Status500InternalServerError.ToString(),
+                message = "Failed to create user account.",
+                data = null
+            };
+        }
     }
 
     public async Task<ApiResponse> ForgotPassword(ForgotPasswordRequest request)
@@ -618,7 +694,9 @@ public class UserService : BaseService<UserService>, IUserService
         };
 
     }
-    
+
+
+    #region ScheduleOtpCancellation
 
     private async Task ScheduleOtpCancellation(Guid otpId, TimeSpan delay)
     {
@@ -634,4 +712,6 @@ public class UserService : BaseService<UserService>, IUserService
             await _unitOfWork.CommitAsync();
         }
     }
+
+    #endregion
 }

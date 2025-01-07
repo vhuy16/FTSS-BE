@@ -51,7 +51,7 @@ public static class DependencyInjection
         // services.AddScoped<IVNPayService, VNPayService>();
         // services.AddScoped<IOrderService, OrderService>();
      
-        // services.AddScoped<IGoogleAuthenticationService, GoogleAuthenticationService>();
+        services.AddScoped<IGoogleAuthenService, GoogleAuthenService>();
         // services.AddScoped<ICartService, CartService>();
         services.AddScoped<IEmailSender, EmailSender>();
         // services.AddScoped<IPayService, PayService>();
@@ -98,15 +98,16 @@ public static class DependencyInjection
                     options.Cookie.HttpOnly = true;
                     options.Cookie.SecurePolicy = CookieSecurePolicy.Always; // Chỉ gửi cookie qua HTTPS
                     options.Cookie.SameSite = SameSiteMode.None; // Cho phép gửi cookie cross-origin
-                });
-        // .AddGoogle(options =>
-        // {
-        // options.ClientId = CreateClientId(configuration);
-        // options.ClientSecret = CreateClientSecret(configuration);
-        // options.SaveTokens = true;
-        // options.SignInScheme = CookieAuthenticationDefaults.AuthenticationScheme;
-        //
-        // });
+                })
+            
+        .AddGoogle(options =>
+        {
+        options.ClientId = CreateClientId(configuration);
+        options.ClientSecret = CreateClientSecret(configuration);
+        options.SaveTokens = true;
+        options.SignInScheme = CookieAuthenticationDefaults.AuthenticationScheme;
+        
+        });
         services.Configure<CookiePolicyOptions>(options =>
         {
             options.MinimumSameSitePolicy = SameSiteMode.None; // Cho phép cross-origin

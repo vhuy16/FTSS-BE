@@ -10,7 +10,6 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using File = System.IO.File;
 
 namespace FTSS_API.Utils
 {
@@ -25,82 +24,79 @@ namespace FTSS_API.Utils
                 _configuration = configuration;
             }
 
-            public List<string> UploadToGoogleDriveAsync(List<IFormFile> filesToUpload)
+            public async Task<string> UploadToGoogleDriveAsync(IFormFile fileToUpload)
             {
+                // Danh sách định dạng tệp được phép
                 var allowedExtensions = new List<string> { ".docx", ".pdf", ".mov", ".xlsx", ".mp4", ".jpg", ".txt" };
-                var fileUrls = new List<string>();
-
-                var folderId = _configuration["Authentication:GoogleDrive:FolderId"];
-                if (string.IsNullOrEmpty(folderId))
-                {
-                    throw new InvalidOperationException("FolderId is missing in the configuration.");
-                }
-
-                GoogleCredential credential;
-                var credentialsSection = _configuration.GetSection("Authentication:GoogleDrive:CredentialsPath");
-                var credentialsJson = credentialsSection.GetChildren().ToDictionary(x => x.Key, x => x.Value);
-                var credentialsJsonString = Newtonsoft.Json.JsonConvert.SerializeObject(credentialsJson);
 
                 try
                 {
+                    // Kiểm tra file đầu vào
+                    if (fileToUpload == null)
+                        throw new ArgumentNullException(nameof(fileToUpload), "Tệp tải lên không được null.");
+
+                    var fileExtension = Path.GetExtension(fileToUpload.FileName).ToLower();
+                    if (!allowedExtensions.Contains(fileExtension))
+                        throw new InvalidOperationException(
+                            $"Định dạng tệp '{fileExtension}' không được phép. Chỉ các định dạng sau được hỗ trợ: {string.Join(", ", allowedExtensions)}");
+
+                    // Đọc cấu hình thư mục Google Drive
+                    var folderId = _configuration["Authentication:GoogleDrive:FolderId"];
+                    if (string.IsNullOrEmpty(folderId))
+                        throw new InvalidOperationException("FolderId không được cấu hình.");
+
+                    // Đọc thông tin xác thực Google Drive
+                    var credentialsSection = _configuration.GetSection("Authentication:GoogleDrive:CredentialsPath");
+                    var credentialsJson = credentialsSection.GetChildren().ToDictionary(x => x.Key, x => x.Value);
+                    var credentialsJsonString = Newtonsoft.Json.JsonConvert.SerializeObject(credentialsJson);
+
+                    GoogleCredential credential;
                     using (var stream = new MemoryStream(Encoding.UTF8.GetBytes(credentialsJsonString)))
                     {
                         credential = GoogleCredential.FromStream(stream)
                             .CreateScoped(new[] { DriveService.ScopeConstants.DriveFile });
                     }
 
+                    // Khởi tạo dịch vụ Google Drive
                     var service = new DriveService(new BaseClientService.Initializer()
                     {
                         HttpClientInitializer = credential,
                         ApplicationName = "Google Drive Upload Console App"
                     });
 
-                    foreach (var fileToUpload in filesToUpload)
+                    if (service == null)
+                        throw new InvalidOperationException("Dịch vụ Google Drive chưa được khởi tạo.");
+
+                    // Tạo metadata cho file
+                    var fileMetaData = new Google.Apis.Drive.v3.Data.File()
                     {
-                        var fileExtension = Path.GetExtension(fileToUpload.FileName).ToLower();
+                        Name = fileToUpload.FileName,
+                        Parents = new List<string> { folderId }
+                    };
 
-                        if (!allowedExtensions.Contains(fileExtension))
-                        {
-                            throw new InvalidOperationException($"Invalid file format: {fileToUpload.FileName}");
-                        }
+                    // Tải file lên Google Drive
+                    using (var stream = fileToUpload.OpenReadStream())
+                    {
+                        if (stream == null)
+                            throw new InvalidOperationException("Luồng dữ liệu của tệp tải lên không hợp lệ.");
 
-                        var fileMetaData = new Google.Apis.Drive.v3.Data.File()
-                        {
-                            Name = fileToUpload.FileName,
-                            Parents = new List<string> { folderId }
-                        };
-
-                        FilesResource.CreateMediaUpload request;
-                        using (var stream = fileToUpload.OpenReadStream())
-                        {
-                            request = service.Files.Create(fileMetaData, stream, fileToUpload.ContentType);
-                            request.Fields = "id";
-                            request.UploadAsync().Wait();
-                        }
-
-                        if (request.ResponseBody == null)
-                        {
-                            throw new InvalidOperationException($"File upload failed: {fileToUpload.FileName}");
-                        }
+                        var request = service.Files.Create(fileMetaData, stream, fileToUpload.ContentType);
+                        request.Fields = "id";
+                        await request.UploadAsync();
 
                         var file = request.ResponseBody;
-                        var permission = new Permission()
-                        {
-                            Type = "anyone",
-                            Role = "reader"
-                        };
-                        service.Permissions.Create(permission, file.Id).Execute();
+                        if (file == null)
+                            throw new InvalidOperationException($"Không thể tải lên tệp: {fileToUpload.FileName}.");
 
-                        string fileUrl = $"https://drive.google.com/uc?id={file.Id}/view?usp=sharing";
-                        fileUrls.Add(fileUrl);
+                        // Trả về URL của file trên Google Drive
+                        string fileUrl = $"https://drive.google.com/file/d/{file.Id}/view?usp=sharing";
+                        return fileUrl;
                     }
-
-                    return fileUrls;
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"Error uploading files to Google Drive: {ex.Message}");
-                    return null;
+                    Console.WriteLine($"Error uploading file to Google Drive: {ex.Message}");
+                    throw;
                 }
             }
         }
