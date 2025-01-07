@@ -57,4 +57,11 @@ public static class ApiEndPointConstant
         public const string DeleteProduct = ProductEndpoint + "/{id}";
         public const string UploadImg = "upload-img";
     }
+    public static class GoogleAuthentication
+    {
+        public const string GoogleAuthenticationEndpoint = ApiEndpoint + "/google-auth";
+        public const string GoogleLogin = GoogleAuthenticationEndpoint + "/login";
+        public const string GoogleSignIn = GoogleAuthenticationEndpoint + "/signin-google/";
+
+    }
 }
