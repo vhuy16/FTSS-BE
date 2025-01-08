@@ -64,4 +64,14 @@ public static class ApiEndPointConstant
         public const string GoogleSignIn = GoogleAuthenticationEndpoint + "/signin-google/";
 
     }
+    public static class Cart
+    {
+        public const string CartEndPoint = ApiEndpoint + "/cart";
+        public const string AddCartItem = CartEndPoint + "/item";
+        public const string DeleteCartItem = CartEndPoint + "item" + "/{itemId}";
+        public const string GetAllCart = CartEndPoint;
+        public const string ClearCart = CartEndPoint + "/clear-all";
+        public const string GetCartSummary = CartEndPoint + "/get-summary";
+        public const string UpdateCartItem = CartEndPoint + "item" + "/{itemId}";
+    }
 }

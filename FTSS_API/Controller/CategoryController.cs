@@ -62,14 +62,14 @@ namespace FTSS_API.Controller
             return StatusCode(int.Parse(response.status), response);
         }
 
-        //[HttpDelete(ApiEndPointConstant.Category.DeleteCategory)]
-        //[ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
-        //[ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
-        //[ProducesErrorResponseType(typeof(ProblemDetails))]
-        //public async Task<IActionResult> DeleteCategory([FromRoute] Guid id)
-        //{
-        //    var response = await _categoryService.DeleteCategory(id);
-        //    return StatusCode(int.Parse(response.status), response);
-        //}
+        [HttpDelete(ApiEndPointConstant.Category.DeleteCategory)]
+        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
+        [ProducesErrorResponseType(typeof(ProblemDetails))]
+        public async Task<IActionResult> DeleteCategory([FromRoute] Guid id)
+        {
+            var response = await _categoryService.DeleteCategory(id);
+            return StatusCode(int.Parse(response.status), response);
+        }
     }
 }

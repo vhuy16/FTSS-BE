@@ -118,8 +118,48 @@ namespace FTSS_API.Service.Implement
             };
         }
 
+        public async Task<ApiResponse> DeleteSubCategory(Guid id)
+        {
+            // Tìm kiếm SubCategory với Id được cung cấp
+            var subCategory = await _unitOfWork.GetRepository<SubCategory>()
+                .SingleOrDefaultAsync(predicate: c => c.Id == id && c.IsDelete == false);
 
+            // Nếu không tìm thấy SubCategory, trả về lỗi
+            if (subCategory == null)
+            {
+                return new ApiResponse
+                {
+                    status = StatusCodes.Status404NotFound.ToString(),
+                    message = "SubCategory không tồn tại hoặc đã bị xóa.",
+                    data = null
+                };
+            }
 
+            // Cập nhật thuộc tính IsDelete thành true
+            subCategory.IsDelete = true;
+
+            // Lưu thay đổi vào cơ sở dữ liệu
+            _unitOfWork.GetRepository<SubCategory>().UpdateAsync(subCategory);
+            bool isSuccessful = await _unitOfWork.CommitAsync() > 0;
+
+            if (!isSuccessful)
+            {
+                return new ApiResponse
+                {
+                    status = StatusCodes.Status500InternalServerError.ToString(),
+                    message = "Không thể xóa SubCategory.",
+                    data = null
+                };
+            }
+
+            // Trả về phản hồi thành công
+            return new ApiResponse
+            {
+                status = StatusCodes.Status200OK.ToString(),
+                message = "SubCategory đã được xóa thành công.",
+                data = null
+            };
+        }
 
         public async Task<ApiResponse> GetAllSubCategories(int page, int size, string searchName, bool? isAscending)
         {
