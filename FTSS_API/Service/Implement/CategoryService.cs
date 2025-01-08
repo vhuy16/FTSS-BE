@@ -11,7 +11,6 @@ using FTSS_Model.Context;
 using FTSS_Model.Entities;
 using FTSS_Model.Paginate;
 using FTSS_Repository.Interface;
-using static FTSS_API.Constant.ApiEndPointConstant;
 
 namespace FTSS_API.Service.Implement
 {
@@ -49,7 +48,7 @@ namespace FTSS_API.Service.Implement
             }
 
             // Đảm bảo rằng gọi đúng overload của SingleOrDefaultAsync
-            var categoryExist = await _unitOfWork.GetRepository<FTSS_Model.Entities.Category>().SingleOrDefaultAsync(
+            var categoryExist = await _unitOfWork.GetRepository<Category>().SingleOrDefaultAsync(
                 predicate: c => c.CategoryName.Equals(request.CategoryName) &&
                         c.IsDelete == false);
 
@@ -64,7 +63,7 @@ namespace FTSS_API.Service.Implement
                     categoryExist.ModifyDate = TimeUtils.GetCurrentSEATime(); // Cập nhật ModifyDate
 
                     // Cập nhật category đã tồn tại trong DB
-                    _unitOfWork.GetRepository<FTSS_Model.Entities.Category>().UpdateAsync(categoryExist);
+                    _unitOfWork.GetRepository<Category>().UpdateAsync(categoryExist);
                     int isSuccessful = await _unitOfWork.CommitAsync(); // Commit thay đổi
 
                     if (isSuccessful <= 0)  // Kiểm tra có thành công không
@@ -97,7 +96,7 @@ namespace FTSS_API.Service.Implement
             }
 
             // Nếu không tìm thấy category đã tồn tại, tiến hành tạo mới
-            var category = new FTSS_Model.Entities.Category
+            var category = new Category
             {
                 Id = Guid.NewGuid(),
                 CategoryName = request.CategoryName,
@@ -108,7 +107,7 @@ namespace FTSS_API.Service.Implement
             };
 
             // Thêm mới category vào database
-            await _unitOfWork.GetRepository<FTSS_Model.Entities.Category>().InsertAsync(category);
+            await _unitOfWork.GetRepository<Category>().InsertAsync(category);
             int isSuccessfulCreate = await _unitOfWork.CommitAsync();  // Commit thay đổi
 
             if (isSuccessfulCreate <= 0)  // Kiểm tra có thành công không
@@ -141,7 +140,7 @@ namespace FTSS_API.Service.Implement
 
         public async Task<ApiResponse> GetAllCategory(int page, int size, string searchName, bool? isAscending)
         {
-            var categories = await _unitOfWork.GetRepository<FTSS_Model.Entities.Category>().GetPagingListAsync(
+            var categories = await _unitOfWork.GetRepository<Category>().GetPagingListAsync(
                 selector: c => new CategoryResponse
                 {
                     Id = c.Id,
@@ -179,13 +178,13 @@ namespace FTSS_API.Service.Implement
                 {
                     status = StatusCodes.Status200OK.ToString(),
                     message = "Category retrieved successfully.",
-                    data = new Paginate<FTSS_Model.Entities.Category>()
+                    data = new Paginate<Category>()
                     {
                         Page = page,
                         Size = size,
                         Total = totalItems,
                         TotalPages = totalPages,
-                        Items = new List<FTSS_Model.Entities.Category>()
+                        Items = new List<Category>()
                     }
                 };
             }
@@ -201,7 +200,7 @@ namespace FTSS_API.Service.Implement
 
         public async Task<ApiResponse> GetCategory(Guid id)
         {
-            var category = await _unitOfWork.GetRepository<FTSS_Model.Entities.Category>().SingleOrDefaultAsync(
+            var category = await _unitOfWork.GetRepository<Category>().SingleOrDefaultAsync(
                 selector: c => new CategoryResponse
                 {
                     Id = c.Id,
@@ -244,7 +243,7 @@ namespace FTSS_API.Service.Implement
 
         public async Task<ApiResponse> UpdateCategory(Guid id, CategoryRequest request)
         {
-            var category = await _unitOfWork.GetRepository<FTSS_Model.Entities.Category>().SingleOrDefaultAsync(
+            var category = await _unitOfWork.GetRepository<Category>().SingleOrDefaultAsync(
                 predicate: c => c.Id.Equals(id) &&
                                 c.IsDelete.Equals(false));
 
@@ -259,7 +258,7 @@ namespace FTSS_API.Service.Implement
             }
 
             // Check if CategoryName already exists in the database
-            var existingCategory = await _unitOfWork.GetRepository<FTSS_Model.Entities.Category>().SingleOrDefaultAsync(
+            var existingCategory = await _unitOfWork.GetRepository<Category>().SingleOrDefaultAsync(
                 predicate: c => c.CategoryName.Equals(request.CategoryName) &&
                                 !c.Id.Equals(id) &&
                                 c.IsDelete.Equals(false));
@@ -281,7 +280,7 @@ namespace FTSS_API.Service.Implement
             category.Description = string.IsNullOrEmpty(request.Description)
                 ? category.Description
                 : request.Description;
-            _unitOfWork.GetRepository<FTSS_Model.Entities.Category>().UpdateAsync(category);
+            _unitOfWork.GetRepository<Category>().UpdateAsync(category);
 
             bool isSuccessful = await _unitOfWork.CommitAsync() > 0;
 
@@ -303,26 +302,47 @@ namespace FTSS_API.Service.Implement
             };
         }
 
-        //public async Task<ApiResponse> DeleteCategory(Guid id)
-        //{
-        //    var category = await _unitOfWork.Repository<Category>().GetByIdAsync(id);
-        //    if (category == null)
-        //    {
-        //        return new ApiResponse
-        //        {
-        //            status = "404",
-        //            message = "Category not found"
-        //        };
-        //    }
+        public async Task<ApiResponse> DeleteCategory(Guid id)
+        {
+            // Kiểm tra sự tồn tại của Category
+            var category = await _unitOfWork.GetRepository<Category>()
+                .SingleOrDefaultAsync(predicate: c => c.Id == id && c.IsDelete == false);
 
-        //    _unitOfWork.Repository<Category>().Delete(category);
-        //    await _unitOfWork.CommitAsync();
+            // Nếu không tìm thấy Category
+            if (category == null)
+            {
+                return new ApiResponse
+                {
+                    status = StatusCodes.Status404NotFound.ToString(),
+                    message = "Category không tồn tại hoặc đã bị xóa.",
+                    data = null
+                };
+            }
 
-        //    return new ApiResponse
-        //    {
-        //        status = "200",
-        //        message = "Category deleted successfully"
-        //    };
-        //}
+            // Cập nhật IsDelete thành true
+            category.IsDelete = true;
+            _unitOfWork.GetRepository<Category>().UpdateAsync(category);
+
+            // Lưu thay đổi
+            bool isSuccessful = await _unitOfWork.CommitAsync() > 0;
+
+            // Trả về kết quả
+            if (!isSuccessful)
+            {
+                return new ApiResponse
+                {
+                    status = StatusCodes.Status500InternalServerError.ToString(),
+                    message = "Không thể xóa Category.",
+                    data = null
+                };
+            }
+
+            return new ApiResponse
+            {
+                status = StatusCodes.Status200OK.ToString(),
+                message = "Category đã được xóa thành công.",
+                data = null
+            };
+        }
     }
 }

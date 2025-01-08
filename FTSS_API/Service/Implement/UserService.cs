@@ -94,7 +94,20 @@ public class UserService : BaseService<UserService>, IUserService
 
         if (isSuccessfully)
         {
-            var createNewAccountResponse = new CreateNewAccountResponse
+                // Tạo cart cho user mới tạo
+                Cart newCart = new Cart
+                {
+                    Id = Guid.NewGuid(),
+                    UserId = newUser.Id,
+                    CreateDate = TimeUtils.GetCurrentSEATime(),
+                    ModifyDate = TimeUtils.GetCurrentSEATime(),
+                    Status = CartEnum.Available.GetDescriptionFromEnum(),
+                    IsDelete = false
+                };
+
+                await _unitOfWork.GetRepository<Cart>().InsertAsync(newCart);
+                await _unitOfWork.CommitAsync();
+                var createNewAccountResponse = new CreateNewAccountResponse
             {
                 Id = newUser.Id,
                 Username = newUser.UserName,

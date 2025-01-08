@@ -1,6 +1,7 @@
 ﻿using FTSS_API.Constant;
 using FTSS_API.Payload;
 using FTSS_API.Payload.Request.SubCategory;
+using FTSS_API.Service.Implement;
 using FTSS_API.Service.Interface;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -55,6 +56,15 @@ namespace FTSS_API.Controller
         public async Task<IActionResult> UpdateSubCategory([FromRoute] Guid id, [FromBody] SubCategoryRequest updateSubCategoryRequest)
         {
             var response = await _subCategoryService.UpdateSubCategory(id, updateSubCategoryRequest);
+            return StatusCode(int.Parse(response.status), response);
+        }
+        [HttpDelete(ApiEndPointConstant.SubCategory.DeleteSubCategory)]
+        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
+        [ProducesErrorResponseType(typeof(ProblemDetails))]
+        public async Task<IActionResult> DeleteSubCategory([FromRoute] Guid id)
+        {
+            var response = await _subCategoryService.DeleteSubCategory(id);
             return StatusCode(int.Parse(response.status), response);
         }
     }
