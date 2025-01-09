@@ -52,7 +52,7 @@ public static class DependencyInjection
         // services.AddScoped<IOrderService, OrderService>();
      
         services.AddScoped<IGoogleAuthenService, GoogleAuthenService>();
-        // services.AddScoped<ICartService, CartService>();
+        services.AddScoped<ICartService, CartService>();
         services.AddScoped<IEmailSender, EmailSender>();
         // services.AddScoped<IPayService, PayService>();
         //

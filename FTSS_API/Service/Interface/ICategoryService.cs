@@ -15,6 +15,6 @@
         Task<ApiResponse> GetAllCategory(int page, int size, string searchName, bool? isAscending);
         Task<ApiResponse> GetCategory(Guid id);
         Task<ApiResponse> UpdateCategory(Guid id, CategoryRequest request);
-        //Task<ApiResponse> DeleteCategory(Guid id);
+        Task<ApiResponse> DeleteCategory(Guid id);
     }
 }
