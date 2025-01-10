@@ -51,7 +51,7 @@ public static class ApiEndPointConstant
         public const string GetListProducts = ProductEndpoint;
         public const string GetAllProducts = ProductEndpoint + "/get-all-product";
         public const string GetProductById = ProductEndpoint + "/{id}";
-        public const string GetListProductsByCategoryId = ProductEndpoint +"/{id}" + "/category";
+        public const string GetListProductsBySubCategoryId = ProductEndpoint +"/{id}" + "/subcategory";
         public const string UpdateProduct = ProductEndpoint + "/{id}";
         public const string EnableProduct = ProductEndpoint + "/enable-product" + "/{id}"  ;
         public const string DeleteProduct = ProductEndpoint + "/{id}";
@@ -64,6 +64,17 @@ public static class ApiEndPointConstant
         public const string GoogleSignIn = GoogleAuthenticationEndpoint + "/signin-google/";
 
     }
+    public static class Order
+    {
+        public const string OrderEndpoint = ApiEndpoint + "/order";
+        public const string CreateNewOrder = OrderEndpoint;
+        public const string GetListOrder = OrderEndpoint;
+        public const string GetALLOrder = OrderEndpoint + "/get-all-order";
+        public const string GetOrderById = OrderEndpoint + "/{id}";
+        public const string UpdateOrder = OrderEndpoint + "/{id}";
+        public const string CancelOrder = OrderEndpoint + "/cancel-order" + "/{id}";
+    }
+
     public static class Cart
     {
         public const string CartEndPoint = ApiEndpoint + "/cart";

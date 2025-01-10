@@ -361,6 +361,9 @@ public partial class MyDbContext : DbContext
             entity.Property(e => e.Id)
                 .HasDefaultValueSql("(newid())")
                 .HasColumnName("id");
+            entity.Property(e => e.Address)
+                .HasMaxLength(50)
+                .HasColumnName("address");
             entity.Property(e => e.CreateDate)
                 .HasColumnType("datetime")
                 .HasColumnName("createDate");
@@ -370,6 +373,9 @@ public partial class MyDbContext : DbContext
             entity.Property(e => e.ModifyDate)
                 .HasColumnType("datetime")
                 .HasColumnName("modifyDate");
+            entity.Property(e => e.Shipcost)
+                .HasColumnType("decimal(10, 2)")
+                .HasColumnName("shipcost");
             entity.Property(e => e.Status)
                 .HasMaxLength(50)
                 .IsUnicode(false)
@@ -382,7 +388,6 @@ public partial class MyDbContext : DbContext
 
             entity.HasOne(d => d.User).WithMany(p => p.Orders)
                 .HasForeignKey(d => d.UserId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK__Order__userId__6383C8BA");
 
             entity.HasOne(d => d.Voucher).WithMany(p => p.Orders)
@@ -656,8 +661,6 @@ public partial class MyDbContext : DbContext
             entity.HasKey(e => e.Id).HasName("PK__User__3213E83FF34271D4");
 
             entity.ToTable("User", "dbo");
-
-            entity.HasIndex(e => e.Email, "UQ__User__AB6E6164211BC737").IsUnique();
 
             entity.Property(e => e.Id)
                 .HasDefaultValueSql("(newid())")
