@@ -7,7 +7,7 @@ public partial class Order
 {
     public Guid Id { get; set; }
 
-    public Guid UserId { get; set; }
+    public Guid? UserId { get; set; }
 
     public decimal TotalPrice { get; set; }
 
@@ -21,13 +21,17 @@ public partial class Order
 
     public Guid? VoucherId { get; set; }
 
+    public decimal? Shipcost { get; set; }
+
+    public string? Address { get; set; }
+
     public virtual ICollection<OrderDetail> OrderDetails { get; set; } = new List<OrderDetail>();
 
     public virtual ICollection<Payment> Payments { get; set; } = new List<Payment>();
 
     public virtual ICollection<Shipment> Shipments { get; set; } = new List<Shipment>();
 
-    public virtual User User { get; set; } = null!;
+    public virtual User? User { get; set; }
 
     public virtual Voucher? Voucher { get; set; }
 }
