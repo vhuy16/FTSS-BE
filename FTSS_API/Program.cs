@@ -5,22 +5,20 @@ using FTSS_API.Payload.Request.Email;
 using Microsoft.OpenApi.Any;
 using Microsoft.OpenApi.Models;
 using Supabase;
-using Microsoft.AspNetCore.Http;
-using System.Security.Claims; // Add this for claim handling
-using Microsoft.Extensions.Logging; // Add this for logging
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddControllers();
+   
 
 // Add Swagger/OpenAPI services
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddLazyResolution();
-
 // Add other custom services and configurations
 builder.Services.AddAuthentication();
+// builder.Services.AddInfrastructure();
 builder.Services.AddDatabase();
 builder.Services.AddUnitOfWork();
 builder.Services.AddCustomServices();
@@ -38,27 +36,33 @@ builder.Services.AddScoped<Supabase.Client>(_ =>
             AutoConnectRealtime = true,
         }));
 builder.Services.AddSingleton<IHttpContextAccessor, HttpContextAccessor>();
-builder.Services.AddLogging(logging =>
-{
-    logging.AddConsole(); // Or configure other log sinks
-    logging.SetMinimumLevel(LogLevel.Information);
-});
 
-
-// Configure CORS - Corrected and simplified
+// builder.Services.AddCors(options =>
+// {
+//     options.AddPolicy("AllowAll",
+//         policyBuilder =>
+//         {
+//             policyBuilder.AllowAnyOrigin()
+//                          .AllowAnyMethod()
+//                          .AllowAnyHeader();
+//         });
+// });
+// builder.Services.AddCors(options =>
+// {
+//     options.AddPolicy(name: CorsConstant.PolicyName,
+//         policy => { policy.WithOrigins( "http://localhost:3000", "localhost:44346").AllowAnyHeader().AllowAnyMethod().AllowCredentials(); });
+// });
 builder.Services.AddCors(options =>
 {
-   options.AddPolicy(name: CorsConstant.PolicyName,
-    policy =>
-    {
-        // Replace with your actual front-end URL(s) or * if you allow any origin
-      policy.WithOrigins("http://localhost:3000", "https://localhost:44346")
-        .AllowAnyHeader()
-        .WithMethods("GET", "POST", "PUT", "DELETE", "PATCH") //Explicitly list the required methods
-         .AllowCredentials(); //Remove if credentials are not needed
-       });
+    options.AddPolicy(name: CorsConstant.PolicyName,
+        policy =>
+        {
+            policy.WithOrigins("http://localhost:3000", "https://localhost:44346")
+                .AllowAnyHeader()
+                .AllowAnyMethod()
+                .AllowCredentials();
+        });
 });
-
 // Configure Swagger/OpenAPI
 builder.Services.AddSwaggerGen(c =>
 {
@@ -97,6 +101,13 @@ builder.Services.AddSwaggerGen(c =>
     var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
     c.IncludeXmlComments(xmlPath);
     c.AddSecurityRequirement(securityRequirement);
+    // c.MapType<OrderStatus>(() => new OpenApiSchema
+    // {
+    //     Type = "string",
+    //     Enum = Enum.GetNames(typeof(OrderStatus))
+    //            .Select(name => new OpenApiString(name) as IOpenApiAny)
+    //            .ToList()
+    // });
 });
 
 // Add AutoMapper
@@ -108,7 +119,7 @@ var app = builder.Build();
 // Configure the HTTP request pipeline
 if (app.Environment.IsDevelopment())
 {
-    app.UseSwagger();
+
     app.UseSwaggerUI();
 }
 else
@@ -120,33 +131,13 @@ else
     });
 }
 
-// Middleware order is crucial
-app.UseRouting();
-app.UseHttpsRedirection(); // Corrected middleware order
-app.UseCors(CorsConstant.PolicyName); // Apply CORS before auth
+app.UseMiddleware<ExceptionHandlingMiddleware>();
+app.UseSwagger();
+app.UseCors(CorsConstant.PolicyName);
 app.UseAuthentication();
+app.UseHttpsRedirection();
 app.UseAuthorization();
-
-app.UseMiddleware<ExceptionHandlingMiddleware>(); // Add exception handling middleware before mapping controllers.
 app.MapControllers();
 
 // Run the application
 app.Run();
-
-
-// Middleware example
-public class RequestLoggerMiddleware
-{
-    private readonly RequestDelegate _next;
-    private readonly ILogger<RequestLoggerMiddleware> _logger;
-    public RequestLoggerMiddleware(RequestDelegate next, ILogger<RequestLoggerMiddleware> logger)
-    {
-        _next = next;
-        _logger = logger;
-    }
-    public async Task InvokeAsync(HttpContext context)
-    {
-       _logger.LogInformation($"Request: {context.Request.Method} {context.Request.Path}");
-        await _next(context);
-    }
-}
