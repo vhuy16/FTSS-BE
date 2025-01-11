@@ -46,12 +46,11 @@ namespace FTSS_API.Service.Implement
                 };
             }
 
-            var categoryExists = await _unitOfWork.GetRepository<Category>()
-                .SingleOrDefaultAsync(predicate: c => c.Id == request.CategoryId &&
-                        c.IsDelete == false);
+            // Kiểm tra tồn tại của Category
+            var category = await _unitOfWork.GetRepository<Category>()
+                .SingleOrDefaultAsync(predicate: c => c.Id == request.CategoryId && c.IsDelete == false);
 
-
-            if (categoryExists == null)
+            if (category == null)
             {
                 return new ApiResponse
                 {
@@ -63,7 +62,7 @@ namespace FTSS_API.Service.Implement
 
             // Kiểm tra trùng SubCategoryName
             var existingSubCategory = await _unitOfWork.GetRepository<SubCategory>().SingleOrDefaultAsync(
-                predicate: s => s.SubCategoryName.Equals(request.SubCategoryName)&&s.IsDelete==false);
+                predicate: s => s.SubCategoryName.Equals(request.SubCategoryName) && s.IsDelete == false);
 
             if (existingSubCategory != null)
             {
@@ -99,7 +98,6 @@ namespace FTSS_API.Service.Implement
                 };
             }
 
-            // Trả về response với SubCategoryResponse
             var response = new SubCategoryResponse
             {
                 Id = subCategory.Id,
@@ -107,7 +105,8 @@ namespace FTSS_API.Service.Implement
                 Description = subCategory.Description,
                 CategoryId = subCategory.CategoryId,
                 CreateDate = subCategory.CreateDate,
-                ModifyDate = subCategory.ModifyDate
+                ModifyDate = subCategory.ModifyDate,
+                CategoryName = category.CategoryName 
             };
 
             return new ApiResponse
@@ -117,6 +116,7 @@ namespace FTSS_API.Service.Implement
                 data = response
             };
         }
+
 
         public async Task<ApiResponse> DeleteSubCategory(Guid id)
         {
@@ -163,23 +163,24 @@ namespace FTSS_API.Service.Implement
 
         public async Task<ApiResponse> GetAllSubCategories(int page, int size, string searchName, bool? isAscending)
         {
-            var subCategories = await _unitOfWork.GetRepository<FTSS_Model.Entities.SubCategory>().GetPagingListAsync(
-        selector: s => new SubCategoryResponse
-        {
-            Id = s.Id,
-            SubCategoryName = s.SubCategoryName,
-            Description = s.Description,
-            CategoryId = s.CategoryId,
-            CreateDate = s.CreateDate,
-            ModifyDate = s.ModifyDate
-        },
-        predicate: s => s.IsDelete == false &&
-                        (string.IsNullOrEmpty(searchName) || s.SubCategoryName.Contains(searchName)),
-        orderBy: q => isAscending.HasValue
-            ? (isAscending.Value ? q.OrderBy(s => s.SubCategoryName) : q.OrderByDescending(s => s.SubCategoryName))
-            : q.OrderByDescending(s => s.CreateDate),
-        size: size,
-        page: page);
+            var subCategories = await _unitOfWork.GetRepository<SubCategory>().GetPagingListAsync(
+                selector: s => new SubCategoryResponse
+                {
+                    Id = s.Id,
+                    SubCategoryName = s.SubCategoryName,
+                    Description = s.Description,
+                    CategoryId = s.CategoryId,
+                    CreateDate = s.CreateDate,
+                    ModifyDate = s.ModifyDate,
+                    CategoryName = s.Category.CategoryName // Bao gồm CategoryName từ liên kết với Category
+                },
+                predicate: s => s.IsDelete == false &&
+                                (string.IsNullOrEmpty(searchName) || s.SubCategoryName.Contains(searchName)),
+                orderBy: q => isAscending.HasValue
+                    ? (isAscending.Value ? q.OrderBy(s => s.SubCategoryName) : q.OrderByDescending(s => s.SubCategoryName))
+                    : q.OrderByDescending(s => s.CreateDate),
+                size: size,
+                page: page);
 
             // Tính toán số lượng tổng cộng và số trang
             int totalItems = subCategories.Total;
@@ -219,6 +220,7 @@ namespace FTSS_API.Service.Implement
             };
         }
 
+
         public async Task<ApiResponse> GetSubCategory(Guid id)
         {
             // Kiểm tra ID không được rỗng
@@ -241,6 +243,7 @@ namespace FTSS_API.Service.Implement
                         SubCategoryName = s.SubCategoryName,
                         Description = s.Description,
                         CategoryId = s.CategoryId,
+                        CategoryName = s.Category.CategoryName, // Bao gồm CategoryName
                         CreateDate = s.CreateDate,
                         ModifyDate = s.ModifyDate
                     },
@@ -263,9 +266,19 @@ namespace FTSS_API.Service.Implement
             {
                 status = StatusCodes.Status200OK.ToString(),
                 message = "SubCategory được lấy thành công.",
-                data = subCategory
+                data = new SubCategoryResponse
+                {
+                    Id = subCategory.Id,
+                    SubCategoryName = subCategory.SubCategoryName,
+                    Description = subCategory.Description,
+                    CategoryId = subCategory.CategoryId,
+                    CategoryName = subCategory.CategoryName,
+                    CreateDate = subCategory.CreateDate,
+                    ModifyDate = subCategory.ModifyDate
+                }
             };
         }
+
 
         public async Task<ApiResponse> UpdateSubCategory(Guid id, SubCategoryRequest request)
         {
@@ -307,7 +320,7 @@ namespace FTSS_API.Service.Implement
 
             // Kiểm tra trùng SubCategoryName
             var duplicateSubCategory = await _unitOfWork.GetRepository<SubCategory>()
-                .SingleOrDefaultAsync(predicate: s => s.SubCategoryName == request.SubCategoryName && s.Id != id&& s.IsDelete == false);
+                .SingleOrDefaultAsync(predicate: s => s.SubCategoryName == request.SubCategoryName && s.Id != id && s.IsDelete == false);
 
             if (duplicateSubCategory != null)
             {
@@ -322,6 +335,7 @@ namespace FTSS_API.Service.Implement
             // Cập nhật thông tin SubCategory
             existingSubCategory.SubCategoryName = request.SubCategoryName;
             existingSubCategory.Description = request.Description;
+            existingSubCategory.CategoryId = request.CategoryId;
             existingSubCategory.ModifyDate = TimeUtils.GetCurrentSEATime();
 
             _unitOfWork.GetRepository<SubCategory>().UpdateAsync(existingSubCategory);
@@ -337,6 +351,12 @@ namespace FTSS_API.Service.Implement
                 };
             }
 
+            // Lấy CategoryName từ bảng Category
+            var category = await _unitOfWork.GetRepository<Category>()
+                .SingleOrDefaultAsync(predicate: c => c.Id == existingSubCategory.CategoryId && c.IsDelete == false);
+
+            string categoryName = category?.CategoryName ?? "Unknown";
+
             // Trả về response
             var response = new SubCategoryResponse
             {
@@ -344,8 +364,9 @@ namespace FTSS_API.Service.Implement
                 SubCategoryName = existingSubCategory.SubCategoryName,
                 Description = existingSubCategory.Description,
                 CategoryId = existingSubCategory.CategoryId,
+                CategoryName = categoryName, 
                 CreateDate = existingSubCategory.CreateDate,
-                ModifyDate = existingSubCategory.ModifyDate
+                ModifyDate = existingSubCategory.ModifyDate,
             };
 
             return new ApiResponse
