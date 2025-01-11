@@ -20,7 +20,8 @@ public interface IProductService
 
         decimal? minPrice,
         decimal? maxPrice);
-    Task<ApiResponse> GetListProductByCategoryId(Guid CateID, int page, int size);
+
+    Task<ApiResponse> GetListProductBySubCategoryId(Guid subCateId, int page, int size);
 //Task<bool> UpdateProduct(Guid ProID, UpdateProductRequest updateProductRequest);
     Task<ApiResponse> UpdateProduct(Guid productId, UpdateProductRequest updateProductRequest, Supabase.Client client);
     Task<bool> DeleteProduct(Guid productId);

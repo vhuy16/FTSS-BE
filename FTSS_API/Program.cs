@@ -47,12 +47,22 @@ builder.Services.AddSingleton<IHttpContextAccessor, HttpContextAccessor>();
 //                          .AllowAnyHeader();
 //         });
 // });
+// builder.Services.AddCors(options =>
+// {
+//     options.AddPolicy(name: CorsConstant.PolicyName,
+//         policy => { policy.WithOrigins( "http://localhost:3000", "localhost:44346").AllowAnyHeader().AllowAnyMethod().AllowCredentials(); });
+// });
 builder.Services.AddCors(options =>
 {
     options.AddPolicy(name: CorsConstant.PolicyName,
-        policy => { policy.WithOrigins( "http://localhost:3000", "localhost:44346").AllowAnyHeader().AllowAnyMethod().AllowCredentials(); });
+        policy =>
+        {
+            policy.WithOrigins("http://localhost:3000", "https://localhost:44346")
+                .AllowAnyHeader()
+                .AllowAnyMethod()
+                .AllowCredentials();
+        });
 });
-
 // Configure Swagger/OpenAPI
 builder.Services.AddSwaggerGen(c =>
 {

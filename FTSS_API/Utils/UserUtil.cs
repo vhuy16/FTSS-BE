@@ -15,7 +15,7 @@ namespace FTSS_API.Utils;
             var nameIdentifierClaim = httpContext.User.FindFirst(ClaimTypes.NameIdentifier);
             if (nameIdentifierClaim == null)
             {
-                return null;
+              return null;
             }
 
             if (!Guid.TryParse(nameIdentifierClaim.Value,out Guid accountId))
