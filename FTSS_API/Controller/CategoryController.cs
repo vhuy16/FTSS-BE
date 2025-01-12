@@ -27,9 +27,9 @@ namespace FTSS_API.Controller
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status201Created)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
         [ProducesErrorResponseType(typeof(ProblemDetails))]
-        public async Task<IActionResult> CreateCategory([FromBody] CategoryRequest createNewCategoryRequest)
+        public async Task<IActionResult> CreateCategory([FromForm] CategoryRequest createNewCategoryRequest, [FromServices] Supabase.Client client)
         {
-            var response = await _categoryService.CreateCategory(createNewCategoryRequest);
+            var response = await _categoryService.CreateCategory(createNewCategoryRequest, client);
             return StatusCode(int.Parse(response.status), response);
         }
 
@@ -68,9 +68,9 @@ namespace FTSS_API.Controller
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
         [ProducesErrorResponseType(typeof(ProblemDetails))]
-        public async Task<IActionResult> UpdateCategory([FromRoute] Guid id, [FromBody] CategoryRequest updateCategoryRequest)
+        public async Task<IActionResult> UpdateCategory([FromRoute] Guid id, [FromForm] CategoryRequest updateCategoryRequest, [FromServices] Supabase.Client client)
         {
-            var response = await _categoryService.UpdateCategory(id, updateCategoryRequest);
+            var response = await _categoryService.UpdateCategory(id, updateCategoryRequest, client);
             return StatusCode(int.Parse(response.status), response);
         }
 

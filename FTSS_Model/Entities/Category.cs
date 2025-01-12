@@ -17,5 +17,7 @@ public partial class Category
 
     public bool? IsDelete { get; set; }
 
+    public string LinkImage { get; set; } = null!;
+
     public virtual ICollection<SubCategory> SubCategories { get; set; } = new List<SubCategory>();
 }
