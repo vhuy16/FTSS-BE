@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Authentication.Google;
 using Microsoft.AspNetCore.Mvc;
 
 namespace FTSS_API.Controller;
+
 [ApiController]
 [Route(ApiEndPointConstant.GoogleAuthentication.GoogleAuthenticationEndpoint)]
 public class GoogleAuthenticationController : BaseController<GoogleAuthenticationController>
@@ -15,7 +16,8 @@ public class GoogleAuthenticationController : BaseController<GoogleAuthenticatio
     private readonly IUserService _userService;
     private readonly IGoogleAuthenService _googleAuthenticationService;
 
-    public GoogleAuthenticationController(ILogger<GoogleAuthenticationController> logger, IUserService userService, IGoogleAuthenService googleAuthenticationService) : base(logger)
+    public GoogleAuthenticationController(ILogger<GoogleAuthenticationController> logger, IUserService userService,
+        IGoogleAuthenService googleAuthenticationService) : base(logger)
     {
         _userService = userService;
         _googleAuthenticationService = googleAuthenticationService;
@@ -40,23 +42,37 @@ public class GoogleAuthenticationController : BaseController<GoogleAuthenticatio
     {
         var googleAuthResponse = await _googleAuthenticationService.AuthenticateGoogleUser(HttpContext);
         var checkAccount = await _userService.GetAccountByEmail(googleAuthResponse.Email);
+
         if (!checkAccount)
         {
             var response = await _userService.CreateNewUserAccountByGoogle(googleAuthResponse);
             if (response == null)
             {
-                _logger.LogError($"Create new user account failed with account");
+                _logger.LogError("Create new user account failed with account");
                 return Problem(MessageConstant.UserMessage.CreateUserAdminFail);
             }
         }
+
         var token = await _userService.CreateTokenByEmail(googleAuthResponse.Email);
-        googleAuthResponse.Token = token;
-        return Ok(new ApiResponse()
-        {
-            status = StatusCodes.Status200OK.ToString(),
-            message = "Login successful",
-            data = googleAuthResponse
-        });
+
+        // Tạo nội dung HTML response để gửi về trình duyệt
+        string htmlResponse = $@"
+                    <html>
+                    <body>
+                    <script type='text/javascript'>
+                    // Gửi token về cửa sổ cha
+                    window.opener.postMessage({{
+                        accessToken: '{token}',
+                        
+                    }}, '*');
+                    window.close(); // Đóng popup
+                    </script>
+                    <p>Đang xử lý đăng nhập, vui lòng chờ...</p>
+                    </body>
+                    </html>";
+
+        // Trả về nội dung HTML
+        return Content(htmlResponse, "text/html");
     }
 
     /// <summary>
