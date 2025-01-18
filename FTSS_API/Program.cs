@@ -57,7 +57,7 @@ builder.Services.AddCors(options =>
     options.AddPolicy(name: CorsConstant.PolicyName,
         policy =>
         {
-            policy.WithOrigins("http://localhost:3000", "https://localhost:44346")
+            policy.WithOrigins("http://localhost:3000", "https://localhost:44346", "https://ftss-fe.vercel.app")
                 .AllowAnyHeader()
                 .AllowAnyMethod()
                 .AllowCredentials();
