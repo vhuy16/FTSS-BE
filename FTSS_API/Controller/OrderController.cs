@@ -56,19 +56,21 @@ public class OrderController : BaseController<OrderController>
 
         return Ok(response);
     }
-
+    /// <summary>
+    /// API lấy danh sách đơn hàng cho user.
+    /// </summary>
     [HttpGet(ApiEndPointConstant.Order.GetALLOrder)]
     [ProducesResponseType(typeof(IPaginate<ApiResponse>), StatusCodes.Status200OK)]
     [ProducesErrorResponseType(typeof(ProblemDetails))]
-    public async Task<IActionResult> GetALLOrder([FromQuery] int? page,
+    public async Task<IActionResult> GetALLOrder([FromRoute] Guid userid,
+        [FromQuery] int? page,
         [FromQuery] int? size,
         [FromQuery] string? status,
-        [FromQuery] bool? isAscending = null,
-        [FromQuery] string userName = null)
+        [FromQuery] bool? isAscending = null)
     {
         int pageNumber = page ?? 1;
         int pageSize = size ?? 10;
-        var response = await _orderService.GetAllOrder(pageNumber, pageSize, status, isAscending, userName);
+        var response = await _orderService.GetAllOrder(userid, pageNumber, pageSize, status, isAscending);
         if (response == null || response.data == null)
         {
             return Problem(detail: MessageConstant.OrderMessage.OrderIsEmpty,

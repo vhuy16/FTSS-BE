@@ -18,4 +18,6 @@ public partial class Payment
     public string? PaymentStatus { get; set; }
 
     public virtual Order Order { get; set; } = null!;
+
+    public virtual ICollection<Transaction> Transactions { get; set; } = new List<Transaction>();
 }
