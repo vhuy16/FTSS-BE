@@ -728,9 +728,6 @@ public partial class MyDbContext : DbContext
             entity.Property(e => e.ModifyDate)
                 .HasColumnType("datetime")
                 .HasColumnName("modifyDate");
-            entity.Property(e => e.Price)
-                .HasColumnType("decimal(10, 2)")
-                .HasColumnName("price");
             entity.Property(e => e.Status)
                 .HasMaxLength(50)
                 .IsUnicode(false)

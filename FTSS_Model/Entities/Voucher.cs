@@ -9,7 +9,7 @@ public partial class Voucher
 
     public string VoucherCode { get; set; } = null!;
 
-    public decimal? Price { get; set; }
+    public decimal Discount { get; set; }
 
     public DateTime? CreateDate { get; set; }
 
@@ -18,6 +18,14 @@ public partial class Voucher
     public bool? IsDelete { get; set; }
 
     public string? Status { get; set; }
+
+    public int? Quantity { get; set; }
+
+    public decimal? MinimumOrderValue { get; set; }
+
+    public DateTime? ExpiryDate { get; set; }
+
+    public string? DiscountType { get; set; }
 
     public virtual ICollection<Order> Orders { get; set; } = new List<Order>();
 }
