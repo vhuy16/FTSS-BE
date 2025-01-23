@@ -85,4 +85,13 @@ public static class ApiEndPointConstant
         public const string GetCartSummary = CartEndPoint + "/get-summary";
         public const string UpdateCartItem = CartEndPoint + "item" + "/{itemId}";
     }
+    public static class Voucher
+    {
+        public const string VoucherEndPoint = ApiEndpoint + "/voucher";
+        public const string AddVoucher = VoucherEndPoint;
+        public const string GetListVoucher = VoucherEndPoint;
+        public const string GetAllVoucher = VoucherEndPoint + "/get-all-voucher";
+        public const string UpdateVoucher = VoucherEndPoint + "{id}";
+        public const string DeleteVoucher = VoucherEndPoint + "{id}";
+    }
 }
