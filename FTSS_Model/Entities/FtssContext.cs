@@ -758,6 +758,9 @@ public partial class FtssContext : DbContext
             entity.Property(e => e.CreateDate)
                 .HasColumnType("datetime")
                 .HasColumnName("createDate");
+            entity.Property(e => e.Description)
+                .HasMaxLength(255)
+                .HasDefaultValue("No description");
             entity.Property(e => e.Discount)
                 .HasColumnType("decimal(10, 2)")
                 .HasColumnName("discount");
@@ -771,9 +774,9 @@ public partial class FtssContext : DbContext
             entity.Property(e => e.IsDelete)
                 .HasDefaultValue(false)
                 .HasColumnName("isDelete");
-            entity.Property(e => e.MinimumOrderValue)
+            entity.Property(e => e.MaximumOrderValue)
                 .HasColumnType("decimal(18, 0)")
-                .HasColumnName("minimumOrderValue");
+                .HasColumnName("maximumOrderValue");
             entity.Property(e => e.ModifyDate)
                 .HasColumnType("datetime")
                 .HasColumnName("modifyDate");

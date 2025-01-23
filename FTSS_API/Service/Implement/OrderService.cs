@@ -366,7 +366,7 @@ public class OrderService : BaseService<OrderService>, IOrderService
         
              if (createOrderRequest.VoucherId != null && voucher != null)
             {
-                 if (totalprice < voucher.MinimumOrderValue)
+                 if (totalprice < voucher.MaximumOrderValue)
                 {
                      return new ApiResponse
                     {
