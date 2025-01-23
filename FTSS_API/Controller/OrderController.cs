@@ -65,7 +65,7 @@ public class OrderController : BaseController<OrderController>
     [HttpGet(ApiEndPointConstant.Order.GetALLOrder)]
     [ProducesResponseType(typeof(IPaginate<ApiResponse>), StatusCodes.Status200OK)]
     [ProducesErrorResponseType(typeof(ProblemDetails))]
-    public async Task<IActionResult> GetALLOrder([FromRoute] Guid userid,
+    public async Task<IActionResult> GetALLOrder(
         [FromQuery] int? page,
         [FromQuery] int? size,
         [FromQuery] string? status,
@@ -73,7 +73,7 @@ public class OrderController : BaseController<OrderController>
     {
         int pageNumber = page ?? 1;
         int pageSize = size ?? 10;
-        var response = await _orderService.GetAllOrder(userid, pageNumber, pageSize, status, isAscending);
+        var response = await _orderService.GetAllOrder(pageNumber, pageSize, status, isAscending);
         if (response == null || response.data == null)
         {
             return Problem(detail: MessageConstant.OrderMessage.OrderIsEmpty,

@@ -603,13 +603,20 @@ public class OrderService : BaseService<OrderService>, IOrderService
     }
 
 
-    public async Task<ApiResponse> GetAllOrder(Guid userid, int page, int size, string status, bool? isAscending)
+    public async Task<ApiResponse> GetAllOrder(int page, int size, string status, bool? isAscending)
     {
         try
         {
-            // Truy vấn với Include
+            Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
+            var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
+                predicate: u => u.Id.Equals(userId) && u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()));
+
+            if (user == null)
+            {
+                throw new BadHttpRequestException("You need to log in.");
+            }
             var query = _unitOfWork.Context.Set<Order>()
-                .Where(o => o.UserId == userid && (string.IsNullOrEmpty(status) || o.Status.Equals(status)))
+                .Where(o => o.UserId == userId && (string.IsNullOrEmpty(status) || o.Status.Equals(status)))
                 .Include(o => o.User)
                 .Include(o => o.Voucher)
                 .Include(o => o.OrderDetails)
