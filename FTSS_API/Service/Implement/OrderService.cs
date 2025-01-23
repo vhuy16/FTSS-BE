@@ -235,7 +235,7 @@ public class OrderService : BaseService<OrderService>, IOrderService
         {
             throw new BadHttpRequestException("User ID cannot be null.");
         }
-        
+
         // Validate if the CartItem list is empty
         if (createOrderRequest.CartItem == null || !createOrderRequest.CartItem.Any())
         {
@@ -246,6 +246,7 @@ public class OrderService : BaseService<OrderService>, IOrderService
                 data = null
             };
         }
+
         
         try
         {
@@ -269,6 +270,7 @@ public class OrderService : BaseService<OrderService>, IOrderService
                     && p.Status.Equals(CartEnum.Available.GetDescriptionFromEnum()));
         
             if (cartItems == null || !cartItems.Any())
+
             {
                 return new ApiResponse()
                 {
@@ -277,6 +279,7 @@ public class OrderService : BaseService<OrderService>, IOrderService
                     data = null
                 };
             }
+
         
         
             decimal totalprice = 0;
@@ -285,6 +288,7 @@ public class OrderService : BaseService<OrderService>, IOrderService
             var productsDict = products.ToDictionary(x => x.Id, x => x);
         
            
+
             Order order = new Order
             {
                 Id = Guid.NewGuid(),
@@ -294,6 +298,7 @@ public class OrderService : BaseService<OrderService>, IOrderService
                 Status = OrderStatus.PENDING_PAYMENT.GetDescriptionFromEnum(),
                 Address = createOrderRequest.Address,
                 Shipcost = createOrderRequest.ShipCost,
+
               //  OrderDetails = orderDetails // remove this to add later
             };
         
@@ -394,6 +399,7 @@ public class OrderService : BaseService<OrderService>, IOrderService
             // insert orderDetails
             await _unitOfWork.GetRepository<OrderDetail>().InsertRangeAsync(orderDetails);
         
+
             bool isSuccessOrder = await _unitOfWork.CommitAsync() > 0;
             if (!isSuccessOrder)
             {
@@ -404,15 +410,17 @@ public class OrderService : BaseService<OrderService>, IOrderService
                     data = null
                 };
             }
-        
+
             // Delete CartItems with status "buyed"
             foreach (var cartItem in cartItems)
             {
                 _unitOfWork.GetRepository<CartItem>().DeleteAsync(cartItem);
             }
+
         
             await _unitOfWork.CommitAsync(); // Commit after deletion
         
+
             // Prepare response
             var orderDetailsResponse = new List<CreateOrderResponse.OrderDetailCreateResponse>();
             foreach (var od in order.OrderDetails)
@@ -429,6 +437,7 @@ public class OrderService : BaseService<OrderService>, IOrderService
                     });
                 }
             }
+
         
             order = await _unitOfWork.GetRepository<Order>()
                 .SingleOrDefaultAsync(predicate: p => p.Id.Equals(order.Id),
@@ -436,18 +445,17 @@ public class OrderService : BaseService<OrderService>, IOrderService
         
             // Check if order or user is still null
         
+
             if (order == null || order.User == null)
             {
                 throw new Exception("Order or User information is missing.");
             }
-        
+
             if (string.IsNullOrEmpty(order.User.UserName) || string.IsNullOrEmpty(order.User.Email))
             {
                 throw new Exception("User name or email is missing.");
             }
-        
-        
-        
+
             CreateOrderResponse createOrderResponse = new CreateOrderResponse
             {
                 Id = order.Id,
@@ -462,7 +470,7 @@ public class OrderService : BaseService<OrderService>, IOrderService
                     PhoneNumber = order.User.PhoneNumber
                 }
             };
-        
+
             return new ApiResponse()
             {
                 status = StatusCodes.Status200OK.ToString(),
@@ -481,16 +489,18 @@ public class OrderService : BaseService<OrderService>, IOrderService
                     {
                         throw new BadHttpRequestException("The order was deleted by another user.");
                     }
+
         
                     throw new BadHttpRequestException(
                         "The order was updated by another user. Please refresh and try again.");
+
                 }
                 else if (entry.Entity is OrderDetail)
                 {
                     throw new BadHttpRequestException("Concurrency conflict occurred for OrderDetail.");
                 }
             }
-        
+
             throw;
         }
         catch (BadHttpRequestException)
@@ -503,20 +513,255 @@ public class OrderService : BaseService<OrderService>, IOrderService
         }
     }
 
-    public Task<ApiResponse> GetListOrder(int page, int size, bool? isAscending)
+    public async Task<ApiResponse> GetListOrder(int page, int size, bool? isAscending)
     {
-        throw new NotImplementedException();
+        try
+        {
+            // Truy vấn với Include
+            var query = _unitOfWork.Context.Set<Order>()
+                .Include(o => o.User)
+                .Include(o => o.Voucher)
+                .Include(o => o.OrderDetails)
+                    .ThenInclude(od => od.Product)
+                        .ThenInclude(p => p.Images) // Bao gồm ảnh sản phẩm
+                .AsQueryable();
+
+            // Sắp xếp nếu cần
+            if (isAscending.HasValue)
+            {
+                query = isAscending.Value
+                    ? query.OrderBy(o => o.CreateDate) // Sắp xếp tăng dần theo CreateDate
+                    : query.OrderByDescending(o => o.CreateDate); // Sắp xếp giảm dần theo CreateDate
+            }
+
+            // Phân trang
+            var totalItems = await query.CountAsync();
+            var orders = await query
+                .Skip((page - 1) * size)
+                .Take(size)
+                .ToListAsync();
+
+            if (!orders.Any())
+            {
+                return new ApiResponse
+                {
+                    status = StatusCodes.Status404NotFound.ToString(),
+                    message = "No orders found.",
+                    data = null
+                };
+            }
+
+            // Chuyển đổi dữ liệu sang response
+            var orderResponses = orders.Select(order => new GetOrderResponse
+            {
+                Id = order.Id,
+                TotalPrice = order.TotalPrice,
+                Status = order.Status,
+                ShipCost = order.Shipcost,
+                Address = order.Address,
+                CreateDate = order.CreateDate,
+                ModifyDate = order.ModifyDate,
+                Discount = order.Voucher?.Discount ?? 0, // Lấy giảm giá từ voucher (nếu có)
+                userResponse = new GetOrderResponse.UserResponse
+                {
+                    Name = order.User?.UserName,
+                    Email = order.User?.Email,
+                    PhoneNumber = order.User?.PhoneNumber
+                },
+                OrderDetails = order.OrderDetails.Select(od => new GetOrderResponse.OrderDetailCreateResponse
+                {
+                    ProductName = od.Product.ProductName,
+                    Price = od.Price,
+                    Quantity = od.Quantity,
+                    LinkImage = od.Product.Images.FirstOrDefault()?.LinkImage ?? "NoImageAvailable" // Lấy ảnh đầu tiên hoặc giá trị mặc định
+                }).ToList()
+            }).ToList();
+
+            // Tạo response kết quả
+            return new ApiResponse
+            {
+                status = StatusCodes.Status200OK.ToString(),
+                message = "Orders retrieved successfully.",
+                data = new
+                {
+                    TotalItems = totalItems,
+                    Page = page,
+                    PageSize = size,
+                    Orders = orderResponses
+                }
+            };
+        }
+        catch (Exception ex)
+        {
+            return new ApiResponse
+            {
+                status = StatusCodes.Status500InternalServerError.ToString(),
+                message = "An error occurred while retrieving orders.",
+                data = ex.Message
+            };
+        }
     }
 
-    public Task<ApiResponse> GetAllOrder(int page, int size, string status, bool? isAscending, string userName)
+
+    public async Task<ApiResponse> GetAllOrder(Guid userid, int page, int size, string status, bool? isAscending)
     {
-        throw new NotImplementedException();
+        try
+        {
+            // Truy vấn với Include
+            var query = _unitOfWork.Context.Set<Order>()
+                .Where(o => o.UserId == userid && (string.IsNullOrEmpty(status) || o.Status.Equals(status)))
+                .Include(o => o.User)
+                .Include(o => o.Voucher)
+                .Include(o => o.OrderDetails)
+                    .ThenInclude(od => od.Product)
+                        .ThenInclude(p => p.Images) // Bao gồm hình ảnh sản phẩm
+                .AsQueryable();
+
+            // Sắp xếp nếu cần
+            if (isAscending.HasValue)
+            {
+                query = isAscending.Value
+                    ? query.OrderBy(o => o.CreateDate) // Sắp xếp tăng dần
+                    : query.OrderByDescending(o => o.CreateDate); // Sắp xếp giảm dần
+            }
+
+            // Phân trang
+            var totalItems = await query.CountAsync();
+            var orders = await query
+                .Skip((page - 1) * size)
+                .Take(size)
+                .ToListAsync();
+
+            if (!orders.Any())
+            {
+                return new ApiResponse
+                {
+                    status = StatusCodes.Status404NotFound.ToString(),
+                    message = "No orders found for the specified user.",
+                    data = null
+                };
+            }
+
+            // Chuyển đổi dữ liệu sang response
+            var orderResponses = orders.Select(order => new GetOrderResponse
+            {
+                Id = order.Id,
+                TotalPrice = order.TotalPrice,
+                Status = order.Status,
+                ShipCost = order.Shipcost,
+                Address = order.Address,
+                CreateDate = order.CreateDate,
+                ModifyDate = order.ModifyDate,
+                Discount = order.Voucher?.Discount ?? 0, // Lấy giảm giá từ voucher (nếu có)
+                userResponse = new GetOrderResponse.UserResponse
+                {
+                    Name = order.User?.UserName,
+                    Email = order.User?.Email,
+                    PhoneNumber = order.User?.PhoneNumber
+                },
+                OrderDetails = order.OrderDetails.Select(od => new GetOrderResponse.OrderDetailCreateResponse
+                {
+                    ProductName = od.Product.ProductName,
+                    Price = od.Price,
+                    Quantity = od.Quantity,
+                    LinkImage = od.Product.Images.FirstOrDefault()?.LinkImage ?? "NoImageAvailable" // Lấy ảnh đầu tiên hoặc giá trị mặc định
+                }).ToList()
+            }).ToList();
+
+            // Tạo response kết quả
+            return new ApiResponse
+            {
+                status = StatusCodes.Status200OK.ToString(),
+                message = "Orders retrieved successfully.",
+                data = new
+                {
+                    TotalItems = totalItems,
+                    Page = page,
+                    PageSize = size,
+                    Orders = orderResponses
+                }
+            };
+        }
+        catch (Exception ex)
+        {
+            return new ApiResponse
+            {
+                status = StatusCodes.Status500InternalServerError.ToString(),
+                message = "An error occurred while retrieving orders.",
+                data = ex.Message
+            };
+        }
     }
 
-    public Task<ApiResponse> GetOrderById(Guid id)
+
+    public async Task<ApiResponse> GetOrderById(Guid id)
     {
-        throw new NotImplementedException();
+        try
+        {
+            // Truy vấn để lấy thông tin đơn hàng
+            var order = await _unitOfWork.Context.Set<Order>()
+                .Include(o => o.User) // Bao gồm thông tin người dùng
+                .Include(o => o.Voucher) // Bao gồm thông tin voucher
+                .Include(o => o.OrderDetails) // Bao gồm chi tiết đơn hàng
+                    .ThenInclude(od => od.Product) // Bao gồm thông tin sản phẩm
+                        .ThenInclude(p => p.Images) // Bao gồm hình ảnh sản phẩm
+                .FirstOrDefaultAsync(o => o.Id == id); // Lọc theo ID
+
+            if (order == null)
+            {
+                return new ApiResponse
+                {
+                    status = StatusCodes.Status404NotFound.ToString(),
+                    message = "Order not found.",
+                    data = null
+                };
+            }
+
+            // Chuyển đổi dữ liệu sang response
+            var orderResponse = new GetOrderResponse
+            {
+                Id = order.Id,
+                TotalPrice = order.TotalPrice,
+                Status = order.Status,
+                ShipCost = order.Shipcost,
+                Address = order.Address,
+                CreateDate = order.CreateDate,
+                ModifyDate = order.ModifyDate,
+                Discount = order.Voucher?.Discount ?? 0, // Lấy giảm giá từ voucher nếu có
+                userResponse = new GetOrderResponse.UserResponse
+                {
+                    Name = order.User?.UserName,
+                    Email = order.User?.Email,
+                    PhoneNumber = order.User?.PhoneNumber
+                },
+                OrderDetails = order.OrderDetails.Select(od => new GetOrderResponse.OrderDetailCreateResponse
+                {
+                    ProductName = od.Product.ProductName,
+                    Price = od.Price,
+                    Quantity = od.Quantity,
+                    LinkImage = od.Product.Images.FirstOrDefault()?.LinkImage ?? "NoImageAvailable" // Lấy ảnh đầu tiên hoặc giá trị mặc định
+                }).ToList()
+            };
+
+            // Tạo response kết quả
+            return new ApiResponse
+            {
+                status = StatusCodes.Status200OK.ToString(),
+                message = "Order retrieved successfully.",
+                data = orderResponse
+            };
+        }
+        catch (Exception ex)
+        {
+            return new ApiResponse
+            {
+                status = StatusCodes.Status500InternalServerError.ToString(),
+                message = "An error occurred while retrieving the order.",
+                data = ex.Message
+            };
+        }
     }
+
 
     public Task<ApiResponse> CancelOrder(Guid id)
     {

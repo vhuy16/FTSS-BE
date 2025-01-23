@@ -11,10 +11,10 @@
 
     public interface ICategoryService
     {
-        Task<ApiResponse> CreateCategory(CategoryRequest request);
+        Task<ApiResponse> CreateCategory(CategoryRequest request, Supabase.Client client);
         Task<ApiResponse> GetAllCategory(int page, int size, string searchName, bool? isAscending);
         Task<ApiResponse> GetCategory(Guid id);
-        Task<ApiResponse> UpdateCategory(Guid id, CategoryRequest request);
+        Task<ApiResponse> UpdateCategory(Guid id, CategoryRequest request, Supabase.Client client);
         Task<ApiResponse> DeleteCategory(Guid id);
     }
 }

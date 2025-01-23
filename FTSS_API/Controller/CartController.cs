@@ -17,6 +17,9 @@ namespace FTSS_API.Controller
             _cartService = cartService;
         }
 
+        /// <summary>
+        /// API thêm sản phẩm vào cart.
+        /// </summary>
         [HttpPost(ApiEndPointConstant.Cart.AddCartItem)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
@@ -37,6 +40,9 @@ namespace FTSS_API.Controller
             return CreatedAtAction(nameof(AddCartItem), addCartItemResponse);
         }
 
+        /// <summary>
+        /// API xoá sản phẩm khỏi cart.
+        /// </summary>
         [HttpDelete(ApiEndPointConstant.Cart.DeleteCartItem)]
         [ProducesResponseType(typeof(bool), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
@@ -47,6 +53,9 @@ namespace FTSS_API.Controller
             return StatusCode(int.Parse(response.status), response);
         }
 
+        /// <summary>
+        /// API lấy thông tin tất cả sản phẩm trong cart.
+        /// </summary>
         [HttpGet(ApiEndPointConstant.Cart.GetAllCart)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
         [ProducesErrorResponseType(typeof(ProblemDetails))]
@@ -60,6 +69,9 @@ namespace FTSS_API.Controller
             return StatusCode(int.Parse(response.status), response);
         }
 
+        /// <summary>
+        /// API xóa tất cả sản phẩm trong cart.
+        /// </summary>
         [HttpDelete(ApiEndPointConstant.Cart.ClearCart)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
         [ProducesErrorResponseType(typeof(ProblemDetails))]
@@ -69,6 +81,9 @@ namespace FTSS_API.Controller
             return StatusCode(int.Parse(response.status), response);
         }
 
+        /// <summary>
+        /// API lấy thông tin số sản phẩm và giá tiền.
+        /// </summary>
         [HttpGet(ApiEndPointConstant.Cart.GetCartSummary)]
         [ProducesResponseType(typeof(CartSummayResponse), StatusCodes.Status200OK)]
         [ProducesErrorResponseType(typeof(ProblemDetails))]
@@ -78,6 +93,9 @@ namespace FTSS_API.Controller
             return Ok(response);
         }
 
+        /// <summary>
+        /// API cập nhật số lượng sản phẩm trong cart.
+        /// </summary>
         [HttpPut(ApiEndPointConstant.Cart.UpdateCartItem)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]

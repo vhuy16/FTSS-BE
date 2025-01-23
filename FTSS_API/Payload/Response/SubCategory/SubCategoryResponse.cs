@@ -13,5 +13,6 @@
         public DateTime? CreateDate { get; set; }
 
         public DateTime? ModifyDate { get; set; }
+        public string CategoryName { get; set; } = null!;
     }
 }

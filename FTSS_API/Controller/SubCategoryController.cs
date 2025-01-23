@@ -17,6 +17,10 @@ namespace FTSS_API.Controller
         {
             _subCategoryService = subCategoryService;
         }
+
+        /// <summary>
+        /// API tạo mới subcategory.
+        /// </summary>
         [HttpPost(ApiEndPointConstant.SubCategory.CreateSubCategory)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status201Created)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
@@ -48,6 +52,9 @@ namespace FTSS_API.Controller
             return StatusCode(int.Parse(response.status), response);
         }
 
+        /// <summary>
+        /// API cập nhật subcategory.
+        /// </summary>
         [HttpPut(ApiEndPointConstant.SubCategory.UpdateSubCategory)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
@@ -58,6 +65,9 @@ namespace FTSS_API.Controller
             var response = await _subCategoryService.UpdateSubCategory(id, updateSubCategoryRequest);
             return StatusCode(int.Parse(response.status), response);
         }
+        /// <summary>
+        /// API xóa subcategory.
+        /// </summary>
         [HttpDelete(ApiEndPointConstant.SubCategory.DeleteSubCategory)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
