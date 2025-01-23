@@ -82,15 +82,20 @@ namespace FTSS_API.Service.Implement
                     };
                 }
 
-                // Tạo mã voucher ngẫu nhiên
-                string voucherCode = GenerateVoucherCode();
+                // Tạo mã voucher ngẫu nhiên và kiểm tra trùng lặp
+                string voucherCode;
+                do
+                {
+                    voucherCode = GenerateVoucherCode();
+                }
+                while (await _unitOfWork.Context.Set<Voucher>().AnyAsync(v => v.VoucherCode == voucherCode));
 
                 // Tạo đối tượng voucher mới
                 var newVoucher = new Voucher
                 {
                     Id = Guid.NewGuid(),
                     VoucherCode = voucherCode,
-                    Discount = voucherRequest.Discount ??0,
+                    Discount = voucherRequest.Discount ?? 0,
                     CreateDate = TimeUtils.GetCurrentSEATime(),
                     ModifyDate = TimeUtils.GetCurrentSEATime(),
                     IsDelete = false,
@@ -106,12 +111,29 @@ namespace FTSS_API.Service.Implement
                 await _unitOfWork.Context.Set<Voucher>().AddAsync(newVoucher);
                 await _unitOfWork.CommitAsync();
 
+                // Tạo đối tượng VoucherResponse để trả về
+                var voucherResponse = new VoucherResponse
+                {
+                    Id = newVoucher.Id,
+                    VoucherCode = newVoucher.VoucherCode,
+                    Discount = newVoucher.Discount,
+                    CreateDate = newVoucher.CreateDate,
+                    ModifyDate = newVoucher.ModifyDate,
+                    IsDelete = newVoucher.IsDelete,
+                    Status = newVoucher.Status,
+                    Quantity = newVoucher.Quantity,
+                    MaximumOrderValue = newVoucher.MaximumOrderValue,
+                    ExpiryDate = newVoucher.ExpiryDate,
+                    DiscountType = newVoucher.DiscountType,
+                    Description = newVoucher.Description
+                };
+
                 // Trả về kết quả thành công
                 return new ApiResponse
                 {
                     status = StatusCodes.Status201Created.ToString(),
                     message = "Voucher added successfully.",
-                    data = newVoucher
+                    data = voucherResponse
                 };
             }
             catch (Exception ex)
@@ -210,6 +232,7 @@ namespace FTSS_API.Service.Implement
                     .Take(pageSize)
                     .Select(v => new
                     {
+                        v.Id,
                         v.VoucherCode,
                         v.Discount,
                         v.Description,
@@ -261,7 +284,8 @@ namespace FTSS_API.Service.Implement
                 var query = _unitOfWork.Context.Set<Voucher>()
                     .Where(v => !v.IsDelete.HasValue || v.IsDelete == false) // isDelete = false
                     .Where(v => v.Status == VoucherEnum.Active.GetDescriptionFromEnum()) // status = Active
-                    .Where(v => v.ExpiryDate > currentTime); // expiryDate chưa hết hạn
+                    .Where(v => v.ExpiryDate > currentTime) // expiryDate chưa hết hạn
+                    .Where(v => v.Quantity > 0);
 
                 // Sắp xếp theo isAscending hoặc mặc định giảm dần theo ngày hết hạn
                 query = isAscending.HasValue && isAscending.Value
@@ -278,6 +302,7 @@ namespace FTSS_API.Service.Implement
                 // Chuyển đổi danh sách voucher sang danh sách response
                 var responseList = vouchers.Select(v => new GetListVoucherResponse
                 {
+                    Id = v.Id,
                     VoucherCode = v.VoucherCode,
                     Description = v.Description,
                     ExpiryDate = v.ExpiryDate
@@ -420,12 +445,29 @@ namespace FTSS_API.Service.Implement
                 _unitOfWork.Context.Set<Voucher>().Update(voucher);
                 await _unitOfWork.CommitAsync();
 
+                // Tạo đối tượng VoucherResponse
+                var voucherResponse = new VoucherResponse
+                {
+                    Id = voucher.Id,
+                    VoucherCode = voucher.VoucherCode,
+                    Discount = voucher.Discount,
+                    CreateDate = voucher.CreateDate,
+                    ModifyDate = voucher.ModifyDate,
+                    IsDelete = voucher.IsDelete,
+                    Status = voucher.Status,
+                    Quantity = voucher.Quantity,
+                    MaximumOrderValue = voucher.MaximumOrderValue,
+                    ExpiryDate = voucher.ExpiryDate,
+                    DiscountType = voucher.DiscountType,
+                    Description = voucher.Description
+                };
+
                 // Trả về kết quả thành công
                 return new ApiResponse
                 {
                     status = StatusCodes.Status200OK.ToString(),
                     message = "Voucher updated successfully.",
-                    data = voucher
+                    data = voucherResponse
                 };
             }
             catch (Exception ex)
@@ -439,8 +481,6 @@ namespace FTSS_API.Service.Implement
                 };
             }
         }
-
-
 
         // Hàm tạo mã voucher ngẫu nhiên
         private string GenerateVoucherCode()
