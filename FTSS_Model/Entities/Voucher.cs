@@ -21,11 +21,13 @@ public partial class Voucher
 
     public int? Quantity { get; set; }
 
-    public decimal? MinimumOrderValue { get; set; }
+    public decimal? MaximumOrderValue { get; set; }
 
     public DateTime? ExpiryDate { get; set; }
 
     public string? DiscountType { get; set; }
+
+    public string? Description { get; set; }
 
     public virtual ICollection<Order> Orders { get; set; } = new List<Order>();
 }
