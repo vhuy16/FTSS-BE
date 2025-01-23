@@ -39,6 +39,9 @@ public class OrderController : BaseController<OrderController>
         return CreatedAtAction(nameof(CreateOrder), createOrderResponse);
     }
 
+    /// <summary>
+    /// API lấy danh sách tất cả đơn hàng cho admin.
+    /// </summary>
     [HttpGet(ApiEndPointConstant.Order.GetListOrder)]
     [ProducesResponseType(typeof(IPaginate<ApiResponse>), StatusCodes.Status200OK)]
     [ProducesErrorResponseType(typeof(ProblemDetails))]
@@ -80,6 +83,9 @@ public class OrderController : BaseController<OrderController>
         return Ok(response);
     }
 
+    /// <summary>
+    /// API lấy đơn hàng theo orderid.
+    /// </summary>
     [HttpGet(ApiEndPointConstant.Order.GetOrderById)]
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
