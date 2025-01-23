@@ -56,6 +56,8 @@ public partial class MyDbContext : DbContext
 
     public virtual DbSet<SubCategory> SubCategories { get; set; }
 
+    public virtual DbSet<Transaction> Transactions { get; set; }
+
     public virtual DbSet<User> Users { get; set; }
 
     public virtual DbSet<Voucher> Vouchers { get; set; }
@@ -154,6 +156,11 @@ public partial class MyDbContext : DbContext
             entity.Property(e => e.IsDelete)
                 .HasDefaultValue(false)
                 .HasColumnName("isDelete");
+            entity.Property(e => e.LinkImage)
+                .HasMaxLength(255)
+                .IsUnicode(false)
+                .HasDefaultValue("default_image_link")
+                .HasColumnName("linkImage");
             entity.Property(e => e.ModifyDate)
                 .HasColumnType("datetime")
                 .HasColumnName("modifyDate");
@@ -656,6 +663,36 @@ public partial class MyDbContext : DbContext
                 .HasConstraintName("FK_SubCategory_Category");
         });
 
+        modelBuilder.Entity<Transaction>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PK__Transact__3213E83FEAB6F003");
+
+            entity.ToTable("Transaction");
+
+            entity.Property(e => e.Id)
+                .ValueGeneratedNever()
+                .HasColumnName("id");
+            entity.Property(e => e.Amount)
+                .HasColumnType("decimal(10, 2)")
+                .HasColumnName("amount");
+            entity.Property(e => e.PaymentId).HasColumnName("paymentId");
+            entity.Property(e => e.Status)
+                .HasMaxLength(50)
+                .IsUnicode(false)
+                .HasColumnName("status");
+            entity.Property(e => e.TransactionDate)
+                .HasColumnType("datetime")
+                .HasColumnName("transactionDate");
+            entity.Property(e => e.TransactionType)
+                .HasMaxLength(50)
+                .IsUnicode(false)
+                .HasColumnName("transactionType");
+
+            entity.HasOne(d => d.Payment).WithMany(p => p.Transactions)
+                .HasForeignKey(d => d.PaymentId)
+                .HasConstraintName("FK__Transacti__payme__01D345B0");
+        });
+
         modelBuilder.Entity<User>(entity =>
         {
             entity.HasKey(e => e.Id).HasName("PK__User__3213E83FF34271D4");
@@ -722,12 +759,28 @@ public partial class MyDbContext : DbContext
             entity.Property(e => e.CreateDate)
                 .HasColumnType("datetime")
                 .HasColumnName("createDate");
+            entity.Property(e => e.Discount)
+                .HasColumnType("decimal(10, 2)")
+                .HasColumnName("discount");
+            entity.Property(e => e.DiscountType)
+                .HasMaxLength(10)
+                .IsFixedLength()
+                .HasColumnName("discountType");
+            entity.Property(e => e.ExpiryDate)
+                .HasColumnType("datetime")
+                .HasColumnName("expiryDate");
             entity.Property(e => e.IsDelete)
                 .HasDefaultValue(false)
                 .HasColumnName("isDelete");
+            entity.Property(e => e.MinimumOrderValue)
+                .HasColumnType("decimal(18, 0)")
+                .HasColumnName("minimumOrderValue");
             entity.Property(e => e.ModifyDate)
                 .HasColumnType("datetime")
                 .HasColumnName("modifyDate");
+
+            entity.Property(e => e.Quantity).HasColumnName("quantity");
+
             entity.Property(e => e.Status)
                 .HasMaxLength(50)
                 .IsUnicode(false)
