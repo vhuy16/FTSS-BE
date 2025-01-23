@@ -774,7 +774,7 @@ public partial class MyDbContext : DbContext
                 .HasColumnName("isDelete");
             entity.Property(e => e.MaximumOrderValue)
                 .HasColumnType("decimal(18, 0)")
-                .HasColumnName("minimumOrderValue");
+                .HasColumnName("maximumOrderValue");
             entity.Property(e => e.ModifyDate)
                 .HasColumnType("datetime")
                 .HasColumnName("modifyDate");
