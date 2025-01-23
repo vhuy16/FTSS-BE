@@ -20,16 +20,22 @@ namespace FTSS_API.Controller
             _categoryService = categoryService;
         }
 
+        /// <summary>
+        /// API tạo mới loại hàng.
+        /// </summary>
         [HttpPost(ApiEndPointConstant.Category.CreateCategory)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status201Created)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
         [ProducesErrorResponseType(typeof(ProblemDetails))]
-        public async Task<IActionResult> CreateCategory([FromBody] CategoryRequest createNewCategoryRequest)
+        public async Task<IActionResult> CreateCategory([FromForm] CategoryRequest createNewCategoryRequest, [FromServices] Supabase.Client client)
         {
-            var response = await _categoryService.CreateCategory(createNewCategoryRequest);
+            var response = await _categoryService.CreateCategory(createNewCategoryRequest, client);
             return StatusCode(int.Parse(response.status), response);
         }
 
+        /// <summary>
+        /// API lấy thông tin tất cả loại hàng.
+        /// </summary>
         [HttpGet(ApiEndPointConstant.Category.GetAllCategory)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
@@ -41,6 +47,9 @@ namespace FTSS_API.Controller
             return StatusCode(int.Parse(response.status), response);
         }
 
+        /// <summary>
+        /// API lấy thông tin loại hàng.
+        /// </summary>
         [HttpGet(ApiEndPointConstant.Category.GetCategory)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
@@ -51,17 +60,23 @@ namespace FTSS_API.Controller
             return StatusCode(int.Parse(response.status), response);
         }
 
+        /// <summary>
+        /// API cập nhật thông tin loại hàng.
+        /// </summary>
         [HttpPut(ApiEndPointConstant.Category.UpdateCategory)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
         [ProducesErrorResponseType(typeof(ProblemDetails))]
-        public async Task<IActionResult> UpdateCategory([FromRoute] Guid id, [FromBody] CategoryRequest updateCategoryRequest)
+        public async Task<IActionResult> UpdateCategory([FromRoute] Guid id, [FromForm] CategoryRequest updateCategoryRequest, [FromServices] Supabase.Client client)
         {
-            var response = await _categoryService.UpdateCategory(id, updateCategoryRequest);
+            var response = await _categoryService.UpdateCategory(id, updateCategoryRequest, client);
             return StatusCode(int.Parse(response.status), response);
         }
 
+        /// <summary>
+        /// API xóa loại hàng.
+        /// </summary>
         [HttpDelete(ApiEndPointConstant.Category.DeleteCategory)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]

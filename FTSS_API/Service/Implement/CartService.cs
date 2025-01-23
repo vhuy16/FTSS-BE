@@ -203,16 +203,19 @@ namespace FTSS_API.Service.Implement
 
             if (user == null)
             {
-                throw new BadHttpRequestException("You need log in.");
+                throw new BadHttpRequestException("You need to log in.");
             }
 
             var cart = await _unitOfWork.GetRepository<Cart>().SingleOrDefaultAsync(
                 predicate: c => c.UserId.Equals(userId));
 
             var cartItems = await _unitOfWork.GetRepository<CartItem>().GetListAsync(
-                predicate: c => c.CartId.Equals(cart.Id) && c.Status.Equals(CartEnum.Available.GetDescriptionFromEnum()),
+                predicate: c => c.CartId.Equals(cart.Id) &&
+                                c.Status.Equals(CartEnum.Available.GetDescriptionFromEnum()) &&
+                                c.Product.Status.Equals(ProductStatusEnum.Available.GetDescriptionFromEnum()), // Kiểm tra Status của Product
                 include: c => c.Include(c => c.Product),
                 orderBy: c => c.OrderByDescending(o => o.CreateDate));
+
             if (cartItems == null || !cartItems.Any())
             {
                 return new ApiResponse()
@@ -223,15 +226,28 @@ namespace FTSS_API.Service.Implement
                 };
             }
 
-            var response = cartItems.Select(cartItem => new GetAllCartItemResponse
+            // Tạo response bao gồm LinkImage
+            var response = new List<GetAllCartItemResponse>();
+
+            foreach (var cartItem in cartItems)
             {
-                CartItemId = cartItem.Id,
-                ProductId = cartItem.ProductId,
-                ProductName = cartItem.Product.ProductName,
-                Quantity = cartItem.Quantity,
-                UnitPrice = cartItem.Product.Price,
-                Price = cartItem.Product.Price * cartItem.Quantity,
-            }).ToList();
+                // Lấy LinkImage từ bảng Image theo ProductId
+                var image = await _unitOfWork.GetRepository<Image>().SingleOrDefaultAsync(
+                    predicate: img => img.ProductId.Equals(cartItem.ProductId) && img.IsDelete == false,
+                    orderBy: img => img.OrderBy(i => i.CreateDate));
+
+                response.Add(new GetAllCartItemResponse
+                {
+                    CartItemId = cartItem.Id,
+                    ProductId = cartItem.ProductId,
+                    ProductName = cartItem.Product.ProductName,
+                    Quantity = cartItem.Quantity,
+                    UnitPrice = cartItem.Product.Price,
+                    Price = cartItem.Product.Price * cartItem.Quantity,
+                    LinkImage = image?.LinkImage // Sử dụng LinkImage nếu tồn tại, nếu không để null
+                });
+            }
+
             return new ApiResponse()
             {
                 status = StatusCodes.Status200OK.ToString(),
@@ -239,6 +255,8 @@ namespace FTSS_API.Service.Implement
                 data = response
             };
         }
+
+
 
         public async Task<ApiResponse> GetCartSummary()
         {
@@ -261,8 +279,12 @@ namespace FTSS_API.Service.Implement
 
 
             var cartItems = await _unitOfWork.GetRepository<CartItem>().GetListAsync(
-                predicate: c => c.CartId.Equals(cart.Id) && c.Status.Equals(CartEnum.Available.GetDescriptionFromEnum()),
-                include: c => c.Include(c => c.Product));
+                    predicate: c => c.CartId.Equals(cart.Id) &&
+                    c.Status.Equals(CartEnum.Available.GetDescriptionFromEnum()) &&
+                    c.Product.Status.Equals(ProductStatusEnum.Available.GetDescriptionFromEnum()), // Thêm điều kiện lọc Product
+                    include: c => c.Include(c => c.Product), // Bao gồm Product để sử dụng các thuộc tính của nó
+                    orderBy: c => c.OrderByDescending(o => o.CreateDate));
+
 
             if (cartItems == null || !cartItems.Any())
             {
@@ -280,7 +302,7 @@ namespace FTSS_API.Service.Implement
 
 
             decimal totalPrice = 0;
-            decimal totalItems = 0;
+            int totalItems = 0;
 
             foreach (var cartItem in cartItems)
             {

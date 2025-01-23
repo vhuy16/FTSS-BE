@@ -11,20 +11,29 @@ using FTSS_Model.Context;
 using FTSS_Model.Entities;
 using FTSS_Model.Paginate;
 using FTSS_Repository.Interface;
+using Google.Apis.Drive.v3;
+using Microsoft.IdentityModel.Tokens;
+using MRC_API.Utils;
 
 namespace FTSS_API.Service.Implement
 {
     public class CategoryService : BaseService<CategoryService>, ICategoryService
     {
+        private readonly SupabaseUltils _supabaseImageService;
+        private readonly HtmlSanitizerUtils _sanitizer;
         public CategoryService(IUnitOfWork<MyDbContext> unitOfWork,
             ILogger<CategoryService> logger,
             IMapper mapper,
-            IHttpContextAccessor httpContextAccessor
+            IHttpContextAccessor httpContextAccessor,
+            SupabaseUltils supabaseImageService,
+            HtmlSanitizerUtils htmlSanitizer
             ) : base(unitOfWork, logger, mapper, httpContextAccessor)
         {
+            _sanitizer = htmlSanitizer;
+            _supabaseImageService = supabaseImageService;
         }
 
-        public async Task<ApiResponse> CreateCategory(CategoryRequest request)
+        public async Task<ApiResponse> CreateCategory(CategoryRequest request, Supabase.Client client)
         {
             // Validate required fields
             if (string.IsNullOrWhiteSpace(request.CategoryName))
@@ -37,65 +46,62 @@ namespace FTSS_API.Service.Implement
                 };
             }
 
-            if (string.IsNullOrWhiteSpace(request.Description))
+            // Check if category already exists
+            var categoryExist = await _unitOfWork.GetRepository<Category>()
+                .SingleOrDefaultAsync(predicate: c => c.CategoryName.Equals(request.CategoryName) && c.IsDelete == false);
+
+            if (categoryExist != null)
             {
                 return new ApiResponse
                 {
                     status = StatusCodes.Status400BadRequest.ToString(),
-                    message = "Description cannot be empty.",
+                    message = "Category already exists.",
+                    data = null
+                };
+            }
+            // Check if image is provided
+            if (request.ImageFile == null)
+            {
+                return new ApiResponse
+                {
+                    status = StatusCodes.Status400BadRequest.ToString(),
+                    message = "Image file is required.",
                     data = null
                 };
             }
 
-            // Đảm bảo rằng gọi đúng overload của SingleOrDefaultAsync
-            var categoryExist = await _unitOfWork.GetRepository<Category>().SingleOrDefaultAsync(
-                predicate: c => c.CategoryName.Equals(request.CategoryName) &&
-                        c.IsDelete == false);
+            string? imageUrl = null;
 
-
-
-            if (categoryExist != null)
+            // Upload image if provided
+            if (request.ImageFile != null)
             {
-                // Nếu category tồn tại và bị đánh dấu là đã xóa, cho phép tạo mới category
-                if ((bool)categoryExist.IsDelete)
+                try
                 {
-                    categoryExist.IsDelete = false; // Đánh dấu category không bị xóa nữa
-                    categoryExist.ModifyDate = TimeUtils.GetCurrentSEATime(); // Cập nhật ModifyDate
+                    // Call your Supabase image upload service
+                    imageUrl = (await _supabaseImageService.SendImagesAsync(new List<IFormFile> { request.ImageFile }, client)).FirstOrDefault();
 
-                    // Cập nhật category đã tồn tại trong DB
-                    _unitOfWork.GetRepository<Category>().UpdateAsync(categoryExist);
-                    int isSuccessful = await _unitOfWork.CommitAsync(); // Commit thay đổi
-
-                    if (isSuccessful <= 0)  // Kiểm tra có thành công không
+                    if (string.IsNullOrEmpty(imageUrl))
                     {
                         return new ApiResponse
                         {
                             status = StatusCodes.Status500InternalServerError.ToString(),
-                            message = "Failed to update existing category.",
+                            message = "Failed to upload image.",
                             data = null
                         };
                     }
-
-                    return new ApiResponse
-                    {
-                        status = StatusCodes.Status200OK.ToString(),
-                        message = "Category reactivated successfully.",
-                        data = null
-                    };
                 }
-                else
+                catch (Exception ex)
                 {
-                    // Nếu category đã tồn tại và chưa bị xóa
                     return new ApiResponse
                     {
-                        status = StatusCodes.Status400BadRequest.ToString(),
-                        message = "Category already exists.",
+                        status = StatusCodes.Status500InternalServerError.ToString(),
+                        message = $"An error occurred while uploading the image: {ex.Message}",
                         data = null
                     };
                 }
             }
 
-            // Nếu không tìm thấy category đã tồn tại, tiến hành tạo mới
+            // Create category object
             var category = new Category
             {
                 Id = Guid.NewGuid(),
@@ -104,38 +110,54 @@ namespace FTSS_API.Service.Implement
                 CreateDate = TimeUtils.GetCurrentSEATime(),
                 ModifyDate = TimeUtils.GetCurrentSEATime(),
                 IsDelete = false,
+                LinkImage = imageUrl // Save the image URL
             };
 
-            // Thêm mới category vào database
-            await _unitOfWork.GetRepository<Category>().InsertAsync(category);
-            int isSuccessfulCreate = await _unitOfWork.CommitAsync();  // Commit thay đổi
+            try
+            {
+                // Insert category into database
+                await _unitOfWork.GetRepository<Category>().InsertAsync(category);
+                bool isSuccessful = await _unitOfWork.CommitAsync() > 0;
 
-            if (isSuccessfulCreate <= 0)  // Kiểm tra có thành công không
+                if (isSuccessful)
+                {
+                    return new ApiResponse
+                    {
+                        status = StatusCodes.Status201Created.ToString(),
+                        message = "Category created successfully.",
+                        data = new
+                        {
+                            category.Id,
+                            category.CategoryName,
+                            category.Description,
+                            category.LinkImage,
+                            category.CreateDate,
+                            category.ModifyDate
+                        }
+                    };
+                }
+                else
+                {
+                    return new ApiResponse
+                    {
+                        status = StatusCodes.Status500InternalServerError.ToString(),
+                        message = "Failed to create category.",
+                        data = null
+                    };
+                }
+            }
+            catch (Exception ex)
             {
                 return new ApiResponse
                 {
                     status = StatusCodes.Status500InternalServerError.ToString(),
-                    message = "Failed to create category.",
+                    message = $"An error occurred: {ex.Message}",
                     data = null
                 };
             }
-
-            var response = new CategoryResponse
-            {
-                Id = category.Id,
-                CategoryName = category.CategoryName,
-                Description = category.Description,
-                CreateDate = category.CreateDate,
-                ModifyDate = category.ModifyDate,
-            };
-
-            return new ApiResponse
-            {
-                status = StatusCodes.Status201Created.ToString(),
-                message = "Category created successfully.",
-                data = response
-            };
         }
+
+
 
 
         public async Task<ApiResponse> GetAllCategory(int page, int size, string searchName, bool? isAscending)
@@ -148,6 +170,7 @@ namespace FTSS_API.Service.Implement
                     Description = c.Description,
                     CreateDate = c.CreateDate,
                     ModifyDate = c.ModifyDate,
+                    LinkImage = c.LinkImage,
                     // Dữ liệu SubCategory sẽ được ánh xạ tại đây
                     SubCategories = c.SubCategories
                         .Where(sub => sub.IsDelete != true)  // Lọc nếu cần
@@ -208,6 +231,7 @@ namespace FTSS_API.Service.Implement
                     Description = c.Description,
                     CreateDate = c.CreateDate,
                     ModifyDate = c.ModifyDate,
+                    LinkImage = c.LinkImage,
                     SubCategories = c.SubCategories
                         .Where(sub => sub.IsDelete != true)  // Lọc nếu cần
                         .Select(sub => new SubCategoryResponse
@@ -241,13 +265,13 @@ namespace FTSS_API.Service.Implement
             };
         }
 
-        public async Task<ApiResponse> UpdateCategory(Guid id, CategoryRequest request)
+        public async Task<ApiResponse> UpdateCategory(Guid categoryId, CategoryRequest updateCategoryRequest, Supabase.Client client)
         {
-            var category = await _unitOfWork.GetRepository<Category>().SingleOrDefaultAsync(
-                predicate: c => c.Id.Equals(id) &&
-                                c.IsDelete.Equals(false));
+            // Lấy thông tin danh mục từ database
+            var existingCategory = await _unitOfWork.GetRepository<Category>()
+                .SingleOrDefaultAsync(predicate: c => c.Id.Equals(categoryId) && (c.IsDelete == null || c.IsDelete == false));
 
-            if (category == null)
+            if (existingCategory == null)
             {
                 return new ApiResponse
                 {
@@ -257,30 +281,70 @@ namespace FTSS_API.Service.Implement
                 };
             }
 
-            // Check if CategoryName already exists in the database
-            var existingCategory = await _unitOfWork.GetRepository<Category>().SingleOrDefaultAsync(
-                predicate: c => c.CategoryName.Equals(request.CategoryName) &&
-                                !c.Id.Equals(id) &&
-                                c.IsDelete.Equals(false));
-
-            if (existingCategory != null)
+            // Kiểm tra tên danh mục nếu có thay đổi
+            if (!string.IsNullOrEmpty(updateCategoryRequest.CategoryName) &&
+                !existingCategory.CategoryName.Equals(updateCategoryRequest.CategoryName))
             {
-                return new ApiResponse
+                var categoryCheck = await _unitOfWork.GetRepository<Category>()
+                    .SingleOrDefaultAsync(predicate: c => c.CategoryName.Equals(updateCategoryRequest.CategoryName) && (c.IsDelete == null || c.IsDelete == false));
+                if (categoryCheck != null)
                 {
-                    status = StatusCodes.Status400BadRequest.ToString(),
-                    message = "CategoryName has exist!",
-                    data = null
-                };
+                    return new ApiResponse
+                    {
+                        status = StatusCodes.Status400BadRequest.ToString(),
+                        message = "CategoryName already exists!",
+                        data = null
+                    };
+                }
+
+                existingCategory.CategoryName = updateCategoryRequest.CategoryName;
             }
 
-            category.CategoryName = string.IsNullOrEmpty(request.CategoryName)
-                ? category.CategoryName
-                : request.CategoryName;
-            category.ModifyDate = TimeUtils.GetCurrentSEATime();
-            category.Description = string.IsNullOrEmpty(request.Description)
-                ? category.Description
-                : request.Description;
-            _unitOfWork.GetRepository<Category>().UpdateAsync(category);
+            // Cập nhật mô tả nếu có
+            if (!string.IsNullOrEmpty(updateCategoryRequest.Description))
+            {
+                existingCategory.Description = updateCategoryRequest.Description;
+            }
+
+            // Cập nhật hình ảnh nếu có
+            if (updateCategoryRequest.ImageFile != null)
+            {
+                try
+                {
+                    // Upload hình ảnh mới lên Supabase
+                    var imageUrls = await _supabaseImageService.SendImagesAsync(new List<IFormFile> { updateCategoryRequest.ImageFile }, client);
+
+                    // Kiểm tra xem Supabase có trả về URL hình ảnh không
+                    if (imageUrls != null && imageUrls.Any())
+                    {
+                        existingCategory.LinkImage = imageUrls.FirstOrDefault();
+                    }
+                    else
+                    {
+                        return new ApiResponse
+                        {
+                            status = StatusCodes.Status500InternalServerError.ToString(),
+                            message = "Failed to upload new image.",
+                            data = null
+                        };
+                    }
+                }
+                catch (Exception ex)
+                {
+                    return new ApiResponse
+                    {
+                        status = StatusCodes.Status500InternalServerError.ToString(),
+                        message = $"An error occurred while uploading the image: {ex.Message}",
+                        data = null
+                    };
+                }
+            }
+
+            // Cập nhật ngày sửa
+            existingCategory.ModifyDate = TimeUtils.GetCurrentSEATime();
+
+            // Gửi yêu cầu cập nhật danh mục
+            _unitOfWork.GetRepository<Category>().UpdateAsync(existingCategory);
 
             bool isSuccessful = await _unitOfWork.CommitAsync() > 0;
 
@@ -298,9 +362,17 @@ namespace FTSS_API.Service.Implement
             {
                 status = StatusCodes.Status200OK.ToString(),
                 message = "Category updated successfully.",
-                data = true
+                data = new
+                {
+                    existingCategory.Id,
+                    existingCategory.CategoryName,
+                    existingCategory.Description,
+                    existingCategory.LinkImage,
+                    existingCategory.ModifyDate
+                }
             };
         }
+
 
         public async Task<ApiResponse> DeleteCategory(Guid id)
         {
