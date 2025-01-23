@@ -28,6 +28,10 @@
             public const string EmailIncorrect = "Email không đúng định dạng";
             public const string PhoneIncorrect = "Số điện thoại không định dạng";
         }
+        public static class VoucherMessage
+        {
+            public const string VoucherIsEmpty = "Không có voucher nào";
+        }
 
         public static class CategoryMessage
         {
