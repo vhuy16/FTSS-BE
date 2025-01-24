@@ -50,7 +50,7 @@ public static class DependencyInjection
         services.AddScoped<SupabaseUltils>();
         // services.AddScoped<IVNPayService, VNPayService>();
         services.AddScoped<IOrderService, OrderService>();
-     
+        services.AddScoped<IVoucherService, VoucherService>();
         services.AddScoped<IGoogleAuthenService, GoogleAuthenService>();
         services.AddScoped<ICartService, CartService>();
         services.AddScoped<IEmailSender, EmailSender>();
