@@ -69,7 +69,7 @@ public class PaymentService : BaseService<PaymentService>, IPaymentService
 
             return new ApiResponse
             {
-                data = createPaymentResponse,
+                data = createPaymentResponse.PaymentURL,
                 message = "Payment created successfully",
                 status = StatusCodes.Status200OK.ToString(),
             };

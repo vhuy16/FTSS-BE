@@ -2,6 +2,7 @@
 using FTSS_API.Constant;
 using FTSS_API.Payload;
 using FTSS_API.Payload.Request;
+using FTSS_API.Payload.Request.Pay;
 using FTSS_API.Payload.Response.Order;
 using FTSS_API.Service.Interface;
 using FTSS_API.Utils;
@@ -15,9 +16,12 @@ namespace FTSS_API.Service.Implement;
 
 public class OrderService : BaseService<OrderService>, IOrderService
 {
+    private readonly Lazy<IPaymentService> _paymentService;
     public OrderService(IUnitOfWork<MyDbContext> unitOfWork, ILogger<OrderService> logger, IMapper mapper,
+        Lazy<IPaymentService> paymentService,
         IHttpContextAccessor httpContextAccessor) : base(unitOfWork, logger, mapper, httpContextAccessor)
     {
+        _paymentService = paymentService;
     }
 
     // public async Task<ApiResponse> CreateOrder(CreateOrderRequest createOrderRequest)
@@ -306,11 +310,11 @@ public class OrderService : BaseService<OrderService>, IOrderService
             // Voucher Implementation
             Voucher? voucher = null;
             if (createOrderRequest.VoucherId != null)
-            {
+            { 
                 voucher = await _unitOfWork.GetRepository<Voucher>().SingleOrDefaultAsync(predicate: v =>
                     v.Id == createOrderRequest.VoucherId &&
-                   v.Status == "active" &&
-                     v.IsDelete.GetValueOrDefault(false) &&
+                    v.Status == "active" &&
+                    v.IsDelete.Equals(false) && // Use .Equals(false)
                     v.ExpiryDate >= TimeUtils.GetCurrentSEATime());
         
                 if (voucher == null)
@@ -398,8 +402,7 @@ public class OrderService : BaseService<OrderService>, IOrderService
         
             // insert orderDetails
             await _unitOfWork.GetRepository<OrderDetail>().InsertRangeAsync(orderDetails);
-        
-
+            
             bool isSuccessOrder = await _unitOfWork.CommitAsync() > 0;
             if (!isSuccessOrder)
             {
@@ -410,7 +413,17 @@ public class OrderService : BaseService<OrderService>, IOrderService
                     data = null
                 };
             }
-
+            var createPaymentRequest = new CreatePaymentRequest
+            {
+                OrderId = order.Id,
+                PaymentMethod = createOrderRequest.PaymentMethod,
+            };
+            var paymentResponse = await _paymentService.Value.CreatePayment(createPaymentRequest);
+            var paymentUrl = "";
+            if (paymentResponse != null && paymentResponse.status.Equals(StatusCodes.Status200OK.ToString()))
+            {
+                paymentUrl = paymentResponse.data.ToString();
+            }
             // Delete CartItems with status "buyed"
             foreach (var cartItem in cartItems)
             {
@@ -444,7 +457,7 @@ public class OrderService : BaseService<OrderService>, IOrderService
                     include: query => query.Include(o => o.User));
         
             // Check if order or user is still null
-        
+            
 
             if (order == null || order.User == null)
             {
@@ -468,7 +481,9 @@ public class OrderService : BaseService<OrderService>, IOrderService
                     Name = order.User.UserName,
                     Email = order.User.Email,
                     PhoneNumber = order.User.PhoneNumber
-                }
+                }, 
+                CheckoutUrl = paymentUrl
+                
             };
 
             return new ApiResponse()
