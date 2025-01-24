@@ -27,6 +27,8 @@ builder.Services.AddJwtValidation();
 builder.Services.Configure<EmailSettings>(builder.Configuration.GetSection("EmailSettings"));
 builder.Services.Configure<PayOSSettings>(builder.Configuration.GetSection("PayOS"));
 builder.Services.AddHttpClientServices();
+builder.Services.AddLazyResolution();
+
 builder.Services.AddScoped<Supabase.Client>(_ =>
     new Supabase.Client(
         builder.Configuration["Supabase:Url"],

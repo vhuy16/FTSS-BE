@@ -6,4 +6,5 @@ public class CreateOrderRequest
     public int ShipCost { get; set; }
     public string Address { get; set; }
     public Guid VoucherId { get; set; }
+    public string PaymentMethod { get; set; }
 }

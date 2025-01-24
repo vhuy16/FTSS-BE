@@ -8,7 +8,7 @@ public class CreateOrderResponse
     public string? Address { get; set; }
     public UserResponse userResponse { get; set; } // Fixed property declaration and removed invalid initialization
     public List<OrderDetailCreateResponse> OrderDetails { get; set; } = new List<OrderDetailCreateResponse>();
-
+    public string? CheckoutUrl { get; set; }
     public class OrderDetailCreateResponse
     {
         public string? ProductName { get; set; }
@@ -23,4 +23,5 @@ public class CreateOrderResponse
         public string? PhoneNumber { get; set; }
     }
 
+  
 }
