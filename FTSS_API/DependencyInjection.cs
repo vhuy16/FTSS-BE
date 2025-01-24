@@ -54,7 +54,8 @@ public static class DependencyInjection
         services.AddScoped<IGoogleAuthenService, GoogleAuthenService>();
         services.AddScoped<ICartService, CartService>();
         services.AddScoped<IEmailSender, EmailSender>();
-        // services.AddScoped<IPayService, PayService>();
+        services.AddScoped<IPayOSService, PayOsService>();
+        services.AddScoped<IPaymentService, PaymentService>();
         //
         // services.AddScoped<PaymentUltils.Utils>();
         services.AddScoped<HtmlSanitizerUtils>();

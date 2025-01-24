@@ -26,6 +26,16 @@ public static class ApiEndPointConstant
         public const string VerifyForgotPassword = UserEndPoint + "/verify-forgot-password";
         public const string ChangePassword = UserEndPoint + "/change-password";
     }
+    public static class PaymentOS
+    {
+        public const string CreatePaymentUrl = "api/payment/create-url";
+        public const string GetPaymentInfo = "api/payment/{paymentLinkId}";
+    }
+    public static class Payment
+    {
+        public const string PaymentEndPoint = ApiEndpoint + "/payment";
+        public const string CreatePaymentUrl = PaymentEndPoint + "/create-url";
+    }
     public static class Category
     {
         public const string CategoryEndPoint = ApiEndpoint + "/category";
