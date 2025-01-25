@@ -22,7 +22,7 @@ public class OrderController : BaseController<OrderController>
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
     [ProducesErrorResponseType(typeof(ProblemDetails))]
-    public async Task<IActionResult> CreateOrder([FromForm] CreateOrderRequest createOrderRequest)
+    public async Task<IActionResult> CreateOrder([FromBody] CreateOrderRequest createOrderRequest)
     {
 
         var createOrderResponse = await _orderService.CreateOrder(createOrderRequest);
