@@ -11,4 +11,5 @@ public interface IPayOSService
     Task<Result<PayOsService.PaymentLinkResponse>> CreatePaymentUrlRegisterCreator(Guid orderId);
     Task<ApiResponse> HandlePaymentCallback(string paymentLinkId, long orderCode);
     Task<Result> HandlePayOsWebhook(WebhookType payload, string signatureFromPayOs, string requestBody);
+    Task<ApiResponse> ConfirmWebhook(string webhookUrl);
 }

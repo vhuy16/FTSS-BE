@@ -237,6 +237,50 @@ public class PayOsService : BaseService<PayOsService>, IPayOSService
         }
         return new ExtendedPaymentInfo();
     }
+
+    public async Task<ApiResponse> ConfirmWebhook(string webhookUrl)
+    {
+        try
+        {
+            // Initialize PayOS with settings
+            PayOS payOS = new PayOS(_payOSSettings.ClientId, _payOSSettings.ApiKey, _payOSSettings.ChecksumKey);
+
+            // Confirm the webhook using the PayOS library
+            string result = await payOS.confirmWebhook(webhookUrl);
+
+            // Check the result and return an appropriate response
+            if (!string.IsNullOrEmpty(result))
+            {
+                return new ApiResponse
+                {
+                    status = StatusCodes.Status200OK.ToString(),
+                    message = "Webhook confirmed successfully.",
+                    data = result // Include the result in the response
+                };
+            }
+            else
+            {
+                return new ApiResponse
+                {
+                    status = StatusCodes.Status400BadRequest.ToString(),
+                    message = "Webhook confirmation failed. The response was empty.",
+                    data = null
+                };
+            }
+        }
+        catch (Exception ex)
+        {
+            // Log the exception for debugging
+            _logger.LogError(ex, "Error occurred while confirming the webhook.");
+
+            return new ApiResponse
+            {
+                status = StatusCodes.Status500InternalServerError.ToString(),
+                message = "An unexpected error occurred while confirming the webhook.",
+                data = ex.Message
+            };
+        }
+    }
     public class PaymentLinkResponse
     {
         public string checkoutUrl { get; set; }
