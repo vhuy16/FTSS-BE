@@ -31,6 +31,11 @@ public static class ApiEndPointConstant
         public const string CreatePaymentUrl = "api/payment/create-url";
         public const string GetPaymentInfo = "api/payment/{paymentLinkId}";
     }
+    public static class VNPay
+    {
+        public const string CreatePaymentUrl = "api/vnpay/create-payment-url";
+        public const string ValidatePaymentResponse = "api/vnpay/validate-payment-response";
+    }
     public static class Payment
     {
         public const string PaymentEndPoint = ApiEndpoint + "/payment";

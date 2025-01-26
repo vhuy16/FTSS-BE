@@ -3,6 +3,7 @@ using FTSS_API.Constant;
 using FTSS_API.Middlewares;
 using FTSS_API.Payload.Pay;
 using FTSS_API.Payload.Request.Email;
+using FTSS_API.Payload.Request.Pay.VnPay;
 using Microsoft.OpenApi.Any;
 using Microsoft.OpenApi.Models;
 using Supabase;
@@ -26,6 +27,8 @@ builder.Services.AddCustomServices();
 builder.Services.AddJwtValidation();
 builder.Services.Configure<EmailSettings>(builder.Configuration.GetSection("EmailSettings"));
 builder.Services.Configure<PayOSSettings>(builder.Configuration.GetSection("PayOS"));
+builder.Services.Configure<VNPaySettings>(builder.Configuration.GetSection("VNPaySettings"));
+
 builder.Services.AddHttpClientServices();
 builder.Services.AddLazyResolution();
 

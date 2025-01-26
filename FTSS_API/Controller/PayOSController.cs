@@ -2,7 +2,10 @@
 using FTSS_API.Payload;
 using FTSS_API.Payload.Pay;
 using FTSS_API.Service.Implement;
+using FTSS_API.Utils;
 using Microsoft.AspNetCore.Mvc;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace FTSS_API.Controller;
 
@@ -16,6 +19,7 @@ namespace FTSS_API.Controller;
      }
 
      // Endpoint to create a payment URL
+     // Endpoint to create a payment URL
      [HttpPost(ApiEndPointConstant.PaymentOS.CreatePaymentUrl)]
      [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
      [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
@@ -23,7 +27,7 @@ namespace FTSS_API.Controller;
      public async Task<IActionResult> CreatePaymentUrl([FromBody] Guid orderID)
      {
          var result = await _payOsService.CreatePaymentUrlRegisterCreator(orderID);
-         return StatusCode(int.Parse(result.status), result);
+         return StatusCode(int.Parse(result.GetDescriptionFromEnum()), result);
      }
 
      // Endpoint to get payment details
@@ -83,4 +87,26 @@ namespace FTSS_API.Controller;
      //         return Redirect("https://www.mrc.vn/payment/callback?status=failed");
      //     }
      // }
+     [HttpPost("webhook")]
+     public async Task<IActionResult> HandlePayOsWebhook([FromBody] JObject payload)
+     {
+         try
+         {
+             var signatureFromPayOs = HttpContext.Request.Headers["x-payos-signature"].ToString();
+             string id = Request.Query["id"].ToString();
+             var requestBody = payload.ToString(Formatting.None);
+             var result = await _payOsService.HandlePayOsWebhook(payload,signatureFromPayOs,requestBody);
+             if (result)
+             {
+                 return Ok();
+             }
+             return BadRequest();
+         }
+         catch (Exception ex)
+         {
+             _logger.LogError(ex, "An error occurred while handling webhook in controller.");
+             return StatusCode(StatusCodes.Status500InternalServerError, "An error occurred while processing the webhook.");
+         }
+            
+     }
  }

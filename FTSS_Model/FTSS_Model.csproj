@@ -31,6 +31,7 @@
       <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
       <PackageReference Include="payOS" Version="1.0.9" />
       <PackageReference Include="Supabase" Version="1.1.1" />
+      <PackageReference Include="VNPAY.NET" Version="8.5.0" />
     </ItemGroup>
 
 </Project>

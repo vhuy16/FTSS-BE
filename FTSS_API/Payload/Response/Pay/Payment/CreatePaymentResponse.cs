@@ -9,4 +9,5 @@ public class CreatePaymentResponse
     public string? PaymentStatus { get; set; }
     public string? PaymentMethod { get; set; }
     public string PaymentURL { get; set; }
+    public long PaymentCode { get; set; }
 }

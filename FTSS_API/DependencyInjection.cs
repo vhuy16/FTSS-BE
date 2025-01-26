@@ -48,7 +48,8 @@ public static class DependencyInjection
         services.AddScoped<IProductService, ProductService>();
         services.AddScoped<GoogleUtils.GoogleDriveService>();
         services.AddScoped<SupabaseUltils>();
-        // services.AddScoped<IVNPayService, VNPayService>();
+        services.AddScoped<IVnPayService, VnPayService>();
+        services.AddScoped<PaymentUltils.Utils>();
         services.AddScoped<IOrderService, OrderService>();
         services.AddScoped<IVoucherService, VoucherService>();
         services.AddScoped<IGoogleAuthenService, GoogleAuthenService>();

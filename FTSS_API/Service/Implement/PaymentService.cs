@@ -39,9 +39,11 @@ public class PaymentService : BaseService<PaymentService>, IPaymentService
 
     if (request.PaymentMethod == PaymenMethodEnum.PayOs.GetDescriptionFromEnum())
     {
-        var response = await _payOSService.CreatePaymentUrlRegisterCreator(request.OrderId);
-        if (response.status == StatusCodes.Status200OK.ToString())
+        var result = await _payOSService.CreatePaymentUrlRegisterCreator(request.OrderId);
+        
+        if (result.IsSuccess && result.Value != null)
         {
+            var paymentLinkResponse = result.Value;
             var createPaymentResponse = new CreatePaymentResponse
             {
                 Id = Guid.NewGuid(),
@@ -50,9 +52,11 @@ public class PaymentService : BaseService<PaymentService>, IPaymentService
                 AmoundPaid = order.TotalPrice,
                 PaymentDate = DateTime.Now,
                 PaymentStatus = PaymentStatusEnum.Processing.ToString(),
-                PaymentURL = response.data.ToString()
+                PaymentURL = paymentLinkResponse.checkoutUrl,
+                PaymentCode = paymentLinkResponse.orderCode
+               
             };
-
+        
             // Save payment to the database
             var payment = new Payment
             {
@@ -61,12 +65,13 @@ public class PaymentService : BaseService<PaymentService>, IPaymentService
                 PaymentMethod = createPaymentResponse.PaymentMethod,
                 AmountPaid = createPaymentResponse.AmoundPaid,
                 PaymentDate = createPaymentResponse.PaymentDate,
-                PaymentStatus = PaymentStatusEnum.Completed.ToString()
+                PaymentStatus = PaymentStatusEnum.Processing.ToString(),
+                OrderCode = createPaymentResponse.PaymentCode
             };
-
+        
             await _unitOfWork.GetRepository<Payment>().InsertAsync(payment);
             await _unitOfWork.CommitAsync();
-
+        
             return new ApiResponse
             {
                 data = createPaymentResponse.PaymentURL,
@@ -80,7 +85,7 @@ public class PaymentService : BaseService<PaymentService>, IPaymentService
             {
                 data = string.Empty,
                 message = "Failed to create payment URL",
-                status = response.status,
+                // status = response.status,
             };
         }
     }
