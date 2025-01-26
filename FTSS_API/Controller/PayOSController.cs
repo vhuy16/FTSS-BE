@@ -108,4 +108,11 @@ namespace FTSS_API.Controller;
              return StatusCode(StatusCodes.Status500InternalServerError, "An error occurred while processing the webhook.");
          }
      }
+     
+     [HttpPost("confirm-webhook")]
+     public async Task<IActionResult> ConfirmWebhook([FromBody] string webhookLink)
+     {
+         var result = await _payOsService.ConfirmWebhook(webhookLink);
+         return Ok(result);
+     }
  }
