@@ -48,13 +48,15 @@ public static class DependencyInjection
         services.AddScoped<IProductService, ProductService>();
         services.AddScoped<GoogleUtils.GoogleDriveService>();
         services.AddScoped<SupabaseUltils>();
-        // services.AddScoped<IVNPayService, VNPayService>();
+        services.AddScoped<IVnPayService, VnPayService>();
+        services.AddScoped<PaymentUltils.Utils>();
         services.AddScoped<IOrderService, OrderService>();
         services.AddScoped<IVoucherService, VoucherService>();
         services.AddScoped<IGoogleAuthenService, GoogleAuthenService>();
         services.AddScoped<ICartService, CartService>();
         services.AddScoped<IEmailSender, EmailSender>();
-        // services.AddScoped<IPayService, PayService>();
+        services.AddScoped<IPayOSService, PayOsService>();
+        services.AddScoped<IPaymentService, PaymentService>();
         //
         // services.AddScoped<PaymentUltils.Utils>();
         services.AddScoped<HtmlSanitizerUtils>();

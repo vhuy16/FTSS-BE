@@ -7,5 +7,6 @@
     DELIVERED,       // Đã giao thành công
     CANCELLED,       // Đã hủy
     REFUNDED,        // Đã hoàn tiền
-    FAILED           // Thanh toán thất bại
+    FAILED,
+    PENDING_DELIVERY
 }

@@ -452,6 +452,7 @@ public partial class MyDbContext : DbContext
             entity.Property(e => e.AmountPaid)
                 .HasColumnType("decimal(10, 2)")
                 .HasColumnName("amountPaid");
+            entity.Property(e => e.OrderCode).HasColumnName("orderCode");
             entity.Property(e => e.OrderId).HasColumnName("orderId");
             entity.Property(e => e.PaymentDate)
                 .HasColumnType("datetime")
@@ -759,6 +760,9 @@ public partial class MyDbContext : DbContext
             entity.Property(e => e.CreateDate)
                 .HasColumnType("datetime")
                 .HasColumnName("createDate");
+            entity.Property(e => e.Description)
+                .HasMaxLength(255)
+                .HasDefaultValue("No description");
             entity.Property(e => e.Discount)
                 .HasColumnType("decimal(10, 2)")
                 .HasColumnName("discount");
@@ -778,9 +782,7 @@ public partial class MyDbContext : DbContext
             entity.Property(e => e.ModifyDate)
                 .HasColumnType("datetime")
                 .HasColumnName("modifyDate");
-
             entity.Property(e => e.Quantity).HasColumnName("quantity");
-
             entity.Property(e => e.Status)
                 .HasMaxLength(50)
                 .IsUnicode(false)
