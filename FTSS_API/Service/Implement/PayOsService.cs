@@ -152,68 +152,65 @@ public class PayOsService : BaseService<PayOsService>, IPayOSService
         throw new NotImplementedException();
     }
 
-    public async Task<bool> HandlePayOsWebhook(JObject payload, string signatureFromPayOs, string requestBody)
+
+    public async Task<Result> HandlePayOsWebhook(WebhookType payload, string signatureFromPayOs, string requestBody)
     {
-         try
+        try
         {
-            _logger.LogInformation($"Webhook received: {payload.ToString(Formatting.Indented)}");
+            _logger.LogInformation($"Webhook received: {JsonConvert.SerializeObject(payload)}");
 
-
-            // Xác thực chữ ký
             var signature = ComputeHmacSha256(requestBody, _payOSSettings.ChecksumKey);
-          
             if (signature != signatureFromPayOs)
             {
                 _logger.LogError("Invalid webhook signature");
-               return false;
+                return Result.Failure("Invalid webhook signature");
             }
 
-
-            var payment = payload["data"].ToObject<ExtendedPaymentInfo>();
-
-            if (payment.Status == "PAID")
+            if (payload?.data == null)
             {
-                var getPayment = await _unitOfWork.GetRepository<Payment>().SingleOrDefaultAsync(
-                    predicate: p => p.OrderCode.Equals(payment.OrderCode));
-
-                if (getPayment != null)
-                {
-                    getPayment.Status = PaymentStatusEnum.Completed.GetDescriptionFromEnum();
-                    var order = await _unitOfWork.GetRepository<Order>().SingleOrDefaultAsync(
-                        predicate: o => o.Id.Equals(getPayment.OrderId));
-                    order.Status = OrderStatus.PENDING_DELIVERY.GetDescriptionFromEnum();
-                    _unitOfWork.GetRepository<Payment>().UpdateAsync(getPayment);
-                    _unitOfWork.GetRepository<Order>().UpdateAsync(order);
-                    await _unitOfWork.CommitAsync();
-                    return true;
-
-                }
+                return Result.Failure("Invalid payload data");
             }
-            else if (payment.Status == "CANCELLED")
+
+            var payment = payload.data;
+            if (payment.orderCode == null)
             {
-                var getPayment = await _unitOfWork.GetRepository<Payment>().SingleOrDefaultAsync(
-                    predicate: p => p.OrderCode.Equals(payment.OrderCode));
-
-                if (getPayment != null)
-                {
-                    getPayment.Status = PaymentStatusEnum.Canceled.GetDescriptionFromEnum();
-                    _unitOfWork.GetRepository<Payment>().UpdateAsync(getPayment);
-                    await _unitOfWork.CommitAsync();
-                    return true;
-                }
+                return Result.Failure("Invalid order code data");
             }
 
+            var getPayment = await _unitOfWork.GetRepository<Payment>().SingleOrDefaultAsync(
+                predicate: p => p.OrderCode.Equals(payment.orderCode));
+            if (getPayment == null)
+            {
+                return Result.Failure("Payment is not found");
+            }
 
-            return false;
+            if (payload.success)
+            {
+                getPayment.PaymentStatus = PaymentStatusEnum.Completed.ToString();
+                var order = await _unitOfWork.GetRepository<Order>().SingleOrDefaultAsync(
+                    predicate: o => o.Id.Equals(getPayment.OrderId));
+                order.Status = OrderStatus.PENDING_DELIVERY.GetDescriptionFromEnum();
+                _unitOfWork.GetRepository<Payment>().UpdateAsync(getPayment);
+                _unitOfWork.GetRepository<Order>().UpdateAsync(order);
+                await _unitOfWork.CommitAsync();
+                return Result.Success();
+            }
+            else
+            {
+                getPayment.PaymentStatus = PaymentStatusEnum.Canceled.ToString();
+                _unitOfWork.GetRepository<Payment>().UpdateAsync(getPayment);
+                await _unitOfWork.CommitAsync();
+                return Result.Success();
+            }
+
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "An error occurred while handling webhook in service.");
-            return false;
+            return Result.Failure("An error occurred while handling webhook");
         }
     }
 
-   
     public async Task<ExtendedPaymentInfo> GetPaymentInfo(string paymentLinkId)
     {
         try
