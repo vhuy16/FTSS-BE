@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using FTSS_Model.Entities;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
 
 namespace FTSS_Model.Context;
 
@@ -64,21 +63,8 @@ public partial class MyDbContext : DbContext
     public virtual DbSet<Voucher> Vouchers { get; set; }
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
-    {
-        if (!optionsBuilder.IsConfigured)
-        {
-            var configuration = new ConfigurationBuilder()
-                .SetBasePath(AppContext.BaseDirectory)
-                .AddJsonFile("appsettings.json")
-                .Build();
-
-            var connectionString = configuration.GetConnectionString("DefautDB");
-
-            optionsBuilder
-                .UseLazyLoadingProxies() // Bật Lazy Loading
-                .UseSqlServer(connectionString);
-        }
-    }
+#warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see https://go.microsoft.com/fwlink/?LinkId=723263.
+        => optionsBuilder.UseSqlServer("Server=137.59.106.46;database=FTSS;user=ftss_admin;password=admin@1234;TrustServerCertificate=True");
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -466,6 +452,7 @@ public partial class MyDbContext : DbContext
             entity.Property(e => e.AmountPaid)
                 .HasColumnType("decimal(10, 2)")
                 .HasColumnName("amountPaid");
+            entity.Property(e => e.OrderCode).HasColumnName("orderCode");
             entity.Property(e => e.OrderId).HasColumnName("orderId");
             entity.Property(e => e.PaymentDate)
                 .HasColumnType("datetime")
@@ -773,6 +760,9 @@ public partial class MyDbContext : DbContext
             entity.Property(e => e.CreateDate)
                 .HasColumnType("datetime")
                 .HasColumnName("createDate");
+            entity.Property(e => e.Description)
+                .HasMaxLength(255)
+                .HasDefaultValue("No description");
             entity.Property(e => e.Discount)
                 .HasColumnType("decimal(10, 2)")
                 .HasColumnName("discount");
@@ -792,9 +782,7 @@ public partial class MyDbContext : DbContext
             entity.Property(e => e.ModifyDate)
                 .HasColumnType("datetime")
                 .HasColumnName("modifyDate");
-
             entity.Property(e => e.Quantity).HasColumnName("quantity");
-
             entity.Property(e => e.Status)
                 .HasMaxLength(50)
                 .IsUnicode(false)
