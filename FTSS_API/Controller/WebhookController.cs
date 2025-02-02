@@ -6,10 +6,9 @@ using System.Security.Cryptography;
 using System.Text;
 
 [ApiController]
-[Route("api/v1/[controller]")] // Đặt route ở cấp controller
 public class WebhookController : ControllerBase
 {
-    [HttpPost("webhook-url")] // Đặt route cụ thể cho action method
+    [HttpPost("api/v1/webhook-url")] // Đặt route cụ thể cho action method
     public IActionResult HandleWebhook()
     {
         try
