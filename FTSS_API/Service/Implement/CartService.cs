@@ -23,7 +23,7 @@ namespace FTSS_API.Service.Implement
         {
             Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
             var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
-                predicate: u => u.Id.Equals(userId) && u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum())&& u.IsDelete.Equals(false));
+                predicate: u => u.Id.Equals(userId) && u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) && u.IsDelete.Equals(false));
 
             if (user == null)
             {
@@ -44,7 +44,6 @@ namespace FTSS_API.Service.Implement
                     message = MessageConstant.ProductMessage.ProductNotExist,
                     data = null
                 };
-                //throw new BadHttpRequestException(MessageConstant.ProductMessage.ProductNotExist);
             }
 
             if (product.Quantity < addCartItemRequest.Quantity)
@@ -67,6 +66,7 @@ namespace FTSS_API.Service.Implement
                 };
             }
 
+            CartItem cartItem;
             var existingCartItem = await _unitOfWork.GetRepository<CartItem>().SingleOrDefaultAsync(
                 predicate: ci => ci.CartId.Equals(cart.Id) && ci.ProductId.Equals(addCartItemRequest.ProductId)
                 && ci.Status.Equals(CartEnum.Available.GetDescriptionFromEnum()));
@@ -80,12 +80,13 @@ namespace FTSS_API.Service.Implement
                 {
                     throw new BadHttpRequestException(MessageConstant.ProductMessage.ProductNotEnough);
                 }
-                _unitOfWork.GetRepository<CartItem>().UpdateAsync(existingCartItem);
-            }
 
+                _unitOfWork.GetRepository<CartItem>().UpdateAsync(existingCartItem);
+                cartItem = existingCartItem; // Assign the existing cart item
+            }
             else
             {
-                CartItem cartItem = new CartItem()
+                cartItem = new CartItem()
                 {
                     Id = Guid.NewGuid(),
                     CartId = cart.Id,
@@ -99,18 +100,19 @@ namespace FTSS_API.Service.Implement
                 await _unitOfWork.GetRepository<CartItem>().InsertAsync(cartItem);
             }
 
-            bool isSuccesfully = await _unitOfWork.CommitAsync() > 0;
+            bool isSuccessfully = await _unitOfWork.CommitAsync() > 0;
             AddCartItemResponse? addCartItemResponse = null;
-            if (isSuccesfully)
+            if (isSuccessfully)
             {
                 addCartItemResponse = new AddCartItemResponse()
                 {
-                    CartItemId = existingCartItem?.Id ?? cart.Id,
+                    CartItemId = cartItem.Id, // Always use the CartItem.Id
                     ProductId = product.Id,
                     ProductName = product.ProductName,
                     Price = product.Price * addCartItemRequest.Quantity,
                 };
             }
+
             return new ApiResponse()
             {
                 status = StatusCodes.Status200OK.ToString(),
@@ -118,6 +120,7 @@ namespace FTSS_API.Service.Implement
                 data = addCartItemResponse
             };
         }
+
 
         public async Task<ApiResponse> ClearCart()
         {
