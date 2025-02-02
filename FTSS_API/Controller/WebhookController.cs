@@ -6,11 +6,10 @@ using System.Security.Cryptography;
 using System.Text;
 
 [ApiController]
-[Route("webhook")]
+[Route("api/v1/[controller]")] // Đặt route ở cấp controller
 public class WebhookController : ControllerBase
 {
-    private readonly string _clientSecret = "e311924fb1e2a5e3094a89395adbf847dd21fd729588de55e84167a793eba23f"; // Thay bằng Client Secret của bạn
-    [HttpPost]
+    [HttpPost("webhook-url")] // Đặt route cụ thể cho action method
     public IActionResult HandleWebhook()
     {
         try
