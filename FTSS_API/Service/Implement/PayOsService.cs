@@ -242,20 +242,38 @@ public class PayOsService : BaseService<PayOsService>, IPayOSService
     {
         try
         {
-            // Initialize PayOS with settings
-            PayOS payOS = new PayOS(_payOSSettings.ClientId, _payOSSettings.ApiKey, _payOSSettings.ChecksumKey);
+            if (string.IsNullOrEmpty(webhookUrl))
+            {
+                Console.WriteLine("Webhook URL is null or empty.");
+                return new ApiResponse
+                {
+                    status = StatusCodes.Status400BadRequest.ToString(),
+                    message = "Invalid webhook URL: null or empty",
+                    data = null
+                };
+            }
+            if (!Uri.TryCreate(webhookUrl, UriKind.Absolute, out Uri uriResult))
+            {
+                Console.WriteLine("Webhook URL is not a valid absolute URI.");
+                 return new ApiResponse
+                {
+                    status = StatusCodes.Status400BadRequest.ToString(),
+                    message = "Invalid webhook URL: invalid format",
+                    data = null
+                };
+            }
+            Console.WriteLine($"Calling confirmWebhook with URL: {webhookUrl}");
+            string result = await _payOS.confirmWebhook(webhookUrl);
+            
+            Console.WriteLine($"confirmWebhook result: {result}");
 
-            // Confirm the webhook using the PayOS library
-            string result = await payOS.confirmWebhook(webhookUrl);
-
-            // Check the result and return an appropriate response
             if (!string.IsNullOrEmpty(result))
             {
                 return new ApiResponse
                 {
                     status = StatusCodes.Status200OK.ToString(),
                     message = "Webhook confirmed successfully.",
-                    data = result // Include the result in the response
+                    data = result
                 };
             }
             else
@@ -270,8 +288,7 @@ public class PayOsService : BaseService<PayOsService>, IPayOSService
         }
         catch (Exception ex)
         {
-            // Log the exception for debugging
-            _logger.LogError(ex, "Error occurred while confirming the webhook.");
+            Console.WriteLine($"Error confirming webhook: {ex.Message}, Stack Trace: {ex.StackTrace}");
 
             return new ApiResponse
             {
