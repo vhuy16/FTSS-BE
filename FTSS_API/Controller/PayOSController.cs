@@ -89,12 +89,13 @@ namespace FTSS_API.Controller;
      //     }
      // }
      [HttpPost("webhook-url")]
-     public async Task<IActionResult> HandlePayOsWebhook([FromBody] WebhookNotification notification)
+     public async Task<IActionResult> HandlePayOsWebhook([FromBody] WebhookType payload)
      {
          try
          {
-             
-             var result = await _payOsService.HandlePayOsWebhook(notification);
+             var signatureFromPayOs = payload.signature; // Lấy signature từ body
+             var requestBody = JsonConvert.SerializeObject(payload);
+             var result = await _payOsService.HandlePayOsWebhook(payload);
              if (result.IsSuccess)
              {
                  return Ok();
