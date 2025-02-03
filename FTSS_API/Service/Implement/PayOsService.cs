@@ -157,57 +157,96 @@ public class PayOsService : BaseService<PayOsService>, IPayOSService
     {
         try
         {
-            _logger.LogInformation($"Webhook received: {JsonConvert.SerializeObject(payload)}");
+           
 
-            var signature = ComputeHmacSha256(requestBody, _payOSSettings.ChecksumKey);
-            if (signature != signatureFromPayOs)
-            {
-                _logger.LogError("Invalid webhook signature");
-                return Result.Failure("Invalid webhook signature");
-            }
-
+            // Validate payload
             if (payload?.data == null)
             {
+         
                 return Result.Failure("Invalid payload data");
             }
 
-            var payment = payload.data;
-            if (payment.orderCode == null)
+            // Validate signature
+            if (!ValidateWebhookSignature(requestBody, signatureFromPayOs))
             {
+            
+                return Result.Failure("Invalid webhook signature");
+            }
+
+            var payment = payload.data;
+            if (string.IsNullOrEmpty(payment.code))
+            {
+             
                 return Result.Failure("Invalid order code data");
             }
 
-            var getPayment = await _unitOfWork.GetRepository<Payment>().SingleOrDefaultAsync(
-                predicate: p => p.OrderCode.Equals(payment.orderCode));
-            if (getPayment == null)
+            // Get payment from database
+            var existingPayment = await _unitOfWork.GetRepository<Payment>()
+                .SingleOrDefaultAsync(predicate:p => p.OrderCode == payment.orderCode);
+
+            if (existingPayment == null)
             {
+             
                 return Result.Failure("Payment is not found");
             }
 
+            // Update payment and order status based on webhook result
             if (payload.success)
             {
-                getPayment.PaymentStatus = PaymentStatusEnum.Completed.ToString();
-                var order = await _unitOfWork.GetRepository<Order>().SingleOrDefaultAsync(
-                    predicate: o => o.Id.Equals(getPayment.OrderId));
-                order.Status = OrderStatus.PENDING_DELIVERY.GetDescriptionFromEnum();
-                _unitOfWork.GetRepository<Payment>().UpdateAsync(getPayment);
-                _unitOfWork.GetRepository<Order>().UpdateAsync(order);
-                await _unitOfWork.CommitAsync();
-                return Result.Success();
+                await HandleSuccessfulPayment(existingPayment);
             }
             else
             {
-                getPayment.PaymentStatus = PaymentStatusEnum.Canceled.ToString();
-                _unitOfWork.GetRepository<Payment>().UpdateAsync(getPayment);
-                await _unitOfWork.CommitAsync();
-                return Result.Success();
+                await HandleFailedPayment(existingPayment);
             }
 
+            await _unitOfWork.CommitAsync();
+            _logger.LogInformation("Successfully processed webhook for orderCode: {OrderCode}", payment.orderCode);
+            return Result.Success();
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "An error occurred while handling webhook in service.");
+    
             return Result.Failure("An error occurred while handling webhook");
+        }
+    }
+
+    private async Task HandleSuccessfulPayment(Payment payment)
+    {
+        payment.PaymentStatus = PaymentStatusEnum.Completed.ToString();
+        payment.PaymentDate = DateTime.UtcNow;
+        
+        var order = await _unitOfWork.GetRepository<Order>()
+            .SingleOrDefaultAsync(predicate:o => o.Id == payment.OrderId);
+
+        if (order != null)
+        {
+            order.Status = OrderStatus.PENDING_DELIVERY.GetDescriptionFromEnum();
+            order.ModifyDate = DateTime.UtcNow;
+             _unitOfWork.GetRepository<Order>().UpdateAsync(order);
+        }
+
+         _unitOfWork.GetRepository<Payment>().UpdateAsync(payment);
+         await _unitOfWork.CommitAsync();
+    }
+
+    private async Task HandleFailedPayment(Payment payment)
+    {
+        payment.PaymentStatus = PaymentStatusEnum.Canceled.ToString();
+        payment.PaymentDate = DateTime.UtcNow;
+         _unitOfWork.GetRepository<Payment>().UpdateAsync(payment);
+          await _unitOfWork.CommitAsync();
+    }
+
+    private bool ValidateWebhookSignature(string requestBody, string signatureFromPayOs)
+    {
+        var secretKey = _payOSSettings.ChecksumKey;
+        
+        using (var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(secretKey)))
+        {
+            var hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(requestBody));
+            var computedSignature = BitConverter.ToString(hash).Replace("-", "").ToLower();
+            return computedSignature == signatureFromPayOs.ToLower();
         }
     }
 
@@ -303,4 +342,12 @@ public class PayOsService : BaseService<PayOsService>, IPayOSService
         public string checkoutUrl { get; set; }
         public long orderCode { get; set; }
     }
+    private bool SecureCompare(string a, string b)
+    {
+        return CryptographicOperations.FixedTimeEquals(
+            Encoding.UTF8.GetBytes(a),
+            Encoding.UTF8.GetBytes(b)
+        );
+    }
+
 }
