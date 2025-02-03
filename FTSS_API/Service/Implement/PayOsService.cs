@@ -153,45 +153,48 @@ public class PayOsService : BaseService<PayOsService>, IPayOSService
     }
 
 
-    public async Task<Result> HandlePayOsWebhook(WebhookType payload, string signatureFromPayOs, string requestBody)
+    public async Task<Result> HandlePayOsWebhook(WebhookType webhookBody)
     {
         try
         {
-           
+            _logger.LogInformation("Webhook received: {WebhookBody}", webhookBody);
 
-            // Validate payload
-            if (payload?.data == null)
+            // Verify webhook data using PayOS SDK
+            WebhookData webhookData;
+            try 
             {
-         
-                return Result.Failure("Invalid payload data");
+                webhookData = _payOS.verifyPaymentWebhookData(webhookBody);
+                if (webhookData == null)
+                {
+                    _logger.LogWarning("Invalid webhook data: Failed PayOS verification");
+                    return Result.Failure("Invalid webhook data");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error verifying webhook data with PayOS");
+                return Result.Failure("Failed to verify webhook signature");
             }
 
-            // Validate signature
-            if (!ValidateWebhookSignature(requestBody, signatureFromPayOs))
+            // Validate order code
+            if (string.IsNullOrEmpty(webhookData.code))
             {
-            
-                return Result.Failure("Invalid webhook signature");
-            }
-
-            var payment = payload.data;
-            if (string.IsNullOrEmpty(payment.code))
-            {
-             
+                _logger.LogWarning("Invalid order code received");
                 return Result.Failure("Invalid order code data");
             }
 
             // Get payment from database
             var existingPayment = await _unitOfWork.GetRepository<Payment>()
-                .SingleOrDefaultAsync(predicate:p => p.OrderCode == payment.orderCode);
+                .SingleOrDefaultAsync(predicate:p => p.OrderCode == webhookData.orderCode);
 
             if (existingPayment == null)
             {
-             
+                _logger.LogWarning("Payment not found for orderCode: {OrderCode}", webhookData.orderCode);
                 return Result.Failure("Payment is not found");
             }
 
             // Update payment and order status based on webhook result
-            if (payload.success)
+            if (webhookData.code.Equals("00", StringComparison.OrdinalIgnoreCase))
             {
                 await HandleSuccessfulPayment(existingPayment);
             }
@@ -201,12 +204,12 @@ public class PayOsService : BaseService<PayOsService>, IPayOSService
             }
 
             await _unitOfWork.CommitAsync();
-            _logger.LogInformation("Successfully processed webhook for orderCode: {OrderCode}", payment.orderCode);
+            _logger.LogInformation("Successfully processed webhook for orderCode: {OrderCode}", webhookData.orderCode);
             return Result.Success();
         }
         catch (Exception ex)
         {
-    
+            _logger.LogError(ex, "An error occurred while handling webhook in service");
             return Result.Failure("An error occurred while handling webhook");
         }
     }
@@ -227,7 +230,7 @@ public class PayOsService : BaseService<PayOsService>, IPayOSService
         }
 
          _unitOfWork.GetRepository<Payment>().UpdateAsync(payment);
-         await _unitOfWork.CommitAsync();
+        
     }
 
     private async Task HandleFailedPayment(Payment payment)
@@ -235,7 +238,7 @@ public class PayOsService : BaseService<PayOsService>, IPayOSService
         payment.PaymentStatus = PaymentStatusEnum.Canceled.ToString();
         payment.PaymentDate = DateTime.UtcNow;
          _unitOfWork.GetRepository<Payment>().UpdateAsync(payment);
-          await _unitOfWork.CommitAsync();
+        
     }
 
     private bool ValidateWebhookSignature(string requestBody, string signatureFromPayOs)
