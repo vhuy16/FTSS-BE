@@ -153,15 +153,15 @@ public class PayOsService : BaseService<PayOsService>, IPayOSService
     }
 
 
-    public async Task<Result> HandlePayOsWebhook(WebhookNotification webhookBody)
+    public async Task<Result> HandlePayOsWebhook(WebhookType webhookBody)
     {
         try
         {
+            
             var existingPayment = await _unitOfWork.GetRepository<Payment>()
-                .SingleOrDefaultAsync(predicate:p => p.OrderCode == webhookBody.Data.OrderCode);
-
+                .SingleOrDefaultAsync(predicate: p => p.OrderCode == webhookBody.data.orderCode);
             // Update payment and order status based on webhook result
-            if (webhookBody.Success && webhookBody.Data.Code == "00")
+            if (webhookBody.data.code == "00" && webhookBody.success)
             {
                 await HandleSuccessfulPayment(existingPayment);
             }
@@ -171,7 +171,7 @@ public class PayOsService : BaseService<PayOsService>, IPayOSService
             }
 
             await _unitOfWork.CommitAsync();
-        
+            _logger.LogInformation("Successfully processed webhook for orderCode: {OrderCode}", webhookBody.data.orderCode);
             return Result.Success();
         }
         catch (Exception ex)
