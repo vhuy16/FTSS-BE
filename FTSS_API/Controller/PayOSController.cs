@@ -93,9 +93,9 @@ namespace FTSS_API.Controller;
      {
          try
          {
-             var signatureFromPayOs = HttpContext.Request.Headers["x-payos-signature"].ToString();
+             var signatureFromPayOs = payload.signature; // Lấy signature từ body
              var requestBody = JsonConvert.SerializeObject(payload);
-             var result = await _payOsService.HandlePayOsWebhook(payload,signatureFromPayOs,requestBody);
+             var result = await _payOsService.HandlePayOsWebhook(payload, signatureFromPayOs, requestBody);
              if (result.IsSuccess)
              {
                  return Ok();
