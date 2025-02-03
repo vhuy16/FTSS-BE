@@ -153,48 +153,15 @@ public class PayOsService : BaseService<PayOsService>, IPayOSService
     }
 
 
-    public async Task<Result> HandlePayOsWebhook(WebhookType webhookBody)
+    public async Task<Result> HandlePayOsWebhook(WebhookNotification webhookBody)
     {
         try
         {
-            _logger.LogInformation("Webhook received: {WebhookBody}", webhookBody);
-
-            // Verify webhook data using PayOS SDK
-            WebhookData webhookData;
-            try 
-            {
-                webhookData = _payOS.verifyPaymentWebhookData(webhookBody);
-                if (webhookData == null)
-                {
-                    _logger.LogWarning("Invalid webhook data: Failed PayOS verification");
-                    return Result.Failure("Invalid webhook data");
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error verifying webhook data with PayOS");
-                return Result.Failure("Failed to verify webhook signature");
-            }
-
-            // Validate order code
-            if (string.IsNullOrEmpty(webhookData.code))
-            {
-                _logger.LogWarning("Invalid order code received");
-                return Result.Failure("Invalid order code data");
-            }
-
-            // Get payment from database
             var existingPayment = await _unitOfWork.GetRepository<Payment>()
-                .SingleOrDefaultAsync(predicate:p => p.OrderCode == webhookData.orderCode);
-
-            if (existingPayment == null)
-            {
-                _logger.LogWarning("Payment not found for orderCode: {OrderCode}", webhookData.orderCode);
-                return Result.Failure("Payment is not found");
-            }
+                .SingleOrDefaultAsync(predicate:p => p.OrderCode == webhookBody.Data.OrderCode);
 
             // Update payment and order status based on webhook result
-            if (webhookData.code.Equals("00", StringComparison.OrdinalIgnoreCase))
+            if (webhookBody.Success && webhookBody.Data.Code == "00")
             {
                 await HandleSuccessfulPayment(existingPayment);
             }
@@ -204,7 +171,7 @@ public class PayOsService : BaseService<PayOsService>, IPayOSService
             }
 
             await _unitOfWork.CommitAsync();
-            _logger.LogInformation("Successfully processed webhook for orderCode: {OrderCode}", webhookData.orderCode);
+        
             return Result.Success();
         }
         catch (Exception ex)
