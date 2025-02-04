@@ -15,9 +15,12 @@ namespace FTSS_API.Service.Implement;
 public class PaymentService : BaseService<PaymentService>, IPaymentService
 {
     private readonly IPayOSService _payOSService;
-    public PaymentService(IUnitOfWork<MyDbContext> unitOfWork, ILogger<PaymentService> logger, IMapper mapper, IHttpContextAccessor httpContextAccessor, IPayOSService payOsService) : base(unitOfWork, logger, mapper, httpContextAccessor)
+    private readonly IVnPayService _vnPayService;
+        
+    public PaymentService(IUnitOfWork<MyDbContext> unitOfWork, ILogger<PaymentService> logger, IMapper mapper, IHttpContextAccessor httpContextAccessor, IPayOSService payOsService, IVnPayService vnPayService) : base(unitOfWork, logger, mapper, httpContextAccessor)
     {
         _payOSService = payOsService;
+        _vnPayService = vnPayService;
     }
 
    public async Task<ApiResponse> CreatePayment(CreatePaymentRequest request)
@@ -89,7 +92,43 @@ public class PaymentService : BaseService<PaymentService>, IPaymentService
             };
         }
     }
-
+    else if( request.PaymentMethod == PaymenMethodEnum.VnPay.GetDescriptionFromEnum())
+    {
+        var paymentUrl = await _vnPayService.CreatePaymentUrl(request.OrderId);
+        Random random = new Random();
+        long orderCode = (DateTime.Now.Ticks % 1000000000000000L) * 10 + random.Next(0, 1000);
+        if (paymentUrl != null)
+        {
+          
+            var createPaymentResponse = new CreatePaymentResponse
+            {
+                Id = Guid.NewGuid(),
+                OrderId = order.Id,
+                PaymentMethod = PaymenMethodEnum.PayOs.GetDescriptionFromEnum(),
+                AmoundPaid = order.TotalPrice,
+                PaymentDate = DateTime.Now,
+                PaymentStatus = PaymentStatusEnum.Processing.ToString(),
+                PaymentURL = paymentUrl,
+                PaymentCode = orderCode
+               
+            };
+            return new ApiResponse()
+            {
+                data = createPaymentResponse.PaymentURL,
+                message = "Payment created successfully",
+                status = StatusCodes.Status200OK.ToString(),
+            };
+            
+        }
+        else
+        {
+            return new ApiResponse
+            {
+                data = string.Empty,
+                message = "Failed to create payment URL",
+                // status = response.status,
+            };
+        }    }
     return new ApiResponse
     {
         data = string.Empty,
