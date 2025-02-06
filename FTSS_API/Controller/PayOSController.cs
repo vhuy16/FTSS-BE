@@ -4,6 +4,7 @@ using FTSS_API.Payload.Pay;
 using FTSS_API.Service.Implement;
 using FTSS_API.Utils;
 using Microsoft.AspNetCore.Mvc;
+using Net.payOS.Types;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -87,26 +88,32 @@ namespace FTSS_API.Controller;
      //         return Redirect("https://www.mrc.vn/payment/callback?status=failed");
      //     }
      // }
-     [HttpPost("webhook")]
-     public async Task<IActionResult> HandlePayOsWebhook([FromBody] JObject payload)
+     [HttpPost("webhook-url")]
+     public async Task<IActionResult> HandlePayOsWebhook([FromBody] WebhookType payload)
      {
          try
          {
-             var signatureFromPayOs = HttpContext.Request.Headers["x-payos-signature"].ToString();
-             string id = Request.Query["id"].ToString();
-             var requestBody = payload.ToString(Formatting.None);
-             var result = await _payOsService.HandlePayOsWebhook(payload,signatureFromPayOs,requestBody);
-             if (result)
+             var signatureFromPayOs = payload.signature; // Lấy signature từ body
+             var requestBody = JsonConvert.SerializeObject(payload);
+             var result = await _payOsService.HandlePayOsWebhook(payload);
+             if (result.IsSuccess)
              {
                  return Ok();
              }
-             return BadRequest();
+             return BadRequest(result.ErrorMessage);
          }
          catch (Exception ex)
          {
              _logger.LogError(ex, "An error occurred while handling webhook in controller.");
              return StatusCode(StatusCodes.Status500InternalServerError, "An error occurred while processing the webhook.");
          }
-            
+     }
+     
+     [HttpPost("confirm-webhook")]
+     public async Task<IActionResult> ConfirmWebhook()
+     {
+         var webhookLink = "https://ftss.id.vn/api/v1/webhook";
+         var result = await _payOsService.ConfirmWebhook(webhookLink);
+         return Ok(result);
      }
  }

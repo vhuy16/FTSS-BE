@@ -152,68 +152,74 @@ public class PayOsService : BaseService<PayOsService>, IPayOSService
         throw new NotImplementedException();
     }
 
-    public async Task<bool> HandlePayOsWebhook(JObject payload, string signatureFromPayOs, string requestBody)
+
+    public async Task<Result> HandlePayOsWebhook(WebhookType webhookBody)
     {
-         try
+        try
         {
-            _logger.LogInformation($"Webhook received: {payload.ToString(Formatting.Indented)}");
-
-
-            // Xác thực chữ ký
-            var signature = ComputeHmacSha256(requestBody, _payOSSettings.ChecksumKey);
-          
-            if (signature != signatureFromPayOs)
+            
+            var existingPayment = await _unitOfWork.GetRepository<Payment>()
+                .SingleOrDefaultAsync(predicate: p => p.OrderCode == webhookBody.data.orderCode);
+            // Update payment and order status based on webhook result
+            if (webhookBody.data.code == "00" && webhookBody.success)
             {
-                _logger.LogError("Invalid webhook signature");
-               return false;
+                await HandleSuccessfulPayment(existingPayment);
+            }
+            else
+            {
+                await HandleFailedPayment(existingPayment);
             }
 
-
-            var payment = payload["data"].ToObject<ExtendedPaymentInfo>();
-
-            if (payment.Status == "PAID")
-            {
-                var getPayment = await _unitOfWork.GetRepository<Payment>().SingleOrDefaultAsync(
-                    predicate: p => p.OrderCode.Equals(payment.OrderCode));
-
-                if (getPayment != null)
-                {
-                    getPayment.Status = PaymentStatusEnum.Completed.GetDescriptionFromEnum();
-                    var order = await _unitOfWork.GetRepository<Order>().SingleOrDefaultAsync(
-                        predicate: o => o.Id.Equals(getPayment.OrderId));
-                    order.Status = OrderStatus.PENDING_DELIVERY.GetDescriptionFromEnum();
-                    _unitOfWork.GetRepository<Payment>().UpdateAsync(getPayment);
-                    _unitOfWork.GetRepository<Order>().UpdateAsync(order);
-                    await _unitOfWork.CommitAsync();
-                    return true;
-
-                }
-            }
-            else if (payment.Status == "CANCELLED")
-            {
-                var getPayment = await _unitOfWork.GetRepository<Payment>().SingleOrDefaultAsync(
-                    predicate: p => p.OrderCode.Equals(payment.OrderCode));
-
-                if (getPayment != null)
-                {
-                    getPayment.Status = PaymentStatusEnum.Canceled.GetDescriptionFromEnum();
-                    _unitOfWork.GetRepository<Payment>().UpdateAsync(getPayment);
-                    await _unitOfWork.CommitAsync();
-                    return true;
-                }
-            }
-
-
-            return false;
+            await _unitOfWork.CommitAsync();
+            _logger.LogInformation("Successfully processed webhook for orderCode: {OrderCode}", webhookBody.data.orderCode);
+            return Result.Success();
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "An error occurred while handling webhook in service.");
-            return false;
+            _logger.LogError(ex, "An error occurred while handling webhook in service");
+            return Result.Failure("An error occurred while handling webhook");
         }
     }
 
-   
+    private async Task HandleSuccessfulPayment(Payment payment)
+    {
+        payment.PaymentStatus = PaymentStatusEnum.Completed.ToString();
+        payment.PaymentDate = DateTime.UtcNow;
+        
+        var order = await _unitOfWork.GetRepository<Order>()
+            .SingleOrDefaultAsync(predicate:o => o.Id == payment.OrderId);
+
+        if (order != null)
+        {
+            order.Status = OrderStatus.PENDING_DELIVERY.GetDescriptionFromEnum();
+            order.ModifyDate = DateTime.UtcNow;
+             _unitOfWork.GetRepository<Order>().UpdateAsync(order);
+        }
+
+         _unitOfWork.GetRepository<Payment>().UpdateAsync(payment);
+        
+    }
+
+    private async Task HandleFailedPayment(Payment payment)
+    {
+        payment.PaymentStatus = PaymentStatusEnum.Canceled.ToString();
+        payment.PaymentDate = DateTime.UtcNow;
+         _unitOfWork.GetRepository<Payment>().UpdateAsync(payment);
+        
+    }
+
+    private bool ValidateWebhookSignature(string requestBody, string signatureFromPayOs)
+    {
+        var secretKey = _payOSSettings.ChecksumKey;
+        
+        using (var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(secretKey)))
+        {
+            var hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(requestBody));
+            var computedSignature = BitConverter.ToString(hash).Replace("-", "").ToLower();
+            return computedSignature == signatureFromPayOs.ToLower();
+        }
+    }
+
     public async Task<ExtendedPaymentInfo> GetPaymentInfo(string paymentLinkId)
     {
         try
@@ -240,9 +246,78 @@ public class PayOsService : BaseService<PayOsService>, IPayOSService
         }
         return new ExtendedPaymentInfo();
     }
+
+    public async Task<ApiResponse> ConfirmWebhook(string webhookUrl)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(webhookUrl))
+            {
+                Console.WriteLine("Webhook URL is null or empty.");
+                return new ApiResponse
+                {
+                    status = StatusCodes.Status400BadRequest.ToString(),
+                    message = "Invalid webhook URL: null or empty",
+                    data = null
+                };
+            }
+            if (!Uri.TryCreate(webhookUrl, UriKind.Absolute, out Uri uriResult))
+            {
+                Console.WriteLine("Webhook URL is not a valid absolute URI.");
+                 return new ApiResponse
+                {
+                    status = StatusCodes.Status400BadRequest.ToString(),
+                    message = "Invalid webhook URL: invalid format",
+                    data = null
+                };
+            }
+            Console.WriteLine($"Calling confirmWebhook with URL: {webhookUrl}");
+            string result = await _payOS.confirmWebhook(webhookUrl);
+            
+            Console.WriteLine($"confirmWebhook result: {result}");
+
+            if (!string.IsNullOrEmpty(result))
+            {
+                return new ApiResponse
+                {
+                    status = StatusCodes.Status200OK.ToString(),
+                    message = "Webhook confirmed successfully.",
+                    data = result
+                };
+            }
+            else
+            {
+                return new ApiResponse
+                {
+                    status = StatusCodes.Status400BadRequest.ToString(),
+                    message = "Webhook confirmation failed. The response was empty.",
+                    data = null
+                };
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error confirming webhook: {ex.Message}, Stack Trace: {ex.StackTrace}");
+
+            return new ApiResponse
+            {
+                status = StatusCodes.Status500InternalServerError.ToString(),
+                message = "An unexpected error occurred while confirming the webhook.",
+                data = ex.Message
+            };
+        }
+    }
     public class PaymentLinkResponse
     {
         public string checkoutUrl { get; set; }
         public long orderCode { get; set; }
     }
+    private bool SecureCompare(string a, string b)
+    {
+        return CryptographicOperations.FixedTimeEquals(
+            Encoding.UTF8.GetBytes(a),
+            Encoding.UTF8.GetBytes(b)
+        );
+    }
+
 }

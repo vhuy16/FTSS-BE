@@ -58,7 +58,7 @@ namespace FTSS_API.Service.Implement;
               pay.AddRequestData("vnp_Version", PaymentUltils.PayLib.VERSION);
               pay.AddRequestData("vnp_Command", "pay");
               pay.AddRequestData("vnp_TmnCode", _vnpTmnCode);
-              pay.AddRequestData("vnp_Amount", ((int)(order.TotalPrice) * 100000).ToString());
+              pay.AddRequestData("vnp_Amount", ((int)order.TotalPrice * 100).ToString());
               pay.AddRequestData("vnp_BankCode", "");
               pay.AddRequestData("vnp_CreateDate", DateTime.Now.ToString("yyyyMMddHHmmss"));
               pay.AddRequestData("vnp_CurrCode", "VND");
