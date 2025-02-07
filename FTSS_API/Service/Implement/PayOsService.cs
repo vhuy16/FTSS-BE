@@ -20,14 +20,16 @@ namespace FTSS_API.Service.Implement;
 
 public class PayOsService : BaseService<PayOsService>, IPayOSService
 {
-
     private readonly PayOS _payOS;
     private readonly PayOSSettings _payOSSettings;
     private readonly HttpClient _client;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IOrderService _oderServicer;
-    public PayOsService(IOptions<PayOSSettings> settings, HttpClient client, IUnitOfWork<MyDbContext> unitOfWork, ILogger<PayOsService> logger, IMapper mapper, IHttpContextAccessor httpContextAccessor, IOrderService oderServicer)
-   : base(unitOfWork, logger, mapper, httpContextAccessor)
+
+    public PayOsService(IOptions<PayOSSettings> settings, HttpClient client, IUnitOfWork<MyDbContext> unitOfWork,
+        ILogger<PayOsService> logger, IMapper mapper, IHttpContextAccessor httpContextAccessor,
+        IOrderService oderServicer)
+        : base(unitOfWork, logger, mapper, httpContextAccessor)
     {
         _payOSSettings = settings.Value; // Lấy giá trị từ IOptions
         _payOS = new PayOS(_payOSSettings.ClientId, _payOSSettings.ApiKey, _payOSSettings.ChecksumKey);
@@ -35,6 +37,7 @@ public class PayOsService : BaseService<PayOsService>, IPayOSService
         _unitOfWork = unitOfWork;
         _oderServicer = oderServicer;
     }
+
     private string ComputeHmacSha256(string data, string checksumKey)
     {
         using (var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(checksumKey)))
@@ -43,9 +46,9 @@ public class PayOsService : BaseService<PayOsService>, IPayOSService
             return BitConverter.ToString(hash).Replace("-", "").ToLower();
         }
     }
-    
 
-     public async Task<Result<PaymentLinkResponse>> CreatePaymentUrlRegisterCreator(Guid orderId)
+
+    public async Task<Result<PaymentLinkResponse>> CreatePaymentUrlRegisterCreator(Guid orderId)
     {
         var items = new List<ItemData>();
         Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
@@ -71,7 +74,7 @@ public class PayOsService : BaseService<PayOsService>, IPayOSService
 
         if (order == null)
         {
-             return Result<PaymentLinkResponse>.Failure("Order not found");
+            return Result<PaymentLinkResponse>.Failure("Order not found");
         }
 
         var orderDetailIds = order.OrderDetails.Select(od => od.Id).ToList();
@@ -135,20 +138,21 @@ public class PayOsService : BaseService<PayOsService>, IPayOSService
 
         var paymentResult = await _payOS.createPaymentLink(paymentData);
 
-       if (paymentResult != null)
+        if (paymentResult != null)
         {
-          var paymentLinkResponse = new PaymentLinkResponse()
+            var paymentLinkResponse = new PaymentLinkResponse()
             {
-             checkoutUrl = paymentResult.checkoutUrl,
-             orderCode = orderCode
+                checkoutUrl = paymentResult.checkoutUrl,
+                orderCode = orderCode
             };
-             return Result<PaymentLinkResponse>.Success(paymentLinkResponse);
+            return Result<PaymentLinkResponse>.Success(paymentLinkResponse);
         }
+
         return Result<PaymentLinkResponse>.Failure("Failed to create payment link");
     }
+
     public Task<ApiResponse> HandlePaymentCallback(string paymentLinkId, long orderCode)
     {
-        
         throw new NotImplementedException();
     }
 
@@ -157,7 +161,6 @@ public class PayOsService : BaseService<PayOsService>, IPayOSService
     {
         try
         {
-            
             var existingPayment = await _unitOfWork.GetRepository<Payment>()
                 .SingleOrDefaultAsync(predicate: p => p.OrderCode == webhookBody.data.orderCode);
             // Update payment and order status based on webhook result
@@ -171,7 +174,8 @@ public class PayOsService : BaseService<PayOsService>, IPayOSService
             }
 
             await _unitOfWork.CommitAsync();
-            _logger.LogInformation("Successfully processed webhook for orderCode: {OrderCode}", webhookBody.data.orderCode);
+            _logger.LogInformation("Successfully processed webhook for orderCode: {OrderCode}",
+                webhookBody.data.orderCode);
             return Result.Success();
         }
         catch (Exception ex)
@@ -185,33 +189,63 @@ public class PayOsService : BaseService<PayOsService>, IPayOSService
     {
         payment.PaymentStatus = PaymentStatusEnum.Completed.ToString();
         payment.PaymentDate = DateTime.UtcNow;
-        
-        var order = await _unitOfWork.GetRepository<Order>()
-            .SingleOrDefaultAsync(predicate:o => o.Id == payment.OrderId);
 
-        if (order != null)
+        var order = await _unitOfWork.GetRepository<Order>()
+            .SingleOrDefaultAsync(
+                predicate: o => o.Id == payment.OrderId,
+                include: x => x.Include(x => x.OrderDetails).Include(u => u.User)
+            );
+
+        if (order == null || order.User == null)
+            throw new InvalidOperationException("Order or User not found.");
+
+        var userId = order.User.Id;
+        var cart = await _unitOfWork.GetRepository<Cart>()
+            .SingleOrDefaultAsync(predicate: c => c.UserId == userId);
+
+        if (cart == null)
+            throw new InvalidOperationException("Cart not found.");
+
+        var productIds = order.OrderDetails.Select(od => od.ProductId).ToList();
+        var products = await _unitOfWork.GetRepository<Product>()
+            .GetListAsync(predicate: p => productIds.Contains(p.Id));
+        var cartItems = await _unitOfWork.GetRepository<CartItem>()
+            .GetListAsync(predicate: ci => ci.CartId == cart.Id && productIds.Contains(ci.ProductId));
+
+        foreach (var od in order.OrderDetails)
         {
-            order.Status = OrderStatus.PENDING_DELIVERY.GetDescriptionFromEnum();
-            order.ModifyDate = DateTime.UtcNow;
-             _unitOfWork.GetRepository<Order>().UpdateAsync(order);
+            var product = products.FirstOrDefault(p => p.Id == od.ProductId);
+            if (product == null) continue;
+
+            product.Quantity -= od.Quantity;
+            _unitOfWork.GetRepository<Product>().UpdateAsync(product);
+
+            var cartItem = cartItems.FirstOrDefault(ci => ci.ProductId == od.ProductId);
+            if (cartItem != null)
+            {
+                cartItem.IsDelete = true;
+                _unitOfWork.GetRepository<CartItem>().UpdateAsync(cartItem);
+            }
         }
 
-         _unitOfWork.GetRepository<Payment>().UpdateAsync(payment);
-        
+        order.Status = OrderStatus.PENDING_DELIVERY.GetDescriptionFromEnum();
+        order.ModifyDate = DateTime.UtcNow;
+        _unitOfWork.GetRepository<Order>().UpdateAsync(order);
+
+        _unitOfWork.GetRepository<Payment>().UpdateAsync(payment);
     }
 
     private async Task HandleFailedPayment(Payment payment)
     {
         payment.PaymentStatus = PaymentStatusEnum.Canceled.ToString();
         payment.PaymentDate = DateTime.UtcNow;
-         _unitOfWork.GetRepository<Payment>().UpdateAsync(payment);
-        
+        _unitOfWork.GetRepository<Payment>().UpdateAsync(payment);
     }
 
     private bool ValidateWebhookSignature(string requestBody, string signatureFromPayOs)
     {
         var secretKey = _payOSSettings.ChecksumKey;
-        
+
         using (var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(secretKey)))
         {
             var hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(requestBody));
@@ -244,6 +278,7 @@ public class PayOsService : BaseService<PayOsService>, IPayOSService
         {
             throw new Exception("An error occurred while getting payment info.", ex);
         }
+
         return new ExtendedPaymentInfo();
     }
 
@@ -261,19 +296,21 @@ public class PayOsService : BaseService<PayOsService>, IPayOSService
                     data = null
                 };
             }
+
             if (!Uri.TryCreate(webhookUrl, UriKind.Absolute, out Uri uriResult))
             {
                 Console.WriteLine("Webhook URL is not a valid absolute URI.");
-                 return new ApiResponse
+                return new ApiResponse
                 {
                     status = StatusCodes.Status400BadRequest.ToString(),
                     message = "Invalid webhook URL: invalid format",
                     data = null
                 };
             }
+
             Console.WriteLine($"Calling confirmWebhook with URL: {webhookUrl}");
             string result = await _payOS.confirmWebhook(webhookUrl);
-            
+
             Console.WriteLine($"confirmWebhook result: {result}");
 
             if (!string.IsNullOrEmpty(result))
@@ -307,11 +344,13 @@ public class PayOsService : BaseService<PayOsService>, IPayOSService
             };
         }
     }
+
     public class PaymentLinkResponse
     {
         public string checkoutUrl { get; set; }
         public long orderCode { get; set; }
     }
+
     private bool SecureCompare(string a, string b)
     {
         return CryptographicOperations.FixedTimeEquals(
@@ -319,5 +358,4 @@ public class PayOsService : BaseService<PayOsService>, IPayOSService
             Encoding.UTF8.GetBytes(b)
         );
     }
-
 }
