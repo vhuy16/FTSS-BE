@@ -425,13 +425,13 @@ public class OrderService : BaseService<OrderService>, IOrderService
                 paymentUrl = paymentResponse.data.ToString();
             }
             // Delete CartItems with status "buyed"
-            foreach (var cartItem in cartItems)
-            {
-                _unitOfWork.GetRepository<CartItem>().DeleteAsync(cartItem);
-            }
+            //foreach (var cartItem in cartItems)
+            //{
+            //    _unitOfWork.GetRepository<CartItem>().DeleteAsync(cartItem);
+            //}
 
         
-            await _unitOfWork.CommitAsync(); // Commit after deletion
+            //await _unitOfWork.CommitAsync(); // Commit after deletion
         
 
             // Prepare response
