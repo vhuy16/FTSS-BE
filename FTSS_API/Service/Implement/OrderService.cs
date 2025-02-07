@@ -271,6 +271,7 @@ public class OrderService : BaseService<OrderService>, IOrderService
             var cartItems = await _unitOfWork.GetRepository<CartItem>().GetListAsync(predicate: p =>
                    p.CartId.Equals(cart.Id)
                     && createOrderRequest.CartItem.Contains(p.Id)
+                   
                     && p.Status.Equals(CartEnum.Available.GetDescriptionFromEnum()));
         
             if (cartItems == null || !cartItems.Any())
@@ -288,7 +289,7 @@ public class OrderService : BaseService<OrderService>, IOrderService
         
             decimal totalprice = 0;
             List<Guid> productIds = cartItems.Select(x => x.ProductId).ToList();
-            var products = await _unitOfWork.GetRepository<Product>().GetListAsync(predicate: p => productIds.Contains(p.Id));
+            var products = await _unitOfWork.GetRepository<Product>().GetListAsync(predicate: p => productIds.Contains(p.Id) );
             var productsDict = products.ToDictionary(x => x.Id, x => x);
         
            
@@ -343,7 +344,9 @@ public class OrderService : BaseService<OrderService>, IOrderService
             {
                 if (productsDict.ContainsKey(cartItem.ProductId))
                 {
+                    
                     var product = productsDict[cartItem.ProductId];
+                    if (product.Quantity < cartItem.Quantity) throw new Exception($"Sản phẩm '{product.ProductName}' chỉ còn {product.Quantity} trong kho, không đủ để đặt hàng.");
                     totalprice += cartItem.Quantity * product.Price;
                     var newOrderDetail = new OrderDetail
                     {

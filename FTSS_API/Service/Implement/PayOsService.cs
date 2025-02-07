@@ -223,8 +223,7 @@ public class PayOsService : BaseService<PayOsService>, IPayOSService
             var cartItem = cartItems.FirstOrDefault(ci => ci.ProductId == od.ProductId);
             if (cartItem != null)
             {
-                cartItem.IsDelete = true;
-                _unitOfWork.GetRepository<CartItem>().UpdateAsync(cartItem);
+                _unitOfWork.GetRepository<CartItem>().DeleteAsync(cartItem);
             }
         }
 
