@@ -45,7 +45,7 @@ public class VnPayController : BaseController<VnPayController>
         
             // Lấy orderId từ query string VNPay gửi về
             string txnRef = vnpay.GetResponseData("vnp_TxnRef");
-            Guid orderId = Guid.ParseExact(txnRef, "N");
+            Guid orderId = new Guid(txnRef);
             
 
             // Lấy trạng thái giao dịch
