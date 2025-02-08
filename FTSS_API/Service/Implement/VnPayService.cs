@@ -112,7 +112,7 @@ namespace FTSS_API.Service.Implement;
           }
       }
 
-      private async Task HandleFailedPayment(Payment payment)
+      private async Task HandleSuccessfulPayment(Payment payment)
       {
           payment.PaymentStatus = PaymentStatusEnum.Completed.ToString();
           payment.PaymentDate = DateTime.UtcNow;
@@ -161,7 +161,7 @@ namespace FTSS_API.Service.Implement;
           _unitOfWork.GetRepository<Payment>().UpdateAsync(payment);
       }
 
-      private async Task HandleSuccessfulPayment(Payment payment)
+      private async Task HandleFailedPayment(Payment payment)
       {
           payment.PaymentStatus = PaymentStatusEnum.Canceled.ToString();
           payment.PaymentDate = DateTime.UtcNow;
