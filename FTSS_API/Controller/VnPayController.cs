@@ -41,15 +41,46 @@ public class VnPayController : BaseController<VnPayController>
     {
         try
         {
-            PaymentUltils.PayLib vnpay = new PaymentUltils.PayLib();
-        
-            // Lấy orderId từ query string VNPay gửi về
-            string txnRef = vnpay.GetResponseData("vnp_TxnRef");
-            Guid orderId = new Guid(txnRef);
-            
+            // Lấy query string từ request
+            var queryString = HttpContext.Request.Query;
+
+            // Lấy giá trị của vnp_TxnRef từ query string
+            if (!queryString.TryGetValue("vnp_TxnRef", out var txnRef))
+            {
+                return BadRequest(new ApiResponse
+                {
+                    status = "400",
+                    message = "Thiếu tham số vnp_TxnRef trong phản hồi từ VNPay",
+                    data = false
+                });
+            }
+
+            // Chuyển đổi txnRef sang Guid
+            Guid orderId;
+            try
+            {
+                orderId = new Guid(txnRef); // Sử dụng new Guid() để parse
+            }
+            catch (FormatException)
+            {
+                return BadRequest(new ApiResponse
+                {
+                    status = "400",
+                    message = "Order ID không hợp lệ",
+                    data = false
+                });
+            }
 
             // Lấy trạng thái giao dịch
-            string vnp_TransactionStatus = vnpay.GetResponseData("vnp_TransactionStatus");
+            if (!queryString.TryGetValue("vnp_TransactionStatus", out var vnp_TransactionStatus))
+            {
+                return BadRequest(new ApiResponse
+                {
+                    status = "400",
+                    message = "Thiếu tham số vnp_TransactionStatus trong phản hồi từ VNPay",
+                    data = false
+                });
+            }
 
             // Gọi service để xử lý callback
             var response = await _vnPayService.HandleCallBack(vnp_TransactionStatus, orderId);

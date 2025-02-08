@@ -112,6 +112,19 @@ public class PaymentService : BaseService<PaymentService>, IPaymentService
                 PaymentCode = orderCode
                
             };
+            var payment = new Payment
+            {
+                Id = createPaymentResponse.Id,
+                OrderId = createPaymentResponse.OrderId,
+                PaymentMethod = createPaymentResponse.PaymentMethod,
+                AmountPaid = createPaymentResponse.AmoundPaid,
+                PaymentDate = createPaymentResponse.PaymentDate,
+                PaymentStatus = PaymentStatusEnum.Processing.ToString(),
+                OrderCode = createPaymentResponse.PaymentCode
+            };
+        
+            await _unitOfWork.GetRepository<Payment>().InsertAsync(payment);
+            await _unitOfWork.CommitAsync();
             return new ApiResponse()
             {
                 data = createPaymentResponse.PaymentURL,
