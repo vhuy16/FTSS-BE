@@ -1,11 +1,14 @@
 ﻿using System.Net;
 using AutoMapper;
+using FTSS_API.Payload;
 using FTSS_API.Payload.Request.Pay.VnPay;
 using FTSS_API.Service.Interface;
 using FTSS_API.Utils;
 using FTSS_Model.Context;
 using FTSS_Model.Entities;
+using FTSS_Model.Enum;
 using FTSS_Repository.Interface;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
 namespace FTSS_API.Service.Implement;
@@ -77,5 +80,91 @@ namespace FTSS_API.Service.Implement;
               _logger.LogError($"Error creating payment URL: {ex.Message}");
               throw new Exception("Failed to create payment URL", ex);
           }
+      }
+
+      public async Task<ApiResponse> HandleCallBack(string status, Guid orderId)
+      {
+          try
+          {
+              var payment = await _unitOfWork.GetRepository<Payment>()
+                  .SingleOrDefaultAsync(predicate: p => p.OrderId.Equals(orderId));
+              if (status == "00")
+              {
+                  await HandleSuccessfulPayment(payment);
+              }
+              else
+              {
+                  await HandleFailedPayment(payment);
+              }
+
+              await _unitOfWork.CommitAsync();
+              return new ApiResponse()
+              {
+                  status = StatusCodes.Status200OK.ToString(),
+                  message = "Thanh toán thành công",
+                  data = true
+              };
+          }
+          catch (Exception e)
+          {
+              Console.WriteLine(e);
+              throw;
+          }
+      }
+
+      private async Task HandleSuccessfulPayment(Payment payment)
+      {
+          payment.PaymentStatus = PaymentStatusEnum.Completed.ToString();
+          payment.PaymentDate = DateTime.UtcNow;
+
+          var order = await _unitOfWork.GetRepository<Order>()
+              .SingleOrDefaultAsync(
+                  predicate: o => o.Id == payment.OrderId,
+                  include: x => x.Include(x => x.OrderDetails).Include(u => u.User)
+              );
+
+          if (order == null || order.User == null)
+              throw new InvalidOperationException("Order or User not found.");
+
+          var userId = order.User.Id;
+          var cart = await _unitOfWork.GetRepository<Cart>()
+              .SingleOrDefaultAsync(predicate: c => c.UserId == userId);
+
+          if (cart == null)
+              throw new InvalidOperationException("Cart not found.");
+
+          var productIds = order.OrderDetails.Select(od => od.ProductId).ToList();
+          var products = await _unitOfWork.GetRepository<Product>()
+              .GetListAsync(predicate: p => productIds.Contains(p.Id));
+          var cartItems = await _unitOfWork.GetRepository<CartItem>()
+              .GetListAsync(predicate: ci => ci.CartId == cart.Id && productIds.Contains(ci.ProductId));
+
+          foreach (var od in order.OrderDetails)
+          {
+              var product = products.FirstOrDefault(p => p.Id == od.ProductId);
+              if (product == null) continue;
+
+              product.Quantity -= od.Quantity;
+              _unitOfWork.GetRepository<Product>().UpdateAsync(product);
+
+              var cartItem = cartItems.FirstOrDefault(ci => ci.ProductId == od.ProductId);
+              if (cartItem != null)
+              {
+                  _unitOfWork.GetRepository<CartItem>().DeleteAsync(cartItem);
+              }
+          }
+
+          order.Status = OrderStatus.PENDING_DELIVERY.GetDescriptionFromEnum();
+          order.ModifyDate = DateTime.UtcNow;
+          _unitOfWork.GetRepository<Order>().UpdateAsync(order);
+
+          _unitOfWork.GetRepository<Payment>().UpdateAsync(payment);
+      }
+
+      private async Task HandleFailedPayment(Payment payment)
+      {
+          payment.PaymentStatus = PaymentStatusEnum.Canceled.ToString();
+          payment.PaymentDate = DateTime.UtcNow;
+          _unitOfWork.GetRepository<Payment>().UpdateAsync(payment);
       }
   }
