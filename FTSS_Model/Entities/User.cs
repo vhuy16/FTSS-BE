@@ -38,4 +38,8 @@ public partial class User
     public virtual ICollection<Order> Orders { get; set; } = new List<Order>();
 
     public virtual ICollection<Otp> Otps { get; set; } = new List<Otp>();
+
+    public virtual ICollection<Payment> Payments { get; set; } = new List<Payment>();
+
+    public virtual ICollection<SetupPackage> SetupPackages { get; set; } = new List<SetupPackage>();
 }

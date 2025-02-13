@@ -439,7 +439,7 @@ public class OrderService : BaseService<OrderService>, IOrderService
 
             // Prepare response
             var orderDetailsResponse = new List<CreateOrderResponse.OrderDetailCreateResponse>();
-            foreach (var od in order.OrderDetails)
+            foreach (var od in  order.OrderDetails)
             {
                 var product = await _unitOfWork.GetRepository<Product>().SingleOrDefaultAsync(
                     predicate: p => p.Id.Equals(od.ProductId));

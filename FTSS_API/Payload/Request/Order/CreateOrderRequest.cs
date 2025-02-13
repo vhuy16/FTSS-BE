@@ -7,4 +7,6 @@ public class CreateOrderRequest
     public string Address { get; set; }
     public Guid? VoucherId { get; set; }
     public string PaymentMethod { get; set; }
+    public string PhoneNumber { get; set; }
+    public string Name { get; set; }
 }
