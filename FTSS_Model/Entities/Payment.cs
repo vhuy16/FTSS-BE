@@ -18,9 +18,18 @@ public partial class Payment
     public string? PaymentStatus { get; set; }
 
     public long? OrderCode { get; set; }
-    
-    public string? Status  {get; set;}
+
+    public string? Status { get; set; }
+
+    public long? BankNumber { get; set; }
+
+    public string? BankName { get; set; }
+
+    public string? BankHolder { get; set; }
+
+    public Guid? UserId { get; set; }
+
     public virtual Order Order { get; set; } = null!;
 
-    public virtual ICollection<Transaction> Transactions { get; set; } = new List<Transaction>();
+    public virtual User? User { get; set; }
 }
