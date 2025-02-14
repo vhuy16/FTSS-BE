@@ -109,4 +109,13 @@ public static class ApiEndPointConstant
         public const string UpdateVoucher = VoucherEndPoint + "{id}";
         public const string DeleteVoucher = VoucherEndPoint + "{id}";
     }
+    public static class SetupPackage
+    {
+        public const string SetupPackageEndPoint = ApiEndpoint + "/setuppackage";
+        public const string AddSetupPackage = SetupPackageEndPoint;
+        public const string RemoveSetupPackage = SetupPackageEndPoint + "/{id}";
+        public const string GetListSetupPackage = SetupPackageEndPoint;
+        public const string GetListSetupPackageAllUser = SetupPackageEndPoint + "/all-users";
+        public const string GetListSetupPackageShop = SetupPackageEndPoint + "/shop";
+    }
 }
