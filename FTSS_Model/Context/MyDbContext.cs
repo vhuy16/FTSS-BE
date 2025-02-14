@@ -56,8 +56,6 @@ public partial class MyDbContext : DbContext
 
     public virtual DbSet<SubCategory> SubCategories { get; set; }
 
-    public virtual DbSet<Transaction> Transactions { get; set; }
-
     public virtual DbSet<User> Users { get; set; }
 
     public virtual DbSet<Voucher> Vouchers { get; set; }
@@ -452,6 +450,15 @@ public partial class MyDbContext : DbContext
             entity.Property(e => e.AmountPaid)
                 .HasColumnType("decimal(10, 2)")
                 .HasColumnName("amountPaid");
+            entity.Property(e => e.BankHolder)
+                .HasMaxLength(50)
+                .IsUnicode(false)
+                .HasColumnName("bankHolder");
+            entity.Property(e => e.BankName)
+                .HasMaxLength(50)
+                .IsUnicode(false)
+                .HasColumnName("bankName");
+            entity.Property(e => e.BankNumber).HasColumnName("bankNumber");
             entity.Property(e => e.OrderCode).HasColumnName("orderCode");
             entity.Property(e => e.OrderId).HasColumnName("orderId");
             entity.Property(e => e.PaymentDate)
@@ -464,11 +471,21 @@ public partial class MyDbContext : DbContext
                 .HasMaxLength(50)
                 .IsUnicode(false)
                 .HasColumnName("paymentStatus");
+            entity.Property(e => e.Status)
+                .HasMaxLength(50)
+                .IsUnicode(false)
+                .HasColumnName("status");
+            entity.Property(e => e.UserId).HasColumnName("userId");
 
             entity.HasOne(d => d.Order).WithMany(p => p.Payments)
                 .HasForeignKey(d => d.OrderId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK__Payment__orderId__17036CC0");
+
+            entity.HasOne(d => d.User).WithMany(p => p.Payments)
+                .HasForeignKey(d => d.UserId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("fk_user_payment");
         });
 
         modelBuilder.Entity<Product>(entity =>
@@ -538,6 +555,11 @@ public partial class MyDbContext : DbContext
             entity.Property(e => e.SetupName)
                 .HasMaxLength(255)
                 .HasColumnName("setupName");
+            entity.Property(e => e.Userid).HasColumnName("userid");
+
+            entity.HasOne(d => d.User).WithMany(p => p.SetupPackages)
+                .HasForeignKey(d => d.Userid)
+                .HasConstraintName("FK_SetupPackage_User");
         });
 
         modelBuilder.Entity<SetupPackageDetail>(entity =>
@@ -662,36 +684,6 @@ public partial class MyDbContext : DbContext
                 .HasForeignKey(d => d.CategoryId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_SubCategory_Category");
-        });
-
-        modelBuilder.Entity<Transaction>(entity =>
-        {
-            entity.HasKey(e => e.Id).HasName("PK__Transact__3213E83FEAB6F003");
-
-            entity.ToTable("Transaction");
-
-            entity.Property(e => e.Id)
-                .ValueGeneratedNever()
-                .HasColumnName("id");
-            entity.Property(e => e.Amount)
-                .HasColumnType("decimal(10, 2)")
-                .HasColumnName("amount");
-            entity.Property(e => e.PaymentId).HasColumnName("paymentId");
-            entity.Property(e => e.Status)
-                .HasMaxLength(50)
-                .IsUnicode(false)
-                .HasColumnName("status");
-            entity.Property(e => e.TransactionDate)
-                .HasColumnType("datetime")
-                .HasColumnName("transactionDate");
-            entity.Property(e => e.TransactionType)
-                .HasMaxLength(50)
-                .IsUnicode(false)
-                .HasColumnName("transactionType");
-
-            entity.HasOne(d => d.Payment).WithMany(p => p.Transactions)
-                .HasForeignKey(d => d.PaymentId)
-                .HasConstraintName("FK__Transacti__payme__01D345B0");
         });
 
         modelBuilder.Entity<User>(entity =>
