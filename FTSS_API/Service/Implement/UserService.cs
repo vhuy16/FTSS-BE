@@ -366,7 +366,7 @@ public class UserService : BaseService<UserService>, IUserService
             data = user
         };
     }
-
+    
     public async Task<ApiResponse> UpdateUser(Guid id, UpdateUserRequest updateUserRequest)
     {
         string phonePattern = @"^0\d{9}$";
@@ -397,7 +397,7 @@ public class UserService : BaseService<UserService>, IUserService
         user.Gender = updateUserRequest.Gender.HasValue ? updateUserRequest.Gender.GetDescriptionFromEnum() : user.Gender.GetDescriptionFromEnum();
         user.ModifyDate = TimeUtils.GetCurrentSEATime();
         user.Address = string.IsNullOrEmpty(updateUserRequest.Address) ? user.Address : updateUserRequest.Address;
-
+        user.Role = string.IsNullOrEmpty(updateUserRequest.Role) ? user.Role : updateUserRequest.Role;
         _unitOfWork.GetRepository<User>().UpdateAsync(user);
 
         bool isSuccessful = await _unitOfWork.CommitAsync() > 0;

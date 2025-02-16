@@ -40,6 +40,8 @@ public static class ApiEndPointConstant
     {
         public const string PaymentEndPoint = ApiEndpoint + "/payment";
         public const string CreatePaymentUrl = PaymentEndPoint + "/create-url";
+        public const string GetPaymentById = PaymentEndPoint + "/{paymentId}";
+        public const string GetPaymentByOrderId = PaymentEndPoint + "/order/{orderId}";
     }
     public static class Category
     {
