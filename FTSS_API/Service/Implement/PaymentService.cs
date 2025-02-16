@@ -7,8 +7,10 @@ using FTSS_API.Utils;
 using FTSS_Model.Context;
 using FTSS_Model.Entities;
 using FTSS_Model.Enum;
+using FTSS_Model.Paginate;
 using FTSS_Repository.Interface;
 using Microsoft.EntityFrameworkCore;
+using Supabase.Gotrue;
 
 namespace FTSS_API.Service.Implement;
 
@@ -150,5 +152,95 @@ public class PaymentService : BaseService<PaymentService>, IPaymentService
     };
 }
 
+public async Task<ApiResponse> GetPaymentById(Guid paymentId)
+{
+    var payment = await _unitOfWork.GetRepository<Payment>().SingleOrDefaultAsync(
+       
+        predicate: o => o.Id.Equals(paymentId)
+      
+    );
+   
+    if (payment == null)
+    {
+        return new ApiResponse
+        {
+            status = StatusCodes.Status404NotFound.ToString(),
+            message = "Payment not found",
+            data = null
 
+        };
+    }
+
+    return new ApiResponse()
+    {
+        status = StatusCodes.Status200OK.ToString(),
+        data = payment,
+        message = "Payment retrieved successfully",
+    };
+}
+
+public async Task<ApiResponse> GetPaymentByOrderId(Guid orderId)
+{
+    var payment = await _unitOfWork.GetRepository<Payment>().SingleOrDefaultAsync(
+        predicate: o => o.Id.Equals(orderId)
+    );
+    if (payment == null)
+    {
+        return new ApiResponse
+        {
+            status = StatusCodes.Status404NotFound.ToString(),
+            message = "Payment not found",
+            data = null
+
+        };
+    }
+
+    return new ApiResponse()
+    {
+        status = StatusCodes.Status200OK.ToString(),
+        data = payment,
+        message = "Payment retrieved successfully",
+    };
+}
+
+public async Task<ApiResponse> GetPayments(int page, int size)
+{
+    var payments = await _unitOfWork.GetRepository<Payment>().GetPagingListAsync(
+        selector: s => new CreatePaymentResponse()
+        {
+            Id = s.Id,
+            OrderId = s.OrderId,
+            PaymentMethod = s.PaymentMethod.ToString(),
+            AmoundPaid = s.AmountPaid,
+            PaymentStatus = s.PaymentStatus.ToString(),
+            PaymentDate = s.PaymentDate,
+        },
+        page: page,
+        size: size
+    );
+    int totalItems = payments.Total;
+    int totalPages = (int)Math.Ceiling((double)totalItems / size);
+    if (payments == null || payments.Items.Count == 0)
+    {
+        return new ApiResponse
+        {
+            status = StatusCodes.Status200OK.ToString(),
+            message = "Products retrieved successfully.",
+            data = new Paginate<Payment>()
+            {
+                Page = page,
+                Size = size,
+                Total = totalItems,
+                TotalPages = totalPages,
+                Items = new List<Payment>()
+            }
+        };
+    }
+    return new ApiResponse
+    {
+        status = StatusCodes.Status200OK.ToString(),
+        message = "Products retrieved successfully.",
+        data = payments
+    };
+}
 }
