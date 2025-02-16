@@ -5,5 +5,5 @@ public enum RoleEnum
     Admin,
     Customer,
     Manager,
-    Staff
+    Technician
 }

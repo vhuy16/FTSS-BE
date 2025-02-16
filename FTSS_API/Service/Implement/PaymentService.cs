@@ -104,7 +104,7 @@ public class PaymentService : BaseService<PaymentService>, IPaymentService
             {
                 Id = Guid.NewGuid(),
                 OrderId = order.Id,
-                PaymentMethod = PaymenMethodEnum.PayOs.GetDescriptionFromEnum(),
+                PaymentMethod = PaymenMethodEnum.VnPay.GetDescriptionFromEnum(),
                 AmoundPaid = order.TotalPrice,
                 PaymentDate = DateTime.Now,
                 PaymentStatus = PaymentStatusEnum.Processing.ToString(),
