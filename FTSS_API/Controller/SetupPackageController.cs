@@ -49,9 +49,9 @@ namespace FTSS_API.Controller
         [HttpGet(ApiEndPointConstant.SetupPackage.GetListSetupPackage)]
         [ProducesResponseType(typeof(IPaginate<ApiResponse>), StatusCodes.Status200OK)]
         [ProducesErrorResponseType(typeof(ProblemDetails))]
-        public async Task<IActionResult> GetListSetupPackage([FromRoute]
-            [FromQuery] int? page,
-            [FromQuery] int? size,
+        public async Task<IActionResult> GetListSetupPackage(
+            [FromQuery] int? page = 1,
+            [FromQuery] int? size = 10,
             [FromQuery] bool? isAscending = null)
         {
             int pageNumber = page ?? 1;
@@ -72,9 +72,9 @@ namespace FTSS_API.Controller
         [HttpGet(ApiEndPointConstant.SetupPackage.GetListSetupPackageShop)]
         [ProducesResponseType(typeof(IPaginate<ApiResponse>), StatusCodes.Status200OK)]
         [ProducesErrorResponseType(typeof(ProblemDetails))]
-        public async Task<IActionResult> GetListSetupPackageShop([FromRoute]
-            [FromQuery] int? page,
-            [FromQuery] int? size,
+        public async Task<IActionResult> GetListSetupPackageShop(
+            [FromQuery] int? page = 1,
+            [FromQuery] int? size = 10,
             [FromQuery] bool? isAscending = null)
         {
             int pageNumber = page ?? 1;
@@ -95,9 +95,9 @@ namespace FTSS_API.Controller
         [HttpGet(ApiEndPointConstant.SetupPackage.GetListSetupPackageAllUser)]
         [ProducesResponseType(typeof(IPaginate<ApiResponse>), StatusCodes.Status200OK)]
         [ProducesErrorResponseType(typeof(ProblemDetails))]
-        public async Task<IActionResult> GetListSetupPackageAllUser([FromRoute]
-            [FromQuery] int? page,
-            [FromQuery] int? size,
+        public async Task<IActionResult> GetListSetupPackageAllUser(
+            [FromQuery] int? page = 1,
+            [FromQuery] int? size = 10,
             [FromQuery] bool? isAscending = null)
         {
             int pageNumber = page ?? 1;

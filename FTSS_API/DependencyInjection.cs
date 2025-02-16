@@ -58,6 +58,7 @@ public static class DependencyInjection
         services.AddScoped<IPayOSService, PayOsService>();
         services.AddScoped<IPaymentService, PaymentService>();
         services.AddScoped<ISetupPackageService, SetupPackageService>();
+        services.AddScoped<IMaintenanceScheduleService, MaintenanceScheduleService>();
         //
         // services.AddScoped<PaymentUltils.Utils>();
         services.AddScoped<HtmlSanitizerUtils>();
