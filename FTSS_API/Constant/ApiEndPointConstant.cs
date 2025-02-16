@@ -118,4 +118,12 @@ public static class ApiEndPointConstant
         public const string GetListSetupPackageAllUser = SetupPackageEndPoint + "/all-users";
         public const string GetListSetupPackageShop = SetupPackageEndPoint + "/shop";
     }
+    public static class MaintenanceSchedule
+    {
+        public const string MaintenanceScheduleEndPoint = ApiEndpoint + "/maintenanceschedule";
+        public const string AssigningTechnician = MaintenanceScheduleEndPoint;
+        public const string CancelTask = MaintenanceScheduleEndPoint + "{id}";
+        public const string GetListTask = MaintenanceScheduleEndPoint;
+        public const string GetListTaskTech = MaintenanceScheduleEndPoint + "/list-task-tech";
+    }
 }

@@ -1,17 +1,16 @@
 ﻿using System;
 using System.Collections.Generic;
-using FTSS_Model.Entities;
 using Microsoft.EntityFrameworkCore;
 
-namespace FTSS_Model.Context;
+namespace FTSS_Model.Entities;
 
-public partial class MyDbContext : DbContext
+public partial class FtssContext : DbContext
 {
-    public MyDbContext()
+    public FtssContext()
     {
     }
 
-    public MyDbContext(DbContextOptions<MyDbContext> options)
+    public FtssContext(DbContextOptions<FtssContext> options)
         : base(options)
     {
     }
@@ -62,7 +61,7 @@ public partial class MyDbContext : DbContext
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
 #warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see https://go.microsoft.com/fwlink/?LinkId=723263.
-        => optionsBuilder.UseSqlServer("Server=137.59.106.46;database=FTSS;user=ftss_admin;password=admin@1234;TrustServerCertificate=True");
+        => optionsBuilder.UseSqlServer("Server=137.59.106.46;Database=FTSS;User Id=ftss_admin;Password=admin@1234;TrustServerCertificate=True;");
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -312,6 +311,7 @@ public partial class MyDbContext : DbContext
             entity.Property(e => e.Id)
                 .HasDefaultValueSql("(newid())")
                 .HasColumnName("id");
+            entity.Property(e => e.Address).HasMaxLength(255);
             entity.Property(e => e.IsDelete)
                 .HasDefaultValue(false)
                 .HasColumnName("isDelete");
@@ -324,11 +324,16 @@ public partial class MyDbContext : DbContext
             entity.Property(e => e.TaskName)
                 .HasMaxLength(255)
                 .HasColumnName("taskName");
+            entity.Property(e => e.Userid).HasColumnName("userid");
 
             entity.HasOne(d => d.MaintenanceSchedule).WithMany(p => p.MaintenanceTasks)
                 .HasForeignKey(d => d.MaintenanceScheduleId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK__Maintenan__maint__114A936A");
+
+            entity.HasOne(d => d.User).WithMany(p => p.MaintenanceTasks)
+                .HasForeignKey(d => d.Userid)
+                .HasConstraintName("FK_MaintenanceTask_User");
         });
 
         modelBuilder.Entity<Model3D>(entity =>
