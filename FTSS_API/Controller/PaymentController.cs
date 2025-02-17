@@ -43,5 +43,29 @@ public class PaymentController : BaseController<PaymentController>
             return BadRequest(result);
         }
     }
-    
+    [HttpGet(ApiEndPointConstant.Payment.GetPaymentById)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetPaymentById(Guid paymentId)
+    {
+        var result = await _paymentService.GetPaymentById(paymentId);
+        return result.status == StatusCodes.Status200OK.ToString() ? Ok(result) : NotFound(result);
+    }
+
+    [HttpGet(ApiEndPointConstant.Payment.GetPaymentByOrderId)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetPaymentByOrderId(Guid orderId)
+    {
+        var result = await _paymentService.GetPaymentByOrderId(orderId);
+        return result.status == StatusCodes.Status200OK.ToString() ? Ok(result) : NotFound(result);
+    }
+
+    [HttpGet]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetPayments([FromQuery] int page = 1, [FromQuery] int size = 10)
+    {
+        var result = await _paymentService.GetPayments(page, size);
+        return Ok(result);
+    }
 }

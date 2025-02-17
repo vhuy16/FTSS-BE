@@ -6,4 +6,7 @@ namespace FTSS_API.Service.Interface;
 public interface IPaymentService
 {
     Task<ApiResponse> CreatePayment(CreatePaymentRequest request);
+    Task<ApiResponse> GetPaymentById(Guid paymentId);
+    Task<ApiResponse> GetPaymentByOrderId(Guid orderId);
+    Task<ApiResponse> GetPayments(int page, int size);
 }
