@@ -276,7 +276,7 @@ public class OrderService : BaseService<OrderService>, IOrderService
             var cartItems = await _unitOfWork.GetRepository<CartItem>().GetListAsync(predicate: p =>
                    p.CartId.Equals(cart.Id)
                     && createOrderRequest.CartItem.Contains(p.Id)
-                    && p.Status.Equals(CartEnum.Available.GetDescriptionFromEnum()));
+                    && p.IsDelete.Equals(false));
         
             if (cartItems == null || !cartItems.Any())
             {
