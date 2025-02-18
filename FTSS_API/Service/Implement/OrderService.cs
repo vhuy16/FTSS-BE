@@ -237,7 +237,12 @@ public class OrderService : BaseService<OrderService>, IOrderService
         Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
         if (userId == null)
         {
-            throw new BadHttpRequestException("User ID cannot be null.");
+            return new ApiResponse()
+            {
+                status = StatusCodes.Status401Unauthorized.ToString(),
+                message = "Unauthorized: Token is missing or expired.",
+                data = null
+            };
         }
 
         // Validate if the CartItem list is empty
@@ -271,11 +276,9 @@ public class OrderService : BaseService<OrderService>, IOrderService
             var cartItems = await _unitOfWork.GetRepository<CartItem>().GetListAsync(predicate: p =>
                    p.CartId.Equals(cart.Id)
                     && createOrderRequest.CartItem.Contains(p.Id)
-                   
                     && p.Status.Equals(CartEnum.Available.GetDescriptionFromEnum()));
         
             if (cartItems == null || !cartItems.Any())
-
             {
                 return new ApiResponse()
                 {
@@ -284,16 +287,12 @@ public class OrderService : BaseService<OrderService>, IOrderService
                     data = null
                 };
             }
-
-        
-        
+            
             decimal totalprice = 0;
             List<Guid> productIds = cartItems.Select(x => x.ProductId).ToList();
             var products = await _unitOfWork.GetRepository<Product>().GetListAsync(predicate: p => productIds.Contains(p.Id) );
             var productsDict = products.ToDictionary(x => x.Id, x => x);
-        
-           
-
+             
             Order order = new Order
             {
                 Id = Guid.NewGuid(),
@@ -498,28 +497,12 @@ public class OrderService : BaseService<OrderService>, IOrderService
         }
         catch (DbUpdateConcurrencyException ex)
         {
-            foreach (var entry in ex.Entries)
+            return new ApiResponse()
             {
-                if (entry.Entity is Order)
-                {
-                    var databaseValues = entry.GetDatabaseValues();
-                    if (databaseValues == null)
-                    {
-                        throw new BadHttpRequestException("The order was deleted by another user.");
-                    }
-
-        
-                    throw new BadHttpRequestException(
-                        "The order was updated by another user. Please refresh and try again.");
-
-                }
-                else if (entry.Entity is OrderDetail)
-                {
-                    throw new BadHttpRequestException("Concurrency conflict occurred for OrderDetail.");
-                }
-            }
-
-            throw;
+                status = StatusCodes.Status409Conflict.ToString(),
+                message = "Database concurrency issue. Please try again.",
+                data = null
+            };
         }
         catch (BadHttpRequestException)
         {
@@ -527,8 +510,12 @@ public class OrderService : BaseService<OrderService>, IOrderService
         }
         catch (Exception ex)
         {
-            throw new BadHttpRequestException("An unexpected error occurred while creating the order.", ex);
-        }
+            return new ApiResponse()
+            {
+                status = StatusCodes.Status500InternalServerError.ToString(),
+                message = $"An unexpected error occurred while creating the order: {ex.Message}",
+                data = null
+            }; }
     }
 
     public async Task<ApiResponse> GetListOrder(int page, int size, bool? isAscending)
@@ -631,7 +618,12 @@ public class OrderService : BaseService<OrderService>, IOrderService
 
             if (user == null)
             {
-                throw new BadHttpRequestException("You need to log in.");
+                return new ApiResponse()
+                {
+                    status = StatusCodes.Status401Unauthorized.ToString(),
+                    message = "Unauthorized: Token is missing or expired.",
+                    data = null
+                };
             }
             var query = _unitOfWork.Context.Set<Order>()
                 .Where(o => o.UserId == userId && (string.IsNullOrEmpty(status) || o.Status.Equals(status)))

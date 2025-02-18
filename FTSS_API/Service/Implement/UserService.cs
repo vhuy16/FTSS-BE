@@ -293,10 +293,10 @@ public class UserService : BaseService<UserService>, IUserService
 
         if (userId == null)
         {
-            return new ApiResponse
+            return new ApiResponse()
             {
-                status = StatusCodes.Status400BadRequest.ToString(),
-                message = "User ID not found.",
+                status = StatusCodes.Status401Unauthorized.ToString(),
+                message = "Unauthorized: Token is missing or expired.",
                 data = null
             };
         }

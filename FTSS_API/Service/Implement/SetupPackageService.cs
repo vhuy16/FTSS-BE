@@ -71,7 +71,12 @@ namespace FTSS_API.Service.Implement
 
                 if (user == null)
                 {
-                    throw new BadHttpRequestException("You need to log in.");
+                    return new ApiResponse()
+                    {
+                        status = StatusCodes.Status401Unauthorized.ToString(),
+                        message = "Unauthorized: Token is missing or expired.",
+                        data = null
+                    };
                 }
 
                 // Kiểm tra xem SetupName đã tồn tại chưa
@@ -236,7 +241,12 @@ namespace FTSS_API.Service.Implement
 
                 if (user == null)
                 {
-                    throw new BadHttpRequestException("You need to log in.");
+                    return new ApiResponse()
+                    {
+                        status = StatusCodes.Status401Unauthorized.ToString(),
+                        message = "Unauthorized: Token is missing or expired.",
+                        data = null
+                    };
                 }
 
                 // Lấy danh sách SetupPackage của userId
@@ -300,7 +310,12 @@ namespace FTSS_API.Service.Implement
 
                 if (user == null)
                 {
-                    throw new BadHttpRequestException("You don't have permission to do this.");
+                    return new ApiResponse()
+                    {
+                        status = StatusCodes.Status401Unauthorized.ToString(),
+                        message = "Unauthorized: Token is missing or expired.",
+                        data = null
+                    };
                 }
 
                 // Lấy danh sách SetupPackage của user có Role là Customer, bao gồm UserName và Id
@@ -380,7 +395,12 @@ namespace FTSS_API.Service.Implement
 
                 if (user == null)
                 {
-                    throw new BadHttpRequestException("You don't have permission to do this.");
+                    return new ApiResponse()
+                    {
+                        status = StatusCodes.Status401Unauthorized.ToString(),
+                        message = "Unauthorized: Token is missing or expired.",
+                        data = null
+                    };
                 }
 
                 // Lấy danh sách SetupPackage của User có Role là Admin hoặc Manager, bao gồm danh sách sản phẩm
@@ -460,7 +480,12 @@ namespace FTSS_API.Service.Implement
 
                 if (user == null)
                 {
-                    throw new BadHttpRequestException("You need to log in.");
+                    return new ApiResponse()
+                    {
+                        status = StatusCodes.Status401Unauthorized.ToString(),
+                        message = "Unauthorized: Token is missing or expired.",
+                        data = null
+                    };
                 }
                 var setupPackage = await _unitOfWork.Context.Set<SetupPackage>()
                     .FirstOrDefaultAsync(sp => sp.Id == id && sp.IsDelete == false);
