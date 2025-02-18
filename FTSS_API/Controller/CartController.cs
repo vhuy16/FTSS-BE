@@ -25,7 +25,7 @@ namespace FTSS_API.Controller
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
         [ProducesErrorResponseType(typeof(ProblemDetails))]
-        public async Task<IActionResult> AddCartItem([FromBody] AddCartItemRequest addCartItemRequest)
+        public async Task<IActionResult> AddCartItem([FromBody] List<AddCartItemRequest> addCartItemRequest)
         {
             var addCartItemResponse = await _cartService.AddCartItem(addCartItemRequest);
             if (addCartItemResponse.status == StatusCodes.Status404NotFound.ToString())

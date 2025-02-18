@@ -22,6 +22,46 @@ namespace FTSS_API.Service.Implement
         {
             try
             {
+                // Kiểm tra xem SetupName và Description có bị bỏ trống không
+                if (string.IsNullOrWhiteSpace(request.SetupName))
+                {
+                    return new ApiResponse
+                    {
+                        status = StatusCodes.Status400BadRequest.ToString(),
+                        message = "Setup name cannot be empty.",
+                        data = null
+                    };
+                }
+
+                if (string.IsNullOrWhiteSpace(request.Description))
+                {
+                    return new ApiResponse
+                    {
+                        status = StatusCodes.Status400BadRequest.ToString(),
+                        message = "Description cannot be empty.",
+                        data = null
+                    };
+                }
+                // Kiểm tra độ dài của SetupName
+                if (request.SetupName.Length > 10)
+                {
+                    return new ApiResponse
+                    {
+                        status = StatusCodes.Status400BadRequest.ToString(),
+                        message = "Setup name must not exceed 10 characters.",
+                        data = null
+                    };
+                }
+                // Kiểm tra ký tự đầu tiên có phải chữ hoa không
+                if (!char.IsUpper(request.SetupName.Trim()[0]))
+                {
+                    return new ApiResponse
+                    {
+                        status = StatusCodes.Status400BadRequest.ToString(),
+                        message = "Setup name must start with an uppercase letter.",
+                        data = null
+                    };
+                }
                 // Lấy UserId từ HttpContext
                 Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
                 var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
