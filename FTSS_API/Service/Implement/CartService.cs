@@ -27,7 +27,12 @@ namespace FTSS_API.Service.Implement
 
             if (user == null)
             {
-                throw new BadHttpRequestException("You need log in.");
+                return new ApiResponse()
+                {
+                    status = StatusCodes.Status401Unauthorized.ToString(),
+                    message = "Unauthorized: Token is missing or expired.",
+                    data = null
+                };
             }
 
             var cart = await _unitOfWork.GetRepository<Cart>().SingleOrDefaultAsync(
@@ -130,7 +135,12 @@ namespace FTSS_API.Service.Implement
 
             if (user == null)
             {
-                throw new BadHttpRequestException("You need log in.");
+                return new ApiResponse()
+                {
+                    status = StatusCodes.Status401Unauthorized.ToString(),
+                    message = "Unauthorized: Token is missing or expired.",
+                    data = null
+                };
             }
 
             var cart = await _unitOfWork.GetRepository<Cart>().SingleOrDefaultAsync(
@@ -167,7 +177,12 @@ namespace FTSS_API.Service.Implement
 
             if (user == null)
             {
-                throw new BadHttpRequestException("You need log in.");
+                return new ApiResponse()
+                {
+                    status = StatusCodes.Status401Unauthorized.ToString(),
+                    message = "Unauthorized: Token is missing or expired.",
+                    data = null
+                };
             }
 
             var cart = await _unitOfWork.GetRepository<Cart>().SingleOrDefaultAsync(
@@ -206,7 +221,12 @@ namespace FTSS_API.Service.Implement
 
             if (user == null)
             {
-                throw new BadHttpRequestException("You need to log in.");
+                return new ApiResponse()
+                {
+                    status = StatusCodes.Status401Unauthorized.ToString(),
+                    message = "Unauthorized: Token is missing or expired.",
+                    data = null
+                };
             }
 
             var cart = await _unitOfWork.GetRepository<Cart>().SingleOrDefaultAsync(
@@ -266,7 +286,12 @@ namespace FTSS_API.Service.Implement
             Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
             if (userId == null)
             {
-                throw new BadHttpRequestException("User not logged in.");
+                return new ApiResponse()
+                {
+                    status = StatusCodes.Status401Unauthorized.ToString(),
+                    message = "Unauthorized: Token is missing or expired.",
+                    data = null
+                };
             }
 
             var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
@@ -336,7 +361,12 @@ namespace FTSS_API.Service.Implement
 
             if (user == null)
             {
-                throw new BadHttpRequestException("You need log in.");
+                return new ApiResponse()
+                {
+                    status = StatusCodes.Status401Unauthorized.ToString(),
+                    message = "Unauthorized: Token is missing or expired.",
+                    data = null
+                };
             }
 
             var cart = await _unitOfWork.GetRepository<Cart>().SingleOrDefaultAsync(
