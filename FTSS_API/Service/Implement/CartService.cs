@@ -37,14 +37,12 @@ namespace FTSS_API.Service.Implement
 
             if (user == null)
             {
-
                 return new ApiResponse()
                 {
                     status = StatusCodes.Status401Unauthorized.ToString(),
                     message = "Unauthorized: Token is missing or expired.",
                     data = null
                 };
-
             }
 
             var cart = await _unitOfWork.GetRepository<Cart>().SingleOrDefaultAsync(
@@ -64,6 +62,16 @@ namespace FTSS_API.Service.Implement
 
             foreach (var item in addCartItemRequest)
             {
+                if (!Enum.TryParse(item.Status, out CartItemEnum cartStatus) || (cartStatus != CartItemEnum.Odd && cartStatus != CartItemEnum.Setup))
+                {
+                    return new ApiResponse()
+                    {
+                        status = StatusCodes.Status400BadRequest.ToString(),
+                        message = "Invalid status value. Allowed values: Odd, Setup",
+                        data = null
+                    };
+                }
+
                 var product = await _unitOfWork.GetRepository<Product>().SingleOrDefaultAsync(
                     predicate: p => p.Id.Equals(item.ProductId) && p.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()));
 
@@ -87,40 +95,18 @@ namespace FTSS_API.Service.Implement
                     };
                 }
 
-                var existingCartItem = await _unitOfWork.GetRepository<CartItem>().SingleOrDefaultAsync(
-                    predicate: ci => ci.CartId.Equals(cart.Id) && ci.ProductId.Equals(item.ProductId)
-                    && ci.Status.Equals(CartEnum.Available.GetDescriptionFromEnum()));
-
-                CartItem cartItem;
-
-                if (existingCartItem != null)
+                var cartItem = new CartItem()
                 {
-                    existingCartItem.Quantity += item.Quantity;
-                    existingCartItem.ModifyDate = TimeUtils.GetCurrentSEATime();
+                    Id = Guid.NewGuid(),
+                    CartId = cart.Id,
+                    ProductId = product.Id,
+                    Quantity = item.Quantity,
+                    Status = cartStatus.ToString(),
+                    CreateDate = TimeUtils.GetCurrentSEATime(),
+                    ModifyDate = TimeUtils.GetCurrentSEATime()
+                };
 
-                    if (product.Quantity < existingCartItem.Quantity)
-                    {
-                        throw new BadHttpRequestException(MessageConstant.ProductMessage.ProductNotEnough);
-                    }
-
-                    _unitOfWork.GetRepository<CartItem>().UpdateAsync(existingCartItem);
-                    cartItem = existingCartItem;
-                }
-                else
-                {
-                    cartItem = new CartItem()
-                    {
-                        Id = Guid.NewGuid(),
-                        CartId = cart.Id,
-                        ProductId = product.Id,
-                        Quantity = item.Quantity,
-                        Status = CartEnum.Available.GetDescriptionFromEnum(),
-                        CreateDate = TimeUtils.GetCurrentSEATime(),
-                        ModifyDate = TimeUtils.GetCurrentSEATime()
-                    };
-
-                    await _unitOfWork.GetRepository<CartItem>().InsertAsync(cartItem);
-                }
+                await _unitOfWork.GetRepository<CartItem>().InsertAsync(cartItem);
 
                 cartItemResponses.Add(new AddCartItemResponse()
                 {
@@ -140,6 +126,7 @@ namespace FTSS_API.Service.Implement
                 data = cartItemResponses
             };
         }
+
 
         //public async Task<ApiResponse> AddCartItem(AddCartItemRequest addCartItemRequest)
         //{
@@ -265,7 +252,7 @@ namespace FTSS_API.Service.Implement
                 predicate: c => c.UserId.Equals(userId));
 
             var cartItems = await _unitOfWork.GetRepository<CartItem>().GetListAsync(
-                predicate: c => c.CartId.Equals(cart.Id) && c.Status.Equals(CartEnum.Available.GetDescriptionFromEnum()));
+                predicate: c => c.CartId.Equals(cart.Id) && c.IsDelete.Equals(false));
 
             if (cartItems == null || !cartItems.Any())
             {
@@ -274,7 +261,7 @@ namespace FTSS_API.Service.Implement
 
             foreach (var cartItem in cartItems)
             {
-                cartItem.Status = CartEnum.Unavailable.GetDescriptionFromEnum();
+                cartItem.IsDelete = true;
                 _unitOfWork.GetRepository<CartItem>().UpdateAsync(cartItem);
             }
 
@@ -283,7 +270,7 @@ namespace FTSS_API.Service.Implement
             {
                 status = StatusCodes.Status200OK.ToString(),
                 message = "Clear cart successful",
-                data = true
+                data = isSuccessful
             };
         }
 
@@ -307,7 +294,7 @@ namespace FTSS_API.Service.Implement
                 predicate: c => c.UserId.Equals(userId));
 
             var cartItem = await _unitOfWork.GetRepository<CartItem>().SingleOrDefaultAsync(
-                predicate: c => c.CartId.Equals(cart.Id) && c.Status.Equals(CartEnum.Available.GetDescriptionFromEnum()) && c.Id.Equals(ItemId));
+                predicate: c => c.CartId.Equals(cart.Id) && c.IsDelete.Equals(false) && c.Id.Equals(ItemId));
 
             if (cartItem == null)
             {
@@ -319,7 +306,7 @@ namespace FTSS_API.Service.Implement
                 };
             }
 
-            cartItem.Status = CartEnum.Unavailable.GetDescriptionFromEnum();
+            cartItem.IsDelete = true; // Đặt isDelete thành true thay vì thay đổi status
             cartItem.ModifyDate = TimeUtils.GetCurrentSEATime();
             _unitOfWork.GetRepository<CartItem>().UpdateAsync(cartItem);
             bool isSuccessful = await _unitOfWork.CommitAsync() > 0;
@@ -327,9 +314,10 @@ namespace FTSS_API.Service.Implement
             {
                 status = StatusCodes.Status200OK.ToString(),
                 message = "Delete successful",
-                data = true
+                data = isSuccessful
             };
         }
+
 
         public async Task<ApiResponse> GetAllCartItem()
         {
@@ -352,7 +340,7 @@ namespace FTSS_API.Service.Implement
 
             var cartItems = await _unitOfWork.GetRepository<CartItem>().GetListAsync(
                 predicate: c => c.CartId.Equals(cart.Id) &&
-                                c.Status.Equals(CartEnum.Available.GetDescriptionFromEnum()) &&
+                                c.IsDelete.Equals(false) &&
                                 c.Product.Status.Equals(ProductStatusEnum.Available.GetDescriptionFromEnum()), // Kiểm tra Status của Product
                 include: c => c.Include(c => c.Product),
                 orderBy: c => c.OrderByDescending(o => o.CreateDate));
@@ -426,7 +414,7 @@ namespace FTSS_API.Service.Implement
 
             var cartItems = await _unitOfWork.GetRepository<CartItem>().GetListAsync(
                     predicate: c => c.CartId.Equals(cart.Id) &&
-                    c.Status.Equals(CartEnum.Available.GetDescriptionFromEnum()) &&
+                    c.IsDelete.Equals(false) &&
                     c.Product.Status.Equals(ProductStatusEnum.Available.GetDescriptionFromEnum()), // Thêm điều kiện lọc Product
                     include: c => c.Include(c => c.Product), // Bao gồm Product để sử dụng các thuộc tính của nó
                     orderBy: c => c.OrderByDescending(o => o.CreateDate));
@@ -492,7 +480,7 @@ namespace FTSS_API.Service.Implement
 
             var existingCartItem = await _unitOfWork.GetRepository<CartItem>().SingleOrDefaultAsync(
                 predicate: ci => ci.Id.Equals(id) && ci.CartId.Equals(cart.Id)
-                && ci.Status.Equals(CartEnum.Available.GetDescriptionFromEnum()));
+                && ci.IsDelete.Equals(false));
 
             if (existingCartItem == null)
             {
@@ -505,7 +493,7 @@ namespace FTSS_API.Service.Implement
             }
 
             var product = await _unitOfWork.GetRepository<Product>().SingleOrDefaultAsync(
-                predicate: p => p.Id.Equals(existingCartItem.ProductId) && p.Status.Equals(CartEnum.Available.GetDescriptionFromEnum()));
+                predicate: p => p.Id.Equals(existingCartItem.ProductId) && p.IsDelete.Equals(false));
 
             if (updateCartItemRequest.Quantity <= 0)
             {
