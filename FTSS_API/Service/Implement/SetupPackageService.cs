@@ -79,6 +79,23 @@ namespace FTSS_API.Service.Implement
                     };
                 }
 
+                // Kiểm tra nếu user có role Customer và đã có SetupPackage
+                if (user.Role == "Customer")
+                {
+                    bool hasSetupPackage = await _unitOfWork.Context.Set<SetupPackage>()
+                        .AnyAsync(sp => sp.Userid == user.Id && sp.IsDelete == false);
+
+                    if (hasSetupPackage)
+                    {
+                        return new ApiResponse
+                        {
+                            status = StatusCodes.Status400BadRequest.ToString(),
+                            message = "Customers can only have one Setup Package.",
+                            data = null
+                        };
+                    }
+                }
+
                 // Kiểm tra xem SetupName đã tồn tại chưa
                 bool isSetupNameExists = await _unitOfWork.Context.Set<SetupPackage>()
                     .AnyAsync(sp => sp.SetupName == request.SetupName && sp.IsDelete == false);
@@ -156,6 +173,20 @@ namespace FTSS_API.Service.Implement
                     {
                         status = StatusCodes.Status400BadRequest.ToString(),
                         message = missingMessage,
+                        data = null
+                    };
+                }
+                // ❗ Kiểm tra nếu có nhiều hơn 1 sản phẩm thuộc danh mục "Bể"
+                var tankProducts = validProducts
+                    .Where(p => categories.Any(c => c.Id == p.SubCategoryId && c.CategoryName == "Bể"))
+                    .ToList();
+
+                if (tankProducts.Count > 1)
+                {
+                    return new ApiResponse
+                    {
+                        status = StatusCodes.Status400BadRequest.ToString(),
+                        message = "Only one product from category 'Bể' is allowed.",
                         data = null
                     };
                 }
