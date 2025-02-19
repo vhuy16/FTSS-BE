@@ -1,6 +1,6 @@
 ﻿namespace FTSS_API.Payload.Request.Shipment;
 
-public class WebhookData
+public class GoshipWebhookData
 {
     public string Gcode { get; set; }
     public string Code { get; set; }
