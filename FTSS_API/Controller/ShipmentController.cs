@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Security.Cryptography;
 using System.Text;
+using FTSS_API.Payload.Request.Shipment;
 using FTSS_Model.Entities;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
@@ -30,11 +31,12 @@ public class ShipmentController :  BaseController<ShipmentController>
         }
     }
     [HttpPost("listen")]
-    public IActionResult ListenWebhook([FromBody] object data)
+    public IActionResult ListenWebhook([FromBody] WebhookData webhookData)
     {
         try
         {
-            string requestBody = System.Text.Json.JsonSerializer.Serialize(data);
+            // Serialize the received data to a string for HMAC verification
+            string requestBody = System.Text.Json.JsonSerializer.Serialize(webhookData);
             string webhookHmac = Request.Headers["X-Goship-Hmac-SHA256"].ToString();
 
             if (string.IsNullOrEmpty(webhookHmac))
@@ -46,7 +48,14 @@ public class ShipmentController :  BaseController<ShipmentController>
             if (VerifyWebhook(requestBody, webhookHmac))
             {
                 _logger.LogInformation("Webhook verified successfully.");
-                return Ok("Webhook verified");
+
+                // Process the webhook data
+                _logger.LogInformation($"Received webhook data: Gcode={webhookData.Gcode}, OrderId={webhookData.OrderId}, Status={webhookData.Status}, Message={webhookData.Message}");
+
+                // You can add your business logic here to handle the webhook data
+                // For example, update the order status in your database
+
+                return Ok("Webhook verified and processed");
             }
             else
             {
