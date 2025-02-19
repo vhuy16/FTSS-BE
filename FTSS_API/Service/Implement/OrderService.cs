@@ -1,4 +1,8 @@
-﻿using AutoMapper;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using AutoMapper;
 using FTSS_API.Constant;
 using FTSS_API.Payload;
 using FTSS_API.Payload.Request;
@@ -10,7 +14,9 @@ using FTSS_Model.Context;
 using FTSS_Model.Entities;
 using FTSS_Model.Enum;
 using FTSS_Repository.Interface;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace FTSS_API.Service.Implement;
 
@@ -770,13 +776,14 @@ public class OrderService : BaseService<OrderService>, IOrderService
         }
         catch (Exception ex)
         {
-            return new ApiResponse
+            return new ApiResponse()
             {
                 status = StatusCodes.Status500InternalServerError.ToString(),
-                message = "An error occurred while retrieving the order.",
-                data = ex.Message
+                message = $"An unexpected error occurred while creating the order: {ex.Message}",
+                data = null
             };
         }
+
     }
 
 
