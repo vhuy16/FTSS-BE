@@ -31,7 +31,7 @@ public class ShipmentController :  BaseController<ShipmentController>
         }
     }
     [HttpPost("listen")]
-    public IActionResult ListenWebhook([FromBody] WebhookData webhookData)
+    public IActionResult ListenWebhook([FromBody] GoshipWebhookData webhookData)
     {
         try
         {
