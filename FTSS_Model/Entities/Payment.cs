@@ -27,9 +27,5 @@ public partial class Payment
 
     public string? BankHolder { get; set; }
 
-    public Guid? UserId { get; set; }
-
     public virtual Order Order { get; set; } = null!;
-
-    public virtual User? User { get; set; }
 }
