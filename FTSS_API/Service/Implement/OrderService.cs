@@ -282,7 +282,7 @@ public class OrderService : BaseService<OrderService>, IOrderService
             var cartItems = await _unitOfWork.GetRepository<CartItem>().GetListAsync(predicate: p =>
                    p.CartId.Equals(cart.Id)
                     && createOrderRequest.CartItem.Contains(p.Id)
-                    && p.Status.Equals(CartEnum.Available.GetDescriptionFromEnum()));
+                    && p.IsDelete.Equals(false));
         
             if (cartItems == null || !cartItems.Any())
             {
@@ -319,7 +319,7 @@ public class OrderService : BaseService<OrderService>, IOrderService
             { 
                 voucher = await _unitOfWork.GetRepository<Voucher>().SingleOrDefaultAsync(predicate: v =>
                     v.Id == createOrderRequest.VoucherId &&
-                    v.Status == "active" &&
+                    v.Status.Equals(VoucherEnum.Active.GetDescriptionFromEnum()) &&
                     v.IsDelete.Equals(false) && // Use .Equals(false)
                     v.ExpiryDate >= TimeUtils.GetCurrentSEATime());
         
@@ -390,11 +390,11 @@ public class OrderService : BaseService<OrderService>, IOrderService
         
                 // Apply the discount logic
                 decimal discountAmount = 0;
-                if (voucher.DiscountType == "percentage")
+                if (voucher.DiscountType.Equals(VoucherTypeEnum.Percentage.GetDescriptionFromEnum()))
                 {
                     discountAmount = totalprice * (voucher.Discount / 100);
                 }
-                else if (voucher.DiscountType == "fixed")
+                else if (voucher.DiscountType.Equals(VoucherTypeEnum.Fixed.GetDescriptionFromEnum()))
                 {
                     discountAmount = voucher.Discount;
                 }
