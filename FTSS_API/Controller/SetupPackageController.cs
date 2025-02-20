@@ -111,5 +111,17 @@ namespace FTSS_API.Controller
 
             return Ok(response);
         }
+        /// <summary>
+        /// API cập nhập Setup cho User
+        /// </summary>
+        [HttpPut(ApiEndPointConstant.SetupPackage.UpdateSetupPackage)]
+        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
+        [ProducesErrorResponseType(typeof(ProblemDetails))]
+        public async Task<IActionResult> UpdateSetupPackage([FromRoute] Guid id, [FromBody] AddSetupPackageRequest request, [FromQuery] List<Guid> productIds)
+        {
+            var response = await _setupPackageService.UpdateSetupPackage(id, request, productIds);
+            return StatusCode(int.Parse(response.status), response);
+        }
     }
 }
