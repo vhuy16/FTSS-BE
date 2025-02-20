@@ -16,7 +16,9 @@ public class OrderController : BaseController<OrderController>
     {
         _orderService = orderService;
     }
-
+    /// <summary>
+    /// API tạo order
+    /// </summary>
     [HttpPost(ApiEndPointConstant.Order.CreateNewOrder)]
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
@@ -105,7 +107,9 @@ public class OrderController : BaseController<OrderController>
     //     var response = await _orderService.UpdateOrder(id, orderStatus, shipStatus);
     //     return StatusCode(int.Parse(response.status), response);
     // }
-
+    /// <summary>
+    /// API xoá order
+    /// </summary>
     [HttpDelete(ApiEndPointConstant.Order.CancelOrder)]
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
