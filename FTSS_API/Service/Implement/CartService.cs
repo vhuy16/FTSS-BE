@@ -31,9 +31,12 @@ namespace FTSS_API.Service.Implement
                     data = null
                 };
             }
+            // Lấy UserId từ HttpContext
             Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
             var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
-                predicate: u => u.Id.Equals(userId) && u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) && u.IsDelete.Equals(false));
+                predicate: u => u.Id.Equals(userId) &&
+                                u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) && u.IsDelete == false &&
+                                (u.Role == RoleEnum.Customer.GetDescriptionFromEnum()));
 
             if (user == null)
             {
@@ -271,9 +274,12 @@ namespace FTSS_API.Service.Implement
 
         public async Task<ApiResponse> ClearCart()
         {
+            // Lấy UserId từ HttpContext
             Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
             var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
-                predicate: u => u.Id.Equals(userId) && u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()));
+                predicate: u => u.Id.Equals(userId) &&
+                                u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) && u.IsDelete == false &&
+                                (u.Role == RoleEnum.Customer.GetDescriptionFromEnum()));
 
             if (user == null)
             {
@@ -313,9 +319,12 @@ namespace FTSS_API.Service.Implement
 
         public async Task<ApiResponse> DeleteCartItem(Guid ItemId)
         {
+            // Lấy UserId từ HttpContext
             Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
             var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
-                predicate: u => u.Id.Equals(userId) && u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()));
+                predicate: u => u.Id.Equals(userId) &&
+                                u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) && u.IsDelete == false &&
+                                (u.Role == RoleEnum.Customer.GetDescriptionFromEnum()));
 
             if (user == null)
             {
@@ -358,9 +367,12 @@ namespace FTSS_API.Service.Implement
 
         public async Task<ApiResponse> GetAllCartItem()
         {
+            // Lấy UserId từ HttpContext
             Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
             var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
-                predicate: u => u.Id.Equals(userId) && u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()));
+                predicate: u => u.Id.Equals(userId) &&
+                                u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) && u.IsDelete == false &&
+                                (u.Role == RoleEnum.Customer.GetDescriptionFromEnum()));
 
             if (user == null)
             {
@@ -426,8 +438,14 @@ namespace FTSS_API.Service.Implement
 
         public async Task<ApiResponse> GetCartSummary()
         {
+            // Lấy UserId từ HttpContext
             Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
-            if (userId == null)
+            var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
+                predicate: u => u.Id.Equals(userId) &&
+                                u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) && u.IsDelete == false &&
+                                (u.Role == RoleEnum.Customer.GetDescriptionFromEnum()));
+
+            if (user == null)
             {
                 return new ApiResponse()
                 {
@@ -435,14 +453,6 @@ namespace FTSS_API.Service.Implement
                     message = "Unauthorized: Token is missing or expired.",
                     data = null
                 };
-            }
-
-            var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
-                predicate: u => u.Id.Equals(userId) && u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()));
-
-            if (user == null)
-            {
-                throw new BadHttpRequestException("User not available.");
             }
 
             var cart = await _unitOfWork.GetRepository<Cart>().SingleOrDefaultAsync(
@@ -498,9 +508,12 @@ namespace FTSS_API.Service.Implement
 
         public async Task<ApiResponse> UpdateCartItem(Guid id, UpdateCartItemRequest updateCartItemRequest)
         {
+            // Lấy UserId từ HttpContext
             Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
             var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
-                predicate: u => u.Id.Equals(userId) && u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()));
+                predicate: u => u.Id.Equals(userId) &&
+                                u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) && u.IsDelete == false &&
+                                (u.Role == RoleEnum.Customer.GetDescriptionFromEnum()));
 
             if (user == null)
             {
