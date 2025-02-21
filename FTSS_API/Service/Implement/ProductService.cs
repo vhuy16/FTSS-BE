@@ -276,17 +276,7 @@ public class ProductService : BaseService<ProductService>, IProductService
         decimal? minPrice,
         decimal? maxPrice)
     {
-        // Lấy UserId từ HttpContext
-        Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
-        var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
-            predicate: u => u.Id.Equals(userId) &&
-                            u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) && u.IsDelete == false &&
-                            (u.Role == RoleEnum.Customer.GetDescriptionFromEnum()));
-
-        if (user == null)
-        {
-            throw new BadHttpRequestException("You don't have permission to do this.");
-        }
+        
         // Đặt giá trị mặc định cho page và size nếu không hợp lệ
         page = page > 0 ? page : 1;
         size = size > 0 ? size : 10;
