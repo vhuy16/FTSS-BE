@@ -42,6 +42,7 @@ public static class ApiEndPointConstant
         public const string CreatePaymentUrl = PaymentEndPoint + "/create-url";
         public const string GetPaymentById = PaymentEndPoint + "/{paymentId}";
         public const string GetPaymentByOrderId = PaymentEndPoint + "/order/{orderId}";
+        public const string GetPayments = PaymentEndPoint;
     }
     public static class Category
     {
@@ -119,6 +120,7 @@ public static class ApiEndPointConstant
         public const string GetListSetupPackage = SetupPackageEndPoint;
         public const string GetListSetupPackageAllUser = SetupPackageEndPoint + "/all-users";
         public const string GetListSetupPackageShop = SetupPackageEndPoint + "/shop";
+        public const string UpdateSetupPackage  = SetupPackageEndPoint + "/{id}";
     }
     public static class MaintenanceSchedule
     {

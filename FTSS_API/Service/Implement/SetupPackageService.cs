@@ -552,5 +552,238 @@ namespace FTSS_API.Service.Implement
                 };
             }
         }
-    }
+       public async Task<ApiResponse> UpdateSetupPackage(Guid id, AddSetupPackageRequest request, List<Guid> productIds)
+        {
+            try
+            {
+                // Lấy UserId từ HttpContext
+                Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
+                var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
+                    predicate: u => u.Id.Equals(userId) &&
+                                    u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) &&
+                                    u.IsDelete == false);
+
+                if (user == null)
+                {
+                    return new ApiResponse()
+                    {
+                        status = StatusCodes.Status401Unauthorized.ToString(),
+                        message = "Unauthorized: Token is missing or expired.",
+                        data = null
+                    };
+                }
+
+                // Kiểm tra xem SetupName và Description có bị bỏ trống không
+                if (string.IsNullOrWhiteSpace(request.SetupName))
+                {
+                    return new ApiResponse
+                    {
+                        status = StatusCodes.Status400BadRequest.ToString(),
+                        message = "Setup name cannot be empty.",
+                        data = null
+                    };
+                }
+
+                if (string.IsNullOrWhiteSpace(request.Description))
+                {
+                    return new ApiResponse
+                    {
+                        status = StatusCodes.Status400BadRequest.ToString(),
+                        message = "Description cannot be empty.",
+                        data = null
+                    };
+                }
+                // Kiểm tra độ dài của SetupName
+                if (request.SetupName.Length > 10)
+                {
+                    return new ApiResponse
+                    {
+                        status = StatusCodes.Status400BadRequest.ToString(),
+                        message = "Setup name must not exceed 10 characters.",
+                        data = null
+                    };
+                }
+                // Kiểm tra ký tự đầu tiên có phải chữ hoa không
+                if (!char.IsUpper(request.SetupName.Trim()[0]))
+                {
+                    return new ApiResponse
+                    {
+                        status = StatusCodes.Status400BadRequest.ToString(),
+                        message = "Setup name must start with an uppercase letter.",
+                        data = null
+                    };
+                }
+
+                var setupPackage = await _unitOfWork.Context.Set<SetupPackage>()
+                    .Include(sp => sp.SetupPackageDetails) // Include existing details for removal
+                    .FirstOrDefaultAsync(sp => sp.Id == id && sp.IsDelete == false && sp.Userid == userId);
+
+                if (setupPackage == null)
+                {
+                    return new ApiResponse
+                    {
+                        status = StatusCodes.Status404NotFound.ToString(),
+                        message = "Setup package not found or not authorized to update.",
+                        data = null
+                    };
+                }
+
+                // Kiểm tra xem SetupName đã tồn tại chưa (ngoại trừ chính nó)
+                bool isSetupNameExists = await _unitOfWork.Context.Set<SetupPackage>()
+                    .AnyAsync(sp => sp.SetupName == request.SetupName && sp.Id != id && sp.IsDelete == false);
+
+                if (isSetupNameExists)
+                {
+                    return new ApiResponse
+                    {
+                        status = StatusCodes.Status400BadRequest.ToString(),
+                        message = "Setup name already exists. Please choose another name.",
+                        data = null
+                    };
+                }
+
+                // Lấy danh sách sản phẩm hợp lệ theo điều kiện
+                var allProducts = await _unitOfWork.Context.Set<Product>()
+                    .Where(p => productIds.Contains(p.Id))
+                    .Select(p => new { p.Id, p.ProductName, p.Price, p.Quantity, p.IsDelete, p.Status, p.SubCategoryId })
+                    .ToListAsync();
+
+                // Kiểm tra sản phẩm không hợp lệ
+                var invalidProducts = allProducts
+                    .Where(p => p.Quantity <= 0 || p.IsDelete == true || p.Status != ProductStatusEnum.Available.GetDescriptionFromEnum())
+                    .ToList();
+
+                if (invalidProducts.Any())
+                {
+                    string errorMessage = string.Join(", ", invalidProducts.Select(p => p.ProductName)) +
+                                          " has been removed or is out of stock, please add another product.";
+
+                    return new ApiResponse
+                    {
+                        status = StatusCodes.Status400BadRequest.ToString(),
+                        message = errorMessage,
+                        data = null
+                    };
+                }
+
+                // Lọc danh sách sản phẩm hợp lệ
+                var validProducts = allProducts
+                    .Where(p => p.Quantity > 0 && p.IsDelete == false && p.Status == ProductStatusEnum.Available.GetDescriptionFromEnum())
+                    .ToList();
+
+                if (!validProducts.Any())
+                {
+                    return new ApiResponse
+                    {
+                        status = StatusCodes.Status400BadRequest.ToString(),
+                        message = "No valid products found.",
+                        data = null
+                    };
+                }
+
+                // Lấy danh sách Category của sản phẩm
+                var categoryIds = validProducts.Select(p => p.SubCategoryId).Distinct().ToList();
+                var categories = await _unitOfWork.Context.Set<SubCategory>()
+                    .Where(sc => categoryIds.Contains(sc.Id))
+                    .Select(sc => new { sc.Id, sc.Category.CategoryName }) // Lấy tên danh mục từ Category
+                    .ToListAsync();
+
+                // Danh sách danh mục bắt buộc
+                var requiredCategories = new List<string> { "Bể", "Lọc", "Đèn" };
+
+                // Danh sách danh mục đã có trong danh sách sản phẩm truyền vào
+                var existingCategories = categories.Select(c => c.CategoryName).ToList();
+
+                // Kiểm tra danh mục nào bị thiếu
+                var missingCategories = requiredCategories.Except(existingCategories).ToList();
+
+                if (missingCategories.Any())
+                {
+                    string missingMessage = "Missing required products from categories: " + string.Join(", ", missingCategories);
+
+                    return new ApiResponse
+                    {
+                        status = StatusCodes.Status400BadRequest.ToString(),
+                        message = missingMessage,
+                        data = null
+                    };
+                }
+
+                // ❗ Kiểm tra nếu có nhiều hơn 1 sản phẩm thuộc danh mục "Bể"
+                var tankProducts = validProducts
+                    .Where(p => categories.Any(c => c.Id == p.SubCategoryId && c.CategoryName == "Bể"))
+                    .ToList();
+
+                if (tankProducts.Count > 1)
+                {
+                    return new ApiResponse
+                    {
+                        status = StatusCodes.Status400BadRequest.ToString(),
+                        message = "Only one product from category 'Bể' is allowed.",
+                        data = null
+                    };
+                }
+
+                // Calculate new total price
+                decimal totalPrice = validProducts.Sum(p => p.Price);
+
+                // Update SetupPackage properties
+                setupPackage.SetupName = request.SetupName;
+                setupPackage.Description = request.Description;
+                setupPackage.Price = totalPrice;
+                setupPackage.ModifyDate = TimeUtils.GetCurrentSEATime();
+
+                // Remove existing SetupPackageDetails
+                _unitOfWork.Context.Set<SetupPackageDetail>().RemoveRange(setupPackage.SetupPackageDetails);
+
+                // Create new SetupPackageDetails based on validProducts
+                var setupPackageDetails = validProducts.Select(p => new SetupPackageDetail
+                {
+                    Id = Guid.NewGuid(),
+                    ProductId = p.Id,
+                    SetupPackageId = setupPackage.Id,
+                    Price = p.Price
+                }).ToList();
+
+                // Add new SetupPackageDetails to the context
+                await _unitOfWork.Context.Set<SetupPackageDetail>().AddRangeAsync(setupPackageDetails);
+
+                await _unitOfWork.CommitAsync();
+
+                // Prepare response data
+                var response = new SetupPackageResponse
+                {
+                    SetupPackageId = setupPackage.Id,
+                    SetupName = setupPackage.SetupName,
+                    Description = setupPackage.Description,
+                    TotalPrice = setupPackage.Price,
+                    CreateDate = setupPackage.CreateDate,
+                    ModifyDate = setupPackage.ModifyDate,
+                    Products = validProducts.Select(p => new ProductResponse
+                    {
+                        ProductId = p.Id,
+                        ProductName = p.ProductName,
+                        Price = p.Price
+                    }).ToList()
+                };
+
+                return new ApiResponse
+                {
+                    status = StatusCodes.Status200OK.ToString(),
+                    message = "Setup package updated successfully.",
+                    data = response
+                };
+            }
+            catch (Exception ex)
+            {
+                return new ApiResponse
+                {
+                    status = StatusCodes.Status500InternalServerError.ToString(),
+                    message = "An error occurred while updating setup package.",
+                    data = ex.Message
+                };
+            }
+        }
+    } 
+    
 }

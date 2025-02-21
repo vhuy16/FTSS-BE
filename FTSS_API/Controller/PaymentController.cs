@@ -13,6 +13,9 @@ public class PaymentController : BaseController<PaymentController>
     {
         _paymentService = paymentService;
     }
+    /// <summary>
+    /// API tạo Payment.
+    /// </summary>
     [HttpPost(ApiEndPointConstant.Payment.CreatePaymentUrl)]
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
@@ -43,6 +46,9 @@ public class PaymentController : BaseController<PaymentController>
             return BadRequest(result);
         }
     }
+    /// <summary>
+    /// API lấy Payment theo id
+    /// </summary>
     [HttpGet(ApiEndPointConstant.Payment.GetPaymentById)]
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
@@ -51,7 +57,9 @@ public class PaymentController : BaseController<PaymentController>
         var result = await _paymentService.GetPaymentById(paymentId);
         return result.status == StatusCodes.Status200OK.ToString() ? Ok(result) : NotFound(result);
     }
-
+    /// <summary>
+    /// API lấy Payment theo id của order
+    /// </summary>
     [HttpGet(ApiEndPointConstant.Payment.GetPaymentByOrderId)]
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
@@ -60,8 +68,10 @@ public class PaymentController : BaseController<PaymentController>
         var result = await _paymentService.GetPaymentByOrderId(orderId);
         return result.status == StatusCodes.Status200OK.ToString() ? Ok(result) : NotFound(result);
     }
-
-    [HttpGet]
+    /// <summary>
+    /// API lấy tất cả Payment cho admin
+    /// </summary>
+    [HttpGet(ApiEndPointConstant.Payment.GetPayments)]
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetPayments([FromQuery] int page = 1, [FromQuery] int size = 10)
     {

@@ -58,7 +58,9 @@ public class PaymentService : BaseService<PaymentService>, IPaymentService
                 PaymentDate = DateTime.Now,
                 PaymentStatus = PaymentStatusEnum.Processing.ToString(),
                 PaymentURL = paymentLinkResponse.checkoutUrl,
-                PaymentCode = paymentLinkResponse.orderCode
+                PaymentCode = paymentLinkResponse.orderCode,
+                Description = paymentLinkResponse.description,
+                
                
             };
         
@@ -79,7 +81,7 @@ public class PaymentService : BaseService<PaymentService>, IPaymentService
         
             return new ApiResponse
             {
-                data = createPaymentResponse.PaymentURL,
+                data = createPaymentResponse,
                 message = "Payment created successfully",
                 status = StatusCodes.Status200OK.ToString(),
             };
@@ -129,7 +131,7 @@ public class PaymentService : BaseService<PaymentService>, IPaymentService
             await _unitOfWork.CommitAsync();
             return new ApiResponse()
             {
-                data = createPaymentResponse.PaymentURL,
+                data = createPaymentResponse,
                 message = "Payment created successfully",
                 status = StatusCodes.Status200OK.ToString(),
             };
