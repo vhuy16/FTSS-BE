@@ -85,32 +85,68 @@ namespace FTSS_API.Service.Implement
                     };
                 }
 
-                if (product.Quantity < item.Quantity || item.Quantity <= 0)
+                if (item.Quantity <= 0)
                 {
                     return new ApiResponse()
                     {
                         status = StatusCodes.Status400BadRequest.ToString(),
-                        message = item.Quantity <= 0 ? MessageConstant.CartMessage.NegativeQuantity : MessageConstant.ProductMessage.ProductNotEnough,
+                        message = MessageConstant.CartMessage.NegativeQuantity,
                         data = null
                     };
                 }
 
-                var cartItem = new CartItem()
-                {
-                    Id = Guid.NewGuid(),
-                    CartId = cart.Id,
-                    ProductId = product.Id,
-                    Quantity = item.Quantity,
-                    Status = cartStatus.ToString(),
-                    CreateDate = TimeUtils.GetCurrentSEATime(),
-                    ModifyDate = TimeUtils.GetCurrentSEATime()
-                };
+                var existingCartItem = await _unitOfWork.GetRepository<CartItem>().SingleOrDefaultAsync(
+                    predicate: ci => ci.CartId.Equals(cart.Id) && ci.ProductId.Equals(product.Id) && ci.Status == CartItemEnum.Odd.ToString() && ci.IsDelete == false);
 
-                await _unitOfWork.GetRepository<CartItem>().InsertAsync(cartItem);
+                if (existingCartItem != null)
+                {
+                    // Nếu sản phẩm đã tồn tại trong giỏ hàng với trạng thái Odd, cộng thêm số lượng
+                    int newQuantity = existingCartItem.Quantity + item.Quantity;
+
+                    if (newQuantity > product.Quantity)
+                    {
+                        return new ApiResponse()
+                        {
+                            status = StatusCodes.Status400BadRequest.ToString(),
+                            message = MessageConstant.ProductMessage.ProductNotEnough,
+                            data = null
+                        };
+                    }
+
+                    existingCartItem.Quantity = newQuantity;
+                    existingCartItem.ModifyDate = TimeUtils.GetCurrentSEATime();
+                    _unitOfWork.GetRepository<CartItem>().UpdateAsync(existingCartItem);
+                }
+                else
+                {
+                    // Nếu sản phẩm chưa có trong giỏ hàng, thêm mới
+                    if (item.Quantity > product.Quantity)
+                    {
+                        return new ApiResponse()
+                        {
+                            status = StatusCodes.Status400BadRequest.ToString(),
+                            message = MessageConstant.ProductMessage.ProductNotEnough,
+                            data = null
+                        };
+                    }
+
+                    var cartItem = new CartItem()
+                    {
+                        Id = Guid.NewGuid(),
+                        CartId = cart.Id,
+                        ProductId = product.Id,
+                        Quantity = item.Quantity,
+                        Status = cartStatus.ToString(),
+                        CreateDate = TimeUtils.GetCurrentSEATime(),
+                        ModifyDate = TimeUtils.GetCurrentSEATime()
+                    };
+
+                    await _unitOfWork.GetRepository<CartItem>().InsertAsync(cartItem);
+                }
 
                 cartItemResponses.Add(new AddCartItemResponse()
                 {
-                    CartItemId = cartItem.Id,
+                    CartItemId = existingCartItem?.Id ?? Guid.NewGuid(),
                     ProductId = product.Id,
                     ProductName = product.ProductName,
                     Price = product.Price * item.Quantity,
@@ -126,6 +162,7 @@ namespace FTSS_API.Service.Implement
                 data = cartItemResponses
             };
         }
+
 
 
         //public async Task<ApiResponse> AddCartItem(AddCartItemRequest addCartItemRequest)
