@@ -335,17 +335,7 @@ public class ProductService : BaseService<ProductService>, IProductService
 
     public async Task<ApiResponse> GetListProductBySubCategoryId(Guid subCateId, int page, int size)
     {
-        // Lấy UserId từ HttpContext
-        Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
-        var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
-            predicate: u => u.Id.Equals(userId) &&
-                            u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) && u.IsDelete == false &&
-                            (u.Role == RoleEnum.Admin.GetDescriptionFromEnum() || u.Role == RoleEnum.Manager.GetDescriptionFromEnum() || u.Role == RoleEnum.Customer.GetDescriptionFromEnum()));
-
-        if (user == null)
-        {
-            throw new BadHttpRequestException("You don't have permission to do this.");
-        }
+        
         var subCateCheck = await _unitOfWork.GetRepository<SubCategory>().SingleOrDefaultAsync(
             predicate: c => c.Id.Equals(subCateId)
         );
@@ -624,17 +614,7 @@ public class ProductService : BaseService<ProductService>, IProductService
 
     public async Task<ApiResponse> GetProductById(Guid productId)
     {
-        // Lấy UserId từ HttpContext
-        Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
-        var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
-            predicate: u => u.Id.Equals(userId) &&
-                            u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) && u.IsDelete == false &&
-                            (u.Role == RoleEnum.Admin.GetDescriptionFromEnum() || u.Role == RoleEnum.Manager.GetDescriptionFromEnum() || u.Role == RoleEnum.Customer.GetDescriptionFromEnum()));
-
-        if (user == null)
-        {
-            throw new BadHttpRequestException("You don't have permission to do this.");
-        }
+        
         var product = await _unitOfWork.GetRepository<Product>().SingleOrDefaultAsync(
             selector: s => new GetProductResponse
             {
