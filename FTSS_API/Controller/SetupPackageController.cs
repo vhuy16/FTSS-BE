@@ -2,6 +2,7 @@
 using FTSS_API.Payload;
 using FTSS_API.Payload.Request.SetupPackage;
 using FTSS_API.Payload.Request.SubCategory;
+using FTSS_API.Payload.Response;
 using FTSS_API.Service.Implement;
 using FTSS_API.Service.Interface;
 using FTSS_Model.Paginate;
@@ -59,7 +60,7 @@ namespace FTSS_API.Controller
             var response = await _setupPackageService.GetListSetupPackage(pageNumber, pageSize, isAscending);
             if (response == null || response.data == null)
             {
-                return Problem(detail: MessageConstant.VoucherMessage.VoucherIsEmpty,
+                return Problem(detail: MessageConstant.SetUpPackageMessage.SetUpPackageIsEmpty,
                     statusCode: StatusCodes.Status404NotFound);
             }
 
@@ -82,7 +83,7 @@ namespace FTSS_API.Controller
             var response = await _setupPackageService.GetListSetupPackageShop(pageNumber, pageSize, isAscending);
             if (response == null || response.data == null)
             {
-                return Problem(detail: MessageConstant.VoucherMessage.VoucherIsEmpty,
+                return Problem(detail: MessageConstant.SetUpPackageMessage.SetUpPackageIsEmpty,
                     statusCode: StatusCodes.Status404NotFound);
             }
 
@@ -122,6 +123,23 @@ namespace FTSS_API.Controller
         {
             var response = await _setupPackageService.UpdateSetupPackage(id, request, productIds);
             return StatusCode(int.Parse(response.status), response);
+        }
+        /// <summary>
+        /// API lấy thông tin chi tiết setup theo ID.
+        /// </summary>
+        [HttpGet(ApiEndPointConstant.SetupPackage.GetSetUpById)]
+        [ProducesResponseType(typeof(IPaginate<GetProductResponse>), StatusCodes.Status200OK)]
+        [ProducesErrorResponseType(typeof(ProblemDetails))]
+        public async Task<IActionResult> GetProductById([FromRoute] Guid id)
+        {
+            var response = await _setupPackageService.GetSetUpById(id);
+
+            if (response == null)
+            {
+                return Problem(MessageConstant.SetUpPackageMessage.SetUpPackageIsEmpty, statusCode: StatusCodes.Status404NotFound);
+            }
+
+            return Ok(response);
         }
     }
 }

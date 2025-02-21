@@ -22,6 +22,23 @@ namespace FTSS_API.Service.Implement
         {
             try
             {
+                // Lấy UserId từ HttpContext
+                Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
+                var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
+                    predicate: u => u.Id.Equals(userId) &&
+                                    u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) && u.IsDelete == false &&
+                                    (u.Role == RoleEnum.Admin.GetDescriptionFromEnum() || u.Role == RoleEnum.Manager.GetDescriptionFromEnum() || u.Role == RoleEnum.Customer.GetDescriptionFromEnum()));
+
+                if (user == null)
+                {
+                    return new ApiResponse()
+                    {
+                        status = StatusCodes.Status401Unauthorized.ToString(),
+                        message = "Unauthorized: Token is missing or expired.",
+                        data = null
+                    };
+                }
+
                 // Kiểm tra xem SetupName và Description có bị bỏ trống không
                 if (string.IsNullOrWhiteSpace(request.SetupName))
                 {
@@ -62,40 +79,7 @@ namespace FTSS_API.Service.Implement
                         data = null
                     };
                 }
-                // Lấy UserId từ HttpContext
-                Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
-                var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
-                    predicate: u => u.Id.Equals(userId) &&
-                                    u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) &&
-                                    u.IsDelete == false);
-
-                if (user == null)
-                {
-                    return new ApiResponse()
-                    {
-                        status = StatusCodes.Status401Unauthorized.ToString(),
-                        message = "Unauthorized: Token is missing or expired.",
-                        data = null
-                    };
-                }
-
-                // Kiểm tra nếu user có role Customer và đã có SetupPackage
-                if (user.Role == "Customer")
-                {
-                    bool hasSetupPackage = await _unitOfWork.Context.Set<SetupPackage>()
-                        .AnyAsync(sp => sp.Userid == user.Id && sp.IsDelete == false);
-
-                    if (hasSetupPackage)
-                    {
-                        return new ApiResponse
-                        {
-                            status = StatusCodes.Status400BadRequest.ToString(),
-                            message = "Customers can only have one Setup Package.",
-                            data = null
-                        };
-                    }
-                }
-
+     
                 // Kiểm tra xem SetupName đã tồn tại chưa
                 bool isSetupNameExists = await _unitOfWork.Context.Set<SetupPackage>()
                     .AnyAsync(sp => sp.SetupName == request.SetupName && sp.IsDelete == false);
@@ -267,8 +251,8 @@ namespace FTSS_API.Service.Implement
                 Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
                 var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
                     predicate: u => u.Id.Equals(userId) &&
-                                    u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) &&
-                                    u.IsDelete == false);
+                                    u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) && u.IsDelete == false &&
+                                    (u.Role == RoleEnum.Customer.GetDescriptionFromEnum()));
 
                 if (user == null)
                 {
@@ -336,7 +320,7 @@ namespace FTSS_API.Service.Implement
                 Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
                 var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
                     predicate: u => u.Id.Equals(userId) &&
-                                    u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) &&
+                                    u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) && u.IsDelete == false &&
                                     (u.Role == RoleEnum.Admin.GetDescriptionFromEnum() || u.Role == RoleEnum.Manager.GetDescriptionFromEnum()));
 
                 if (user == null)
@@ -420,7 +404,7 @@ namespace FTSS_API.Service.Implement
                 Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
                 var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
                     predicate: u => u.Id.Equals(userId) &&
-                                    u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) &&
+                                    u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) && u.IsDelete== false &&
                                     u.IsDelete == false &&
                                     (u.Role == RoleEnum.Admin.GetDescriptionFromEnum() || u.Role == RoleEnum.Manager.GetDescriptionFromEnum()));
 
@@ -496,6 +480,81 @@ namespace FTSS_API.Service.Implement
             }
         }
 
+        public async Task<ApiResponse> GetSetUpById(Guid id)
+        {
+            try
+            {
+                // Lấy UserId từ HttpContext
+                Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
+                var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
+                    predicate: u => u.Id.Equals(userId) &&
+                                    u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) && u.IsDelete == false &&
+                                    (u.Role == RoleEnum.Customer.GetDescriptionFromEnum()));
+
+                if (user == null)
+                {
+                    return new ApiResponse()
+                    {
+                        status = StatusCodes.Status401Unauthorized.ToString(),
+                        message = "Unauthorized: Token is missing or expired.",
+                        data = null
+                    };
+                }
+                // Lấy thông tin setup package theo ID
+                var setupPackage = await _unitOfWork.GetRepository<SetupPackage>()
+                    .SingleOrDefaultAsync(
+                        predicate: sp => sp.Id == id && sp.IsDelete == false, // Không lấy bản ghi đã bị xóa
+                        include: source => source
+                            .Include(sp => sp.SetupPackageDetails) // Bao gồm chi tiết gói setup
+                            .ThenInclude(d => d.Product) // Lấy thông tin sản phẩm từ SetupPackageDetails
+                    );
+
+                // Kiểm tra nếu không tìm thấy gói setup
+                if (setupPackage == null)
+                {
+                    return new ApiResponse
+                    {
+                        status = StatusCodes.Status404NotFound.ToString(),
+                        message = "Setup package not found.",
+                        data = null
+                    };
+                }
+
+                // Chuyển dữ liệu sang response
+                var response = new SetupPackageResponse
+                {
+                    SetupPackageId = setupPackage.Id,
+                    SetupName = setupPackage.SetupName,
+                    Description = setupPackage.Description,
+                    TotalPrice = setupPackage.Price,
+                    CreateDate = setupPackage.CreateDate,
+                    ModifyDate = setupPackage.ModifyDate,
+                    Products = setupPackage.SetupPackageDetails.Select(d => new ProductResponse
+                    {
+                        ProductId = d.Product.Id,
+                        ProductName = d.Product.ProductName,
+                        Price = d.Product.Price
+                    }).ToList()
+                };
+
+                return new ApiResponse
+                {
+                    status = StatusCodes.Status200OK.ToString(),
+                    message = "Setup package details retrieved successfully.",
+                    data = response
+                };
+            }
+            catch (Exception ex)
+            {
+                return new ApiResponse
+                {
+                    status = StatusCodes.Status500InternalServerError.ToString(),
+                    message = "An error occurred while retrieving setup package details.",
+                    data = ex.Message
+                };
+            }
+        }
+
 
 
         public async Task<ApiResponse> RemoveSetupPackage(Guid id)
@@ -506,8 +565,8 @@ namespace FTSS_API.Service.Implement
                 Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
                 var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
                     predicate: u => u.Id.Equals(userId) &&
-                                    u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) &&
-                                    u.IsDelete == false);
+                                    u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) && u.IsDelete == false &&
+                                    (u.Role == RoleEnum.Admin.GetDescriptionFromEnum() || u.Role == RoleEnum.Manager.GetDescriptionFromEnum() || u.Role == RoleEnum.Customer.GetDescriptionFromEnum()));
 
                 if (user == null)
                 {

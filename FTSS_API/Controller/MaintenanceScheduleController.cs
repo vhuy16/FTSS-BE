@@ -60,7 +60,7 @@ namespace FTSS_API.Controller
             var response = await _maintenanceScheduleService.GetListTask(pageNumber, pageSize, status, isAscending);
             if (response == null || response.data == null)
             {
-                return Problem(detail: MessageConstant.OrderMessage.OrderIsEmpty,
+                return Problem(detail: MessageConstant.MaintenanceScheduleMessage.MaintenanceScheduleIsEmpty,
                     statusCode: StatusCodes.Status404NotFound);
             }
 
@@ -83,7 +83,7 @@ namespace FTSS_API.Controller
             var response = await _maintenanceScheduleService.GetListTaskTech(pageNumber, pageSize, status, isAscending);
             if (response == null || response.data == null)
             {
-                return Problem(detail: MessageConstant.OrderMessage.OrderIsEmpty,
+                return Problem(detail: MessageConstant.MaintenanceScheduleMessage.MaintenanceScheduleIsEmpty,
                     statusCode: StatusCodes.Status404NotFound);
             }
 

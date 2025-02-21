@@ -22,15 +22,6 @@ namespace FTSS_API.Service.Implement
 
         public async Task<ApiResponse> AddCartItem(List<AddCartItemRequest> addCartItemRequest)
         {
-            if (addCartItemRequest == null || !addCartItemRequest.Any())
-            {
-                return new ApiResponse()
-                {
-                    status = StatusCodes.Status400BadRequest.ToString(),
-                    message = "Request cannot be empty",
-                    data = null
-                };
-            }
             // Lấy UserId từ HttpContext
             Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
             var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
@@ -48,6 +39,16 @@ namespace FTSS_API.Service.Implement
                 };
             }
 
+            if (addCartItemRequest == null || !addCartItemRequest.Any())
+            {
+                return new ApiResponse()
+                {
+                    status = StatusCodes.Status400BadRequest.ToString(),
+                    message = "Request cannot be empty",
+                    data = null
+                };
+            }
+         
             var cart = await _unitOfWork.GetRepository<Cart>().SingleOrDefaultAsync(
                 predicate: c => c.UserId.Equals(userId));
 

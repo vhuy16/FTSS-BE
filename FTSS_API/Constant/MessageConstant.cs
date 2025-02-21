@@ -32,6 +32,14 @@
         {
             public const string VoucherIsEmpty = "Không có voucher nào";
         }
+        public static class SetUpPackageMessage
+        {
+            public const string SetUpPackageIsEmpty = "Không có setup nào";
+        }
+        public static class MaintenanceScheduleMessage
+        {
+            public const string MaintenanceScheduleIsEmpty = "Không có MaintenanceSchedule nào";
+        }
 
         public static class CategoryMessage
         {
