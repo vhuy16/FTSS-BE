@@ -143,7 +143,8 @@ public class PayOsService : BaseService<PayOsService>, IPayOSService
             var paymentLinkResponse = new PaymentLinkResponse()
             {
                 checkoutUrl = paymentResult.checkoutUrl,
-                orderCode = orderCode
+                orderCode = orderCode,
+                description = paymentResult.description
             };
             return Result<PaymentLinkResponse>.Success(paymentLinkResponse);
         }
@@ -348,6 +349,7 @@ public class PayOsService : BaseService<PayOsService>, IPayOSService
     {
         public string checkoutUrl { get; set; }
         public long orderCode { get; set; }
+        public string description { get; set; }
     }
 
     private bool SecureCompare(string a, string b)

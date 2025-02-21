@@ -10,4 +10,5 @@ public class CreatePaymentResponse
     public string? PaymentMethod { get; set; }
     public string? PaymentURL { get; set; }
     public long PaymentCode { get; set; }
+    public string Description { get; set; }
 }

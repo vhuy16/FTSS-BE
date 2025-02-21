@@ -8,6 +8,7 @@ using FTSS_API.Payload;
 using FTSS_API.Payload.Request;
 using FTSS_API.Payload.Request.Pay;
 using FTSS_API.Payload.Response.Order;
+using FTSS_API.Payload.Response.Pay.Payment;
 using FTSS_API.Service.Interface;
 using FTSS_API.Utils;
 using FTSS_Model.Context;
@@ -427,10 +428,10 @@ public class OrderService : BaseService<OrderService>, IOrderService
                 PaymentMethod = createOrderRequest.PaymentMethod,
             };
             var paymentResponse = await _paymentService.Value.CreatePayment(createPaymentRequest);
-            var paymentUrl = "";
+            CreatePaymentResponse payment = null;
             if (paymentResponse != null && paymentResponse.status.Equals(StatusCodes.Status200OK.ToString()))
             {
-                paymentUrl = paymentResponse.data.ToString();
+                payment = paymentResponse.data as CreatePaymentResponse;
             }
             // Delete CartItems with status "buyed"
             //foreach (var cartItem in cartItems)
@@ -490,7 +491,9 @@ public class OrderService : BaseService<OrderService>, IOrderService
                     Email = order.User.Email,
                     PhoneNumber = order.User.PhoneNumber
                 }, 
-                CheckoutUrl = paymentUrl
+                CheckoutUrl = payment?.PaymentURL,
+                Description = payment?.Description
+                
                 
             };
 
