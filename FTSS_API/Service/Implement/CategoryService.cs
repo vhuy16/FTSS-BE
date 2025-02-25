@@ -182,6 +182,7 @@ namespace FTSS_API.Service.Implement
                             Description = sub.Description,
                             CreateDate = sub.CreateDate,
                             ModifyDate = sub.ModifyDate,
+                            CategoryName = sub.Category.CategoryName
                         }).ToList()
                 },
                 predicate: p => p.IsDelete.Equals(false) &&
