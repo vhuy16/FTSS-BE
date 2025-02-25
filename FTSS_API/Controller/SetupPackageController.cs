@@ -26,9 +26,9 @@ namespace FTSS_API.Controller
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status201Created)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
         [ProducesErrorResponseType(typeof(ProblemDetails))]
-        public async Task<IActionResult> AddSetupPackage([FromForm] List<Guid> productids, [FromForm] AddSetupPackageRequest request)
+        public async Task<IActionResult> AddSetupPackage([FromForm] List<Guid> productids, [FromForm] AddSetupPackageRequest request, [FromServices] Supabase.Client client)
         {
-            var response = await _setupPackageService.AddSetupPackage(productids, request);
+            var response = await _setupPackageService.AddSetupPackage(productids, request, client);
             return StatusCode(int.Parse(response.status), response);
         }
         /// <summary>
@@ -68,19 +68,19 @@ namespace FTSS_API.Controller
         }
 
         /// <summary>
-        /// API lấy danh sách SetupPackage của shop cho admin, manager.
+        /// API lấy danh sách SetupPackage của shop cho admin, manager, customer.
         /// </summary>
-        [HttpGet(ApiEndPointConstant.SetupPackage.GetListSetupPackageShop)]
+        [HttpGet(ApiEndPointConstant.SetupPackage.GetListSetupPackageAllShop)]
         [ProducesResponseType(typeof(IPaginate<ApiResponse>), StatusCodes.Status200OK)]
         [ProducesErrorResponseType(typeof(ProblemDetails))]
-        public async Task<IActionResult> GetListSetupPackageShop(
+        public async Task<IActionResult> GetListSetupPackageAllShop(
             [FromQuery] int? page = 1,
             [FromQuery] int? size = 10,
             [FromQuery] bool? isAscending = null)
         {
             int pageNumber = page ?? 1;
             int pageSize = size ?? 10;
-            var response = await _setupPackageService.GetListSetupPackageShop(pageNumber, pageSize, isAscending);
+            var response = await _setupPackageService.GetListSetupPackageAllShop(pageNumber, pageSize, isAscending);
             if (response == null || response.data == null)
             {
                 return Problem(detail: MessageConstant.SetUpPackageMessage.SetUpPackageIsEmpty,
@@ -104,9 +104,9 @@ namespace FTSS_API.Controller
             int pageNumber = page ?? 1;
             int pageSize = size ?? 10;
             var response = await _setupPackageService.GetListSetupPackageAllUser(pageNumber, pageSize, isAscending);
-            if (response == null || response.data == null)
+            if (response == null && response.data == null)
             {
-                return Problem(detail: MessageConstant.VoucherMessage.VoucherIsEmpty,
+                return Problem(detail: MessageConstant.SetUpPackageMessage.SetUpPackageIsEmpty,
                     statusCode: StatusCodes.Status404NotFound);
             }
 

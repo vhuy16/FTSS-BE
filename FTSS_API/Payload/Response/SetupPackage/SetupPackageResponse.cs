@@ -8,6 +8,8 @@
         public decimal? TotalPrice { get; set; }
         public DateTime? CreateDate { get; set; }
         public DateTime? ModifyDate { get; set; }
+        public string? Size { get; set; }
+        public string LinkImage { get; set; } = null!;
         public List<ProductResponse> Products { get; set; } = new();
     }
 
@@ -16,5 +18,6 @@
         public Guid ProductId { get; set; }
         public string ProductName { get; set; } = null!;
         public decimal Price { get; set; }
+        public string? Status { get; set; }
     }
 }

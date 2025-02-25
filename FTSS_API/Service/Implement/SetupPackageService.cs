@@ -9,16 +9,19 @@ using FTSS_Model.Entities;
 using FTSS_Model.Enum;
 using FTSS_Repository.Interface;
 using Microsoft.EntityFrameworkCore;
+using Supabase;
 
 namespace FTSS_API.Service.Implement
 {
     public class SetupPackageService : BaseService<SetupPackageService>, ISetupPackageService
     {
-        public SetupPackageService(IUnitOfWork<MyDbContext> unitOfWork, ILogger<SetupPackageService> logger, IMapper mapper, IHttpContextAccessor httpContextAccessor) : base(unitOfWork, logger, mapper, httpContextAccessor)
+        private readonly SupabaseUltils _supabaseImageService;
+        public SetupPackageService(IUnitOfWork<MyDbContext> unitOfWork, ILogger<SetupPackageService> logger, IMapper mapper, IHttpContextAccessor httpContextAccessor, SupabaseUltils supabaseImageService) : base(unitOfWork, logger, mapper, httpContextAccessor)
         {
+            _supabaseImageService = supabaseImageService;
         }
 
-        public async Task<ApiResponse> AddSetupPackage(List<Guid> productIds, AddSetupPackageRequest request)
+        public async Task<ApiResponse> AddSetupPackage(List<Guid> productIds, AddSetupPackageRequest request, Supabase.Client client)
         {
             try
             {
@@ -79,7 +82,6 @@ namespace FTSS_API.Service.Implement
                         data = null
                     };
                 }
-     
                 // Kiểm tra xem SetupName đã tồn tại chưa
                 bool isSetupNameExists = await _unitOfWork.Context.Set<SetupPackage>()
                     .AnyAsync(sp => sp.SetupName == request.SetupName && sp.IsDelete == false);
@@ -94,10 +96,52 @@ namespace FTSS_API.Service.Implement
                     };
                 }
 
+                // Check if image is provided
+                if (request.ImageFile == null)
+                {
+                    return new ApiResponse
+                    {
+                        status = StatusCodes.Status400BadRequest.ToString(),
+                        message = "Image file is required.",
+                        data = null
+                    };
+                }
+
+                string? imageUrl = null;
+
+                // Upload image if provided
+                if (request.ImageFile != null)
+                {
+                    try
+                    {
+                        // Call your Supabase image upload service
+                        imageUrl = (await _supabaseImageService.SendImagesAsync(new List<IFormFile> { request.ImageFile }, client)).FirstOrDefault();
+
+                        if (string.IsNullOrEmpty(imageUrl))
+                        {
+                            return new ApiResponse
+                            {
+                                status = StatusCodes.Status500InternalServerError.ToString(),
+                                message = "Failed to upload image.",
+                                data = null
+                            };
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        return new ApiResponse
+                        {
+                            status = StatusCodes.Status500InternalServerError.ToString(),
+                            message = $"An error occurred while uploading the image: {ex.Message}",
+                            data = null
+                        };
+                    }
+                }
+
                 // Lấy danh sách sản phẩm hợp lệ theo điều kiện
                 var allProducts = await _unitOfWork.Context.Set<Product>()
                     .Where(p => productIds.Contains(p.Id))
-                    .Select(p => new { p.Id, p.ProductName, p.Price, p.Quantity, p.IsDelete, p.Status, p.SubCategoryId })
+                    .Select(p => new { p.Id, p.ProductName, p.Price, p.Quantity, p.IsDelete, p.Status, p.SubCategoryId, p.Size })
                     .ToListAsync();
 
                 // Kiểm tra sản phẩm không hợp lệ
@@ -174,7 +218,8 @@ namespace FTSS_API.Service.Implement
                         data = null
                     };
                 }
-
+                // Lấy kích thước từ sản phẩm thuộc danh mục "Bể"
+                string? tankSize = tankProducts.FirstOrDefault()?.Size;
                 // Tính tổng giá của các sản phẩm hợp lệ
                 decimal totalPrice = validProducts.Sum(p => p.Price);
 
@@ -188,7 +233,8 @@ namespace FTSS_API.Service.Implement
                     CreateDate = TimeUtils.GetCurrentSEATime(),
                     ModifyDate = TimeUtils.GetCurrentSEATime(),
                     IsDelete = false,
-                    Userid = userId
+                    Userid = userId,
+                    Image = imageUrl
                 };
 
                 // Thêm SetupPackage vào database
@@ -217,11 +263,14 @@ namespace FTSS_API.Service.Implement
                     TotalPrice = setupPackage.Price,
                     CreateDate = setupPackage.CreateDate,
                     ModifyDate = setupPackage.ModifyDate,
+                    Size = tankSize,
+                    LinkImage = setupPackage.Image,
                     Products = validProducts.Select(p => new ProductResponse
                     {
                         ProductId = p.Id,
                         ProductName = p.ProductName,
-                        Price = p.Price
+                        Price = p.Price,
+                        Status = p.Status
                     }).ToList()
                 };
 
@@ -285,11 +334,17 @@ namespace FTSS_API.Service.Implement
                         TotalPrice = sp.Price,
                         CreateDate = sp.CreateDate,
                         ModifyDate = sp.ModifyDate,
+                        Size = sp.SetupPackageDetails
+                        .Where(spd => spd.Product.SubCategory.Category.CategoryName == "Bể")  // Lọc sản phẩm có Category là "Bể"
+                        .Select(spd => spd.Product.Size)                 // Lấy Size của sản phẩm
+                        .FirstOrDefault(),
+                        LinkImage = sp.Image,
                         Products = sp.SetupPackageDetails.Select(spd => new ProductResponse
                         {
                             ProductId = spd.Product.Id,
                             ProductName = spd.Product.ProductName,
-                            Price = spd.Product.Price
+                            Price = spd.Product.Price,
+                            Status = spd.Product.Status,
                         }).ToList()
                     })
                     .ToListAsync();
@@ -333,11 +388,13 @@ namespace FTSS_API.Service.Implement
                     };
                 }
 
-                // Lấy danh sách SetupPackage của user có Role là Customer, bao gồm UserName và Id
+                // Lấy danh sách SetupPackage của user có Role là Customer, bao gồm thông tin User
                 var query = _unitOfWork.Context.Set<SetupPackage>()
                     .Include(sp => sp.User) // Bao gồm thông tin User
                     .Include(sp => sp.SetupPackageDetails)
                         .ThenInclude(spd => spd.Product)
+                            .ThenInclude(p => p.SubCategory)
+                                .ThenInclude(sc => sc.Category) // Truy vấn đến Category
                     .Where(sp => sp.User != null &&
                                  sp.User.Role == RoleEnum.Customer.GetDescriptionFromEnum() &&
                                  sp.IsDelete == false);
@@ -368,11 +425,16 @@ namespace FTSS_API.Service.Implement
                             TotalPrice = sp.Price,
                             CreateDate = sp.CreateDate,
                             ModifyDate = sp.ModifyDate,
+                            Size = sp.SetupPackageDetails
+                                .Select(spd => spd.Product)
+                                .FirstOrDefault(p => p.SubCategory != null && p.SubCategory.Category != null && p.SubCategory.Category.CategoryName == "Bể")?.Size, // Lấy Size từ sản phẩm có Category "Bể"
+                            LinkImage = sp.Image,
                             Products = sp.SetupPackageDetails.Select(spd => new ProductResponse
                             {
                                 ProductId = spd.Product.Id,
                                 ProductName = spd.Product.ProductName,
-                                Price = spd.Product.Price
+                                Price = spd.Product.Price,
+                                Status = spd.Product.Status
                             }).ToList()
                         }).ToList()
                     }).ToList();
@@ -396,36 +458,22 @@ namespace FTSS_API.Service.Implement
         }
 
 
-        public async Task<ApiResponse> GetListSetupPackageShop(int pageNumber, int pageSize, bool? isAscending)
+
+        public async Task<ApiResponse> GetListSetupPackageAllShop(int pageNumber, int pageSize, bool? isAscending)
         {
             try
             {
-                // Lấy UserId từ HttpContext
-                Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
-                var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
-                    predicate: u => u.Id.Equals(userId) &&
-                                    u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) && u.IsDelete== false &&
-                                    u.IsDelete == false &&
-                                    (u.Role == RoleEnum.Admin.GetDescriptionFromEnum() || u.Role == RoleEnum.Manager.GetDescriptionFromEnum()));
-
-                if (user == null)
-                {
-                    return new ApiResponse()
-                    {
-                        status = StatusCodes.Status401Unauthorized.ToString(),
-                        message = "Unauthorized: Token is missing or expired.",
-                        data = null
-                    };
-                }
-
                 // Lấy danh sách SetupPackage của User có Role là Admin hoặc Manager, bao gồm danh sách sản phẩm
                 var query = _unitOfWork.Context.Set<SetupPackage>()
-                    .Include(sp => sp.SetupPackageDetails) // Bao gồm danh sách sản phẩm
-                    .ThenInclude(spd => spd.Product) // Bao gồm thông tin sản phẩm
-                    .Where(sp => sp.User != null &&
-                                 (sp.User.Role == RoleEnum.Admin.GetDescriptionFromEnum() ||
-                                  sp.User.Role == RoleEnum.Manager.GetDescriptionFromEnum()) &&
-                                 sp.IsDelete == false);
+                                .Include(sp => sp.SetupPackageDetails)
+                                .ThenInclude(spd => spd.Product)
+                                .ThenInclude(p => p.SubCategory)
+                                .ThenInclude(sc => sc.Category)  // Đảm bảo có Category
+                                    .Where(sp => sp.User != null &&
+                                         (sp.User.Role == RoleEnum.Admin.GetDescriptionFromEnum() ||
+                                          sp.User.Role == RoleEnum.Manager.GetDescriptionFromEnum()) &&
+                                         sp.IsDelete == false);
+
 
                 // Sắp xếp kết quả theo CreateDate
                 query = isAscending == true
@@ -448,11 +496,20 @@ namespace FTSS_API.Service.Implement
                     TotalPrice = sp.Price,
                     CreateDate = sp.CreateDate,
                     ModifyDate = sp.ModifyDate,
+                    Size = sp.SetupPackageDetails
+    .Where(spd => spd.Product != null &&
+                  spd.Product.SubCategory != null &&
+                  spd.Product.SubCategory.Category != null &&
+                  spd.Product.SubCategory.Category.CategoryName == "Bể")  // Kiểm tra null trước khi truy cập CategoryName
+    .Select(spd => spd.Product.Size)
+    .FirstOrDefault(),
+                    LinkImage = sp.Image,
                     Products = sp.SetupPackageDetails.Select(spd => new ProductResponse
                     {
                         ProductId = spd.Product.Id,
                         ProductName = spd.Product.ProductName,
-                        Price = spd.Product.Price
+                        Price = spd.Product.Price,
+                        Status = spd.Product.Status,
                     }).ToList()
                 }).ToList();
 
@@ -488,7 +545,8 @@ namespace FTSS_API.Service.Implement
                 Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
                 var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
                     predicate: u => u.Id.Equals(userId) &&
-                                    u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) && u.IsDelete == false &&
+                                    u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) &&
+                                    u.IsDelete == false &&
                                     (u.Role == RoleEnum.Customer.GetDescriptionFromEnum()));
 
                 if (user == null)
@@ -500,13 +558,16 @@ namespace FTSS_API.Service.Implement
                         data = null
                     };
                 }
+
                 // Lấy thông tin setup package theo ID
                 var setupPackage = await _unitOfWork.GetRepository<SetupPackage>()
                     .SingleOrDefaultAsync(
-                        predicate: sp => sp.Id == id && sp.IsDelete == false, // Không lấy bản ghi đã bị xóa
+                        predicate: sp => sp.Id == id && sp.IsDelete == false,
                         include: source => source
-                            .Include(sp => sp.SetupPackageDetails) // Bao gồm chi tiết gói setup
-                            .ThenInclude(d => d.Product) // Lấy thông tin sản phẩm từ SetupPackageDetails
+                            .Include(sp => sp.SetupPackageDetails)
+                            .ThenInclude(d => d.Product)
+                            .ThenInclude(p => p.SubCategory)
+                            .ThenInclude(sc => sc.Category) // Bảo đảm truy vấn đến Category
                     );
 
                 // Kiểm tra nếu không tìm thấy gói setup
@@ -520,6 +581,13 @@ namespace FTSS_API.Service.Implement
                     };
                 }
 
+                // Lấy kích thước từ sản phẩm có CategoryName là "Bể"
+                var productWithCategoryBe = setupPackage.SetupPackageDetails
+                    .Select(d => d.Product)
+                    .FirstOrDefault(p => p.SubCategory != null && p.SubCategory.Category != null && p.SubCategory.Category.CategoryName == "Bể");
+
+                string? size = productWithCategoryBe?.Size; // Nếu không tìm thấy, size sẽ là null
+
                 // Chuyển dữ liệu sang response
                 var response = new SetupPackageResponse
                 {
@@ -529,11 +597,14 @@ namespace FTSS_API.Service.Implement
                     TotalPrice = setupPackage.Price,
                     CreateDate = setupPackage.CreateDate,
                     ModifyDate = setupPackage.ModifyDate,
+                    Size = size, // Lấy kích thước từ sản phẩm thuộc Category "Bể"
+                    LinkImage = setupPackage.Image,
                     Products = setupPackage.SetupPackageDetails.Select(d => new ProductResponse
                     {
                         ProductId = d.Product.Id,
                         ProductName = d.Product.ProductName,
-                        Price = d.Product.Price
+                        Price = d.Product.Price,
+                        Status = d.Product.Status,
                     }).ToList()
                 };
 
@@ -554,8 +625,6 @@ namespace FTSS_API.Service.Implement
                 };
             }
         }
-
-
 
         public async Task<ApiResponse> RemoveSetupPackage(Guid id)
         {
@@ -611,7 +680,7 @@ namespace FTSS_API.Service.Implement
                 };
             }
         }
-       public async Task<ApiResponse> UpdateSetupPackage(Guid id, AddSetupPackageRequest request, List<Guid> productIds)
+        public async Task<ApiResponse> UpdateSetupPackage(Guid id, AddSetupPackageRequest request, List<Guid> productIds)
         {
             try
             {
@@ -822,7 +891,8 @@ namespace FTSS_API.Service.Implement
                     {
                         ProductId = p.Id,
                         ProductName = p.ProductName,
-                        Price = p.Price
+                        Price = p.Price,
+                        Status = p.Status
                     }).ToList()
                 };
 
@@ -843,6 +913,6 @@ namespace FTSS_API.Service.Implement
                 };
             }
         }
-    } 
-    
+    }
+
 }
