@@ -541,24 +541,6 @@ namespace FTSS_API.Service.Implement
         {
             try
             {
-                // Lấy UserId từ HttpContext
-                Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
-                var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
-                    predicate: u => u.Id.Equals(userId) &&
-                                    u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) &&
-                                    u.IsDelete == false &&
-                                    (u.Role == RoleEnum.Customer.GetDescriptionFromEnum()));
-
-                if (user == null)
-                {
-                    return new ApiResponse()
-                    {
-                        status = StatusCodes.Status401Unauthorized.ToString(),
-                        message = "Unauthorized: Token is missing or expired.",
-                        data = null
-                    };
-                }
-
                 // Lấy thông tin setup package theo ID
                 var setupPackage = await _unitOfWork.GetRepository<SetupPackage>()
                     .SingleOrDefaultAsync(
