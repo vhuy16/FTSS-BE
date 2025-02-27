@@ -119,9 +119,9 @@ namespace FTSS_API.Controller
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
         [ProducesErrorResponseType(typeof(ProblemDetails))]
-        public async Task<IActionResult> UpdateSetupPackage([FromRoute] Guid id, [FromBody] AddSetupPackageRequest request, [FromQuery] List<Guid> productIds)
+        public async Task<IActionResult> UpdateSetupPackage(Guid setupPackageId, [FromForm] List<Guid> productids, [FromForm] AddSetupPackageRequest request, [FromServices] Supabase.Client client)
         {
-            var response = await _setupPackageService.UpdateSetupPackage(id, request, productIds);
+            var response = await _setupPackageService.UpdateSetupPackage(setupPackageId, productids, request, client);
             return StatusCode(int.Parse(response.status), response);
         }
         /// <summary>

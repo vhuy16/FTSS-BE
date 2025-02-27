@@ -13,6 +13,6 @@ namespace FTSS_API.Service.Interface
         Task<ApiResponse> GetListSetupPackageAllShop(int pageNumber, int pageSize, bool? isAscending);
         Task<ApiResponse> GetSetUpById(Guid id);
         Task<ApiResponse> RemoveSetupPackage(Guid id);
-        Task<ApiResponse> UpdateSetupPackage(Guid id, AddSetupPackageRequest request, List<Guid> productIds);
+        Task<ApiResponse> UpdateSetupPackage(Guid setupPackageId, List<Guid> productIds, AddSetupPackageRequest request, Supabase.Client client);
     }
 }
