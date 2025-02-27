@@ -853,7 +853,7 @@ namespace FTSS_API.Service.Implement
                 return new ApiResponse 
                 { status = StatusCodes.Status200OK.ToString(),
                     message = "Setup package updated successfully.", 
-                    data = null 
+                    data = response
                 };
             }
             catch (Exception ex)
