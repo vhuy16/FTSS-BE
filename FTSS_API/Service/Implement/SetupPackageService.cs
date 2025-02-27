@@ -106,8 +106,11 @@ namespace FTSS_API.Service.Implement
 
                 var productCount = productIds.GroupBy(id => id).ToDictionary(g => g.Key, g => g.Count());
                 var allProducts = await _unitOfWork.Context.Set<Product>()
-                    .Where(p => productCount.Keys.Contains(p.Id))
-                    .ToListAsync();
+                        .Where(p => productCount.Keys.Contains(p.Id))
+                        .Include(p => p.SubCategory) // Load bảng SubCategory
+                        .ThenInclude(sc => sc.Category) // Load bảng Category từ SubCategory
+                        .Include(p => p.Images) // Load danh sách Image
+                        .ToListAsync();
 
                 if (!allProducts.Any())
                 {
@@ -198,18 +201,23 @@ namespace FTSS_API.Service.Implement
                     ModifyDate = setupPackage.ModifyDate,
                     Size = tankSize,
                     LinkImage = setupPackage.Image,
-                    Products = setupPackage.SetupPackageDetails.Select(p => new ProductResponse
+                    Products = setupPackage.SetupPackageDetails.Select(spd => new ProductResponse
                     {
-                        ProductId = p.ProductId,
-                        ProductName = p.Product.ProductName,
-                        Quantity = p.Quantity,
-                        Price = p.Product.Price,
-                        Status = p.Product.Status,
-                        IsDelete = p.Product.IsDelete,
-                        CategoryName = p.Product.SubCategory.Category.CategoryName,
-                        LinkImage = p.Product.Images.Where(img => img.IsDelete == false).OrderBy(img => img.CreateDate).Select(img => img.LinkImage).FirstOrDefault()
+                        ProductId = spd.Product.Id,
+                        ProductName = spd.Product.ProductName,
+                        Quantity = spd.Quantity,  // Lấy Quantity từ SetupPackageDetail
+                        Price = spd.Product.Price,
+                        Status = spd.Product.Status,
+                        IsDelete = setupPackage.IsDelete,
+                        CategoryName = spd.Product.SubCategory.Category.CategoryName,
+                        LinkImage = spd.Product.Images
+                                .Where(img => img.IsDelete == false)
+                                .OrderBy(img => img.CreateDate)
+                                .Select(img => img.LinkImage)
+                                .FirstOrDefault()
                     }).ToList()
                 };
+
 
                 return new ApiResponse { status = StatusCodes.Status201Created.ToString(), message = "Setup package added successfully.", data = response };
             }
@@ -447,12 +455,12 @@ namespace FTSS_API.Service.Implement
                     CreateDate = sp.CreateDate,
                     ModifyDate = sp.ModifyDate,
                     Size = sp.SetupPackageDetails
-    .Where(spd => spd.Product != null &&
-                  spd.Product.SubCategory != null &&
-                  spd.Product.SubCategory.Category != null &&
-                  spd.Product.SubCategory.Category.CategoryName == "Bể")  // Kiểm tra null trước khi truy cập CategoryName
-    .Select(spd => spd.Product.Size)
-    .FirstOrDefault(),
+                        .Where(spd => spd.Product != null &&
+                                      spd.Product.SubCategory != null &&
+                                      spd.Product.SubCategory.Category != null &&
+                                      spd.Product.SubCategory.Category.CategoryName == "Bể")  // Kiểm tra null trước khi truy cập CategoryName
+                        .Select(spd => spd.Product.Size)
+                        .FirstOrDefault(),
                     LinkImage = sp.Image,
                     Products = sp.SetupPackageDetails.Select(spd => new ProductResponse
                     {
@@ -552,10 +560,10 @@ namespace FTSS_API.Service.Implement
                         IsDelete = setupPackage.IsDelete,
                         CategoryName = spd.Product.SubCategory.Category.CategoryName,
                         LinkImage = spd.Product.Images
-                    .Where(img => img.IsDelete == false)
-                    .OrderBy(img => img.CreateDate)
-                    .Select(img => img.LinkImage)
-                    .FirstOrDefault()
+                                .Where(img => img.IsDelete == false)
+                                .OrderBy(img => img.CreateDate)
+                                .Select(img => img.LinkImage)
+                                .FirstOrDefault()
                     }).ToList()
                 };
 
