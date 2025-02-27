@@ -20,7 +20,7 @@ namespace FTSS_API.Controller
             _setupPackageService = setupPackageService;
         }
         /// <summary>
-        /// API tạo mới setup cho mọi role
+        /// API tạo mới setup cho admin, manager, customer.
         /// </summary>
         [HttpPost(ApiEndPointConstant.SetupPackage.AddSetupPackage)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status201Created)]
@@ -32,7 +32,7 @@ namespace FTSS_API.Controller
             return StatusCode(int.Parse(response.status), response);
         }
         /// <summary>
-        /// API delete setup cho mọi role.
+        /// API delete setup cho admin, manager, customer.
         /// </summary>
         [HttpDelete(ApiEndPointConstant.SetupPackage.RemoveSetupPackage)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
@@ -45,7 +45,7 @@ namespace FTSS_API.Controller
         }
 
         /// <summary>
-        /// API lấy danh sách SetupPackage cho user.
+        /// API lấy danh sách SetupPackage của customer cho customer.
         /// </summary>
         [HttpGet(ApiEndPointConstant.SetupPackage.GetListSetupPackage)]
         [ProducesResponseType(typeof(IPaginate<ApiResponse>), StatusCodes.Status200OK)]
@@ -68,7 +68,7 @@ namespace FTSS_API.Controller
         }
 
         /// <summary>
-        /// API lấy danh sách SetupPackage của shop cho admin, manager, customer.
+        /// API lấy danh sách SetupPackage của shop cho mọi role.
         /// </summary>
         [HttpGet(ApiEndPointConstant.SetupPackage.GetListSetupPackageAllShop)]
         [ProducesResponseType(typeof(IPaginate<ApiResponse>), StatusCodes.Status200OK)]
@@ -113,7 +113,7 @@ namespace FTSS_API.Controller
             return Ok(response);
         }
         /// <summary>
-        /// API cập nhập Setup cho User
+        /// API cập nhập Setup cho admin, manager, customer.
         /// </summary>
         [HttpPut(ApiEndPointConstant.SetupPackage.UpdateSetupPackage)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
@@ -125,7 +125,7 @@ namespace FTSS_API.Controller
             return StatusCode(int.Parse(response.status), response);
         }
         /// <summary>
-        /// API lấy thông tin chi tiết setup theo ID.
+        /// API lấy thông tin chi tiết setup theo ID cho mọi role.
         /// </summary>
         [HttpGet(ApiEndPointConstant.SetupPackage.GetSetUpById)]
         [ProducesResponseType(typeof(IPaginate<GetProductResponse>), StatusCodes.Status200OK)]
