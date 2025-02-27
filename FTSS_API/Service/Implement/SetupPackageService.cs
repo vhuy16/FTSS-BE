@@ -206,7 +206,8 @@ namespace FTSS_API.Service.Implement
                         Price = p.Product.Price,
                         Status = p.Product.Status,
                         IsDelete = p.Product.IsDelete,
-                        CategoryName = p.Product.SubCategory.Category.CategoryName
+                        CategoryName = p.Product.SubCategory.Category.CategoryName,
+                        LinkImage = p.Product.Images.Where(img => img.IsDelete == false).OrderBy(img => img.CreateDate).Select(img => img.LinkImage).FirstOrDefault()
                     }).ToList()
                 };
 
@@ -274,7 +275,12 @@ namespace FTSS_API.Service.Implement
                             Price = spd.Product.Price,
                             Status = spd.Product.Status,
                             IsDelete = sp.IsDelete,
-                            CategoryName = spd.Product.SubCategory.Category.CategoryName
+                            CategoryName = spd.Product.SubCategory.Category.CategoryName,
+                            LinkImage = spd.Product.Images
+                        .Where(img => img.IsDelete == false)
+                        .OrderBy(img => img.CreateDate)
+                        .Select(img => img.LinkImage)
+                        .FirstOrDefault()
                         }).ToList()
                     })
                     .ToListAsync();
@@ -325,6 +331,9 @@ namespace FTSS_API.Service.Implement
                         .ThenInclude(spd => spd.Product)
                             .ThenInclude(p => p.SubCategory)
                                 .ThenInclude(sc => sc.Category) // Truy vấn đến Category
+                                .Include(sp => sp.SetupPackageDetails)
+                                    .ThenInclude(spd => spd.Product)
+                                    .ThenInclude(p => p.Images) // Bao gồm 
                     .Where(sp => sp.User != null &&
                                  sp.User.Role == RoleEnum.Customer.GetDescriptionFromEnum() &&
                                  sp.IsDelete == false);
@@ -367,7 +376,12 @@ namespace FTSS_API.Service.Implement
                                 Price = spd.Product.Price,
                                 Status = spd.Product.Status,
                                 IsDelete = sp.IsDelete,
-                                CategoryName = spd.Product.SubCategory.Category.CategoryName
+                                CategoryName = spd.Product.SubCategory.Category.CategoryName,
+                                LinkImage = spd.Product.Images
+                            .Where(img => img.IsDelete == false)
+                            .OrderBy(img => img.CreateDate)
+                            .Select(img => img.LinkImage)
+                            .FirstOrDefault()
                             }).ToList()
                         }).ToList()
                     }).ToList();
@@ -402,6 +416,9 @@ namespace FTSS_API.Service.Implement
                                 .ThenInclude(spd => spd.Product)
                                 .ThenInclude(p => p.SubCategory)
                                 .ThenInclude(sc => sc.Category)  // Đảm bảo có Category
+                                .Include(sp => sp.SetupPackageDetails)
+                        .ThenInclude(spd => spd.Product)
+                        .ThenInclude(p => p.Images)
                                     .Where(sp => sp.User != null &&
                                          (sp.User.Role == RoleEnum.Admin.GetDescriptionFromEnum() ||
                                           sp.User.Role == RoleEnum.Manager.GetDescriptionFromEnum()) &&
@@ -445,7 +462,12 @@ namespace FTSS_API.Service.Implement
                         Price = spd.Product.Price,
                         Status = spd.Product.Status,
                         IsDelete = sp.IsDelete,
-                        CategoryName = spd.Product.SubCategory.Category.CategoryName
+                        CategoryName = spd.Product.SubCategory.Category.CategoryName,
+                        LinkImage = spd.Product.Images
+                    .Where(img => img.IsDelete == false)
+                    .OrderBy(img => img.CreateDate)
+                    .Select(img => img.LinkImage)
+                    .FirstOrDefault()
                     }).ToList()
                 }).ToList();
 
@@ -486,6 +508,9 @@ namespace FTSS_API.Service.Implement
                             .ThenInclude(d => d.Product)
                             .ThenInclude(p => p.SubCategory)
                             .ThenInclude(sc => sc.Category) // Bảo đảm truy vấn đến Category
+                            .Include(sp => sp.SetupPackageDetails)
+                        .ThenInclude(spd => spd.Product)
+                        .ThenInclude(p => p.Images)
                     );
 
                 // Kiểm tra nếu không tìm thấy gói setup
@@ -525,7 +550,12 @@ namespace FTSS_API.Service.Implement
                         Price = spd.Product.Price,
                         Status = spd.Product.Status,
                         IsDelete = setupPackage.IsDelete,
-                        CategoryName = spd.Product.SubCategory.Category.CategoryName
+                        CategoryName = spd.Product.SubCategory.Category.CategoryName,
+                        LinkImage = spd.Product.Images
+                    .Where(img => img.IsDelete == false)
+                    .OrderBy(img => img.CreateDate)
+                    .Select(img => img.LinkImage)
+                    .FirstOrDefault()
                     }).ToList()
                 };
 

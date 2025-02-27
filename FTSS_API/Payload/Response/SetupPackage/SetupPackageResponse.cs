@@ -22,6 +22,7 @@
         public string? Status { get; set; }
         public bool? IsDelete { get; set; }
         public string CategoryName { get; set; } = null!;
+        public string LinkImage { get; set; } = null!;
 
     }
 }
