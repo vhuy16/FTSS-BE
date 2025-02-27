@@ -206,6 +206,7 @@ namespace FTSS_API.Service.Implement
                         Price = p.Product.Price,
                         Status = p.Product.Status,
                         IsDelete = p.Product.IsDelete,
+                        CategoryName = p.Product.SubCategory.Category.CategoryName
                     }).ToList()
                 };
 
@@ -273,6 +274,7 @@ namespace FTSS_API.Service.Implement
                             Price = spd.Product.Price,
                             Status = spd.Product.Status,
                             IsDelete = sp.IsDelete,
+                            CategoryName = spd.Product.SubCategory.Category.CategoryName
                         }).ToList()
                     })
                     .ToListAsync();
@@ -365,6 +367,7 @@ namespace FTSS_API.Service.Implement
                                 Price = spd.Product.Price,
                                 Status = spd.Product.Status,
                                 IsDelete = sp.IsDelete,
+                                CategoryName = spd.Product.SubCategory.Category.CategoryName
                             }).ToList()
                         }).ToList()
                     }).ToList();
@@ -442,6 +445,7 @@ namespace FTSS_API.Service.Implement
                         Price = spd.Product.Price,
                         Status = spd.Product.Status,
                         IsDelete = sp.IsDelete,
+                        CategoryName = spd.Product.SubCategory.Category.CategoryName
                     }).ToList()
                 }).ToList();
 
@@ -521,6 +525,7 @@ namespace FTSS_API.Service.Implement
                         Price = spd.Product.Price,
                         Status = spd.Product.Status,
                         IsDelete = setupPackage.IsDelete,
+                        CategoryName = spd.Product.SubCategory.Category.CategoryName
                     }).ToList()
                 };
 
