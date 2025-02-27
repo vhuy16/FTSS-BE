@@ -9,7 +9,7 @@
         public DateTime? CreateDate { get; set; }
         public DateTime? ModifyDate { get; set; }
         public string? Size { get; set; }
-        public string LinkImage { get; set; } = null!;
+        public string images { get; set; } = null!;
         public List<ProductResponse> Products { get; set; } = new();
     }
 
@@ -22,7 +22,7 @@
         public string? Status { get; set; }
         public bool? IsDelete { get; set; }
         public string CategoryName { get; set; } = null!;
-        public string LinkImage { get; set; } = null!;
+        public string images { get; set; } = null!;
 
     }
 }

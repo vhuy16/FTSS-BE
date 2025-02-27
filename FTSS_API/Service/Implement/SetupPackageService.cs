@@ -200,7 +200,7 @@ namespace FTSS_API.Service.Implement
                     CreateDate = setupPackage.CreateDate,
                     ModifyDate = setupPackage.ModifyDate,
                     Size = tankSize,
-                    LinkImage = setupPackage.Image,
+                    images = setupPackage.Image,
                     Products = setupPackage.SetupPackageDetails.Select(spd => new ProductResponse
                     {
                         ProductId = spd.Product.Id,
@@ -210,7 +210,7 @@ namespace FTSS_API.Service.Implement
                         Status = spd.Product.Status,
                         IsDelete = setupPackage.IsDelete,
                         CategoryName = spd.Product.SubCategory.Category.CategoryName,
-                        LinkImage = spd.Product.Images
+                        images = spd.Product.Images
                                 .Where(img => img.IsDelete == false)
                                 .OrderBy(img => img.CreateDate)
                                 .Select(img => img.LinkImage)
@@ -274,7 +274,7 @@ namespace FTSS_API.Service.Implement
                         .Where(spd => spd.Product.SubCategory.Category.CategoryName == "Bể")  // Lọc sản phẩm có Category là "Bể"
                         .Select(spd => spd.Product.Size)                 // Lấy Size của sản phẩm
                         .FirstOrDefault(),
-                        LinkImage = sp.Image,
+                        images = sp.Image,
                         Products = sp.SetupPackageDetails.Select(spd => new ProductResponse
                         {
                             ProductId = spd.Product.Id,
@@ -284,7 +284,7 @@ namespace FTSS_API.Service.Implement
                             Status = spd.Product.Status,
                             IsDelete = sp.IsDelete,
                             CategoryName = spd.Product.SubCategory.Category.CategoryName,
-                            LinkImage = spd.Product.Images
+                            images = spd.Product.Images
                         .Where(img => img.IsDelete == false)
                         .OrderBy(img => img.CreateDate)
                         .Select(img => img.LinkImage)
@@ -375,7 +375,7 @@ namespace FTSS_API.Service.Implement
                             Size = sp.SetupPackageDetails
                                 .Select(spd => spd.Product)
                                 .FirstOrDefault(p => p.SubCategory != null && p.SubCategory.Category != null && p.SubCategory.Category.CategoryName == "Bể")?.Size, // Lấy Size từ sản phẩm có Category "Bể"
-                            LinkImage = sp.Image,
+                            images = sp.Image,
                             Products = sp.SetupPackageDetails.Select(spd => new ProductResponse
                             {
                                 ProductId = spd.Product.Id,
@@ -385,7 +385,7 @@ namespace FTSS_API.Service.Implement
                                 Status = spd.Product.Status,
                                 IsDelete = sp.IsDelete,
                                 CategoryName = spd.Product.SubCategory.Category.CategoryName,
-                                LinkImage = spd.Product.Images
+                                images = spd.Product.Images
                             .Where(img => img.IsDelete == false)
                             .OrderBy(img => img.CreateDate)
                             .Select(img => img.LinkImage)
@@ -461,7 +461,7 @@ namespace FTSS_API.Service.Implement
                                       spd.Product.SubCategory.Category.CategoryName == "Bể")  // Kiểm tra null trước khi truy cập CategoryName
                         .Select(spd => spd.Product.Size)
                         .FirstOrDefault(),
-                    LinkImage = sp.Image,
+                    images = sp.Image,
                     Products = sp.SetupPackageDetails.Select(spd => new ProductResponse
                     {
                         ProductId = spd.Product.Id,
@@ -471,7 +471,7 @@ namespace FTSS_API.Service.Implement
                         Status = spd.Product.Status,
                         IsDelete = sp.IsDelete,
                         CategoryName = spd.Product.SubCategory.Category.CategoryName,
-                        LinkImage = spd.Product.Images
+                        images = spd.Product.Images
                     .Where(img => img.IsDelete == false)
                     .OrderBy(img => img.CreateDate)
                     .Select(img => img.LinkImage)
@@ -549,7 +549,7 @@ namespace FTSS_API.Service.Implement
                     CreateDate = setupPackage.CreateDate,
                     ModifyDate = setupPackage.ModifyDate,
                     Size = size, // Lấy kích thước từ sản phẩm thuộc Category "Bể"
-                    LinkImage = setupPackage.Image,
+                    images = setupPackage.Image,
                     Products = setupPackage.SetupPackageDetails.Select(spd => new ProductResponse
                     {
                         ProductId = spd.Product.Id,
@@ -559,7 +559,7 @@ namespace FTSS_API.Service.Implement
                         Status = spd.Product.Status,
                         IsDelete = setupPackage.IsDelete,
                         CategoryName = spd.Product.SubCategory.Category.CategoryName,
-                        LinkImage = spd.Product.Images
+                        images = spd.Product.Images
                                 .Where(img => img.IsDelete == false)
                                 .OrderBy(img => img.CreateDate)
                                 .Select(img => img.LinkImage)
@@ -760,7 +760,10 @@ namespace FTSS_API.Service.Implement
                 {
                     var productCount = productIds.GroupBy(id => id).ToDictionary(g => g.Key, g => g.Count());
                     var allProducts = await _unitOfWork.Context.Set<Product>()
-                        .Where(p => productCount.Keys.Contains(p.Id) && p.IsDelete != true && p.Status != ProductStatusEnum.Unavailable.GetDescriptionFromEnum())
+                        .Where(p => productCount.Keys.Contains(p.Id))
+                        .Include(p => p.SubCategory) // Load bảng SubCategory
+                        .ThenInclude(sc => sc.Category) // Load bảng Category từ SubCategory
+                        .Include(p => p.Images) // Load danh sách Image
                         .ToListAsync();
 
                     if (!allProducts.Any())
@@ -818,7 +821,40 @@ namespace FTSS_API.Service.Implement
                     await transaction.CommitAsync();
                 }
 
-                return new ApiResponse { status = StatusCodes.Status200OK.ToString(), message = "Setup package updated successfully.", data = null };
+                var response = new SetupPackageResponse
+                {
+                    SetupPackageId = setupPackage.Id,
+                    SetupName = setupPackage.SetupName,
+                    Description = setupPackage.Description,
+                    TotalPrice = setupPackage.Price,
+                    CreateDate = setupPackage.CreateDate,
+                    ModifyDate = setupPackage.ModifyDate,
+                    Size = setupPackage.SetupPackageDetails
+                                .Select(spd => spd.Product)
+                                .FirstOrDefault(p => p.SubCategory != null && p.SubCategory.Category != null && p.SubCategory.Category.CategoryName == "Bể")?.Size,
+                    images = setupPackage.Image,
+                    Products = setupPackage.SetupPackageDetails.Select(spd => new ProductResponse
+                    {
+                        ProductId = spd.Product.Id,
+                        ProductName = spd.Product.ProductName,
+                        Quantity = spd.Quantity,  // Lấy Quantity từ SetupPackageDetail
+                        Price = spd.Product.Price,
+                        Status = spd.Product.Status,
+                        IsDelete = setupPackage.IsDelete,
+                        CategoryName = spd.Product.SubCategory.Category.CategoryName,
+                        images = spd.Product.Images
+                                .Where(img => img.IsDelete == false)
+                                .OrderBy(img => img.CreateDate)
+                                .Select(img => img.LinkImage)
+                                .FirstOrDefault()
+                    }).ToList()
+                };
+
+                return new ApiResponse 
+                { status = StatusCodes.Status200OK.ToString(),
+                    message = "Setup package updated successfully.", 
+                    data = null 
+                };
             }
             catch (Exception ex)
             {
