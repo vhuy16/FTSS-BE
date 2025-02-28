@@ -22,18 +22,12 @@ namespace FTSS_API.Service.Implement
 
         public async Task<ApiResponse> AddCartItem(List<AddCartItemRequest> addCartItemRequest)
         {
-            if (addCartItemRequest == null || !addCartItemRequest.Any())
-            {
-                return new ApiResponse()
-                {
-                    status = StatusCodes.Status400BadRequest.ToString(),
-                    message = "Request cannot be empty",
-                    data = null
-                };
-            }
+            // Lấy UserId từ HttpContext
             Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
             var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
-                predicate: u => u.Id.Equals(userId) && u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) && u.IsDelete.Equals(false));
+                predicate: u => u.Id.Equals(userId) &&
+                                u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) && u.IsDelete == false &&
+                                (u.Role == RoleEnum.Customer.GetDescriptionFromEnum()));
 
             if (user == null)
             {
@@ -45,6 +39,16 @@ namespace FTSS_API.Service.Implement
                 };
             }
 
+            if (addCartItemRequest == null || !addCartItemRequest.Any())
+            {
+                return new ApiResponse()
+                {
+                    status = StatusCodes.Status400BadRequest.ToString(),
+                    message = "Request cannot be empty",
+                    data = null
+                };
+            }
+         
             var cart = await _unitOfWork.GetRepository<Cart>().SingleOrDefaultAsync(
                 predicate: c => c.UserId.Equals(userId));
 
@@ -85,32 +89,68 @@ namespace FTSS_API.Service.Implement
                     };
                 }
 
-                if (product.Quantity < item.Quantity || item.Quantity <= 0)
+                if (item.Quantity <= 0)
                 {
                     return new ApiResponse()
                     {
                         status = StatusCodes.Status400BadRequest.ToString(),
-                        message = item.Quantity <= 0 ? MessageConstant.CartMessage.NegativeQuantity : MessageConstant.ProductMessage.ProductNotEnough,
+                        message = MessageConstant.CartMessage.NegativeQuantity,
                         data = null
                     };
                 }
 
-                var cartItem = new CartItem()
-                {
-                    Id = Guid.NewGuid(),
-                    CartId = cart.Id,
-                    ProductId = product.Id,
-                    Quantity = item.Quantity,
-                    Status = cartStatus.ToString(),
-                    CreateDate = TimeUtils.GetCurrentSEATime(),
-                    ModifyDate = TimeUtils.GetCurrentSEATime()
-                };
+                var existingCartItem = await _unitOfWork.GetRepository<CartItem>().SingleOrDefaultAsync(
+                    predicate: ci => ci.CartId.Equals(cart.Id) && ci.ProductId.Equals(product.Id) && ci.Status == CartItemEnum.Odd.ToString() && ci.IsDelete == false);
 
-                await _unitOfWork.GetRepository<CartItem>().InsertAsync(cartItem);
+                if (existingCartItem != null)
+                {
+                    // Nếu sản phẩm đã tồn tại trong giỏ hàng với trạng thái Odd, cộng thêm số lượng
+                    int newQuantity = existingCartItem.Quantity + item.Quantity;
+
+                    if (newQuantity > product.Quantity)
+                    {
+                        return new ApiResponse()
+                        {
+                            status = StatusCodes.Status400BadRequest.ToString(),
+                            message = MessageConstant.ProductMessage.ProductNotEnough,
+                            data = null
+                        };
+                    }
+
+                    existingCartItem.Quantity = newQuantity;
+                    existingCartItem.ModifyDate = TimeUtils.GetCurrentSEATime();
+                    _unitOfWork.GetRepository<CartItem>().UpdateAsync(existingCartItem);
+                }
+                else
+                {
+                    // Nếu sản phẩm chưa có trong giỏ hàng, thêm mới
+                    if (item.Quantity > product.Quantity)
+                    {
+                        return new ApiResponse()
+                        {
+                            status = StatusCodes.Status400BadRequest.ToString(),
+                            message = MessageConstant.ProductMessage.ProductNotEnough,
+                            data = null
+                        };
+                    }
+
+                    var cartItem = new CartItem()
+                    {
+                        Id = Guid.NewGuid(),
+                        CartId = cart.Id,
+                        ProductId = product.Id,
+                        Quantity = item.Quantity,
+                        Status = cartStatus.ToString(),
+                        CreateDate = TimeUtils.GetCurrentSEATime(),
+                        ModifyDate = TimeUtils.GetCurrentSEATime()
+                    };
+
+                    await _unitOfWork.GetRepository<CartItem>().InsertAsync(cartItem);
+                }
 
                 cartItemResponses.Add(new AddCartItemResponse()
                 {
-                    CartItemId = cartItem.Id,
+                    CartItemId = existingCartItem?.Id ?? Guid.NewGuid(),
                     ProductId = product.Id,
                     ProductName = product.ProductName,
                     Price = product.Price * item.Quantity,
@@ -126,6 +166,7 @@ namespace FTSS_API.Service.Implement
                 data = cartItemResponses
             };
         }
+
 
 
         //public async Task<ApiResponse> AddCartItem(AddCartItemRequest addCartItemRequest)
@@ -234,9 +275,12 @@ namespace FTSS_API.Service.Implement
 
         public async Task<ApiResponse> ClearCart()
         {
+            // Lấy UserId từ HttpContext
             Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
             var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
-                predicate: u => u.Id.Equals(userId) && u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()));
+                predicate: u => u.Id.Equals(userId) &&
+                                u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) && u.IsDelete == false &&
+                                (u.Role == RoleEnum.Customer.GetDescriptionFromEnum()));
 
             if (user == null)
             {
@@ -276,9 +320,12 @@ namespace FTSS_API.Service.Implement
 
         public async Task<ApiResponse> DeleteCartItem(Guid ItemId)
         {
+            // Lấy UserId từ HttpContext
             Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
             var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
-                predicate: u => u.Id.Equals(userId) && u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()));
+                predicate: u => u.Id.Equals(userId) &&
+                                u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) && u.IsDelete == false &&
+                                (u.Role == RoleEnum.Customer.GetDescriptionFromEnum()));
 
             if (user == null)
             {
@@ -321,9 +368,12 @@ namespace FTSS_API.Service.Implement
 
         public async Task<ApiResponse> GetAllCartItem()
         {
+            // Lấy UserId từ HttpContext
             Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
             var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
-                predicate: u => u.Id.Equals(userId) && u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()));
+                predicate: u => u.Id.Equals(userId) &&
+                                u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) && u.IsDelete == false &&
+                                (u.Role == RoleEnum.Customer.GetDescriptionFromEnum()));
 
             if (user == null)
             {
@@ -389,8 +439,14 @@ namespace FTSS_API.Service.Implement
 
         public async Task<ApiResponse> GetCartSummary()
         {
+            // Lấy UserId từ HttpContext
             Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
-            if (userId == null)
+            var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
+                predicate: u => u.Id.Equals(userId) &&
+                                u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) && u.IsDelete == false &&
+                                (u.Role == RoleEnum.Customer.GetDescriptionFromEnum()));
+
+            if (user == null)
             {
                 return new ApiResponse()
                 {
@@ -398,14 +454,6 @@ namespace FTSS_API.Service.Implement
                     message = "Unauthorized: Token is missing or expired.",
                     data = null
                 };
-            }
-
-            var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
-                predicate: u => u.Id.Equals(userId) && u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()));
-
-            if (user == null)
-            {
-                throw new BadHttpRequestException("User not available.");
             }
 
             var cart = await _unitOfWork.GetRepository<Cart>().SingleOrDefaultAsync(
@@ -461,9 +509,12 @@ namespace FTSS_API.Service.Implement
 
         public async Task<ApiResponse> UpdateCartItem(Guid id, UpdateCartItemRequest updateCartItemRequest)
         {
+            // Lấy UserId từ HttpContext
             Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
             var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
-                predicate: u => u.Id.Equals(userId) && u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()));
+                predicate: u => u.Id.Equals(userId) &&
+                                u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) && u.IsDelete == false &&
+                                (u.Role == RoleEnum.Customer.GetDescriptionFromEnum()));
 
             if (user == null)
             {

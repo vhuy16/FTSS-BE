@@ -2,8 +2,9 @@
 {
     public class AddSetupPackageRequest
     {
-        public string SetupName { get; set; } = null!;
+        public string? SetupName { get; set; }
 
         public string? Description { get; set; }
+        public IFormFile? ImageFile { get; set; }
     }
 }

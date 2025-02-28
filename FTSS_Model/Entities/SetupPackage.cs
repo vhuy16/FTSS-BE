@@ -21,6 +21,8 @@ public partial class SetupPackage
 
     public Guid? Userid { get; set; }
 
+    public string? Image { get; set; }
+
     public virtual ICollection<SetupPackageDetail> SetupPackageDetails { get; set; } = new List<SetupPackageDetail>();
 
     public virtual User? User { get; set; }

@@ -119,8 +119,9 @@ public static class ApiEndPointConstant
         public const string RemoveSetupPackage = SetupPackageEndPoint + "/{id}";
         public const string GetListSetupPackage = SetupPackageEndPoint;
         public const string GetListSetupPackageAllUser = SetupPackageEndPoint + "/all-users";
-        public const string GetListSetupPackageShop = SetupPackageEndPoint + "/shop";
-        public const string UpdateSetupPackage  = SetupPackageEndPoint + "/{id}";
+        public const string GetListSetupPackageAllShop = SetupPackageEndPoint + "/all-shop";
+        public const string UpdateSetupPackage  = SetupPackageEndPoint + "/{setupPackageId}";
+        public const string GetSetUpById = SetupPackageEndPoint + "/{id}";
     }
     public static class MaintenanceSchedule
     {

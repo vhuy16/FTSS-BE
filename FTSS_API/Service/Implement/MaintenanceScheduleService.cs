@@ -25,7 +25,7 @@ namespace FTSS_API.Service.Implement
                 Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
                 var userr = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
                     predicate: u => u.Id.Equals(userId) &&
-                                    u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) &&
+                                    u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) && u.IsDelete == false &&
                                     (u.Role == RoleEnum.Admin.GetDescriptionFromEnum() || u.Role == RoleEnum.Manager.GetDescriptionFromEnum()));
 
                 if (userr == null)
@@ -188,7 +188,7 @@ namespace FTSS_API.Service.Implement
                 Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
                 var userr = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
                     predicate: u => u.Id.Equals(userId) &&
-                                    u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) &&
+                                    u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) && u.IsDelete == false &&
                                     (u.Role == RoleEnum.Admin.GetDescriptionFromEnum() || u.Role == RoleEnum.Manager.GetDescriptionFromEnum() || u.Role == RoleEnum.Technician.GetDescriptionFromEnum()));
 
                 if (userr == null)
@@ -248,7 +248,7 @@ namespace FTSS_API.Service.Implement
                 Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
                 var userr = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
                     predicate: u => u.Id.Equals(userId) &&
-                                    u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) &&
+                                    u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) && u.IsDelete == false &&
                                     (u.Role == RoleEnum.Admin.GetDescriptionFromEnum() || u.Role == RoleEnum.Manager.GetDescriptionFromEnum()));
 
                 if (userr == null)
@@ -328,7 +328,7 @@ namespace FTSS_API.Service.Implement
                 Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
                 var userr = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
                     predicate: u => u.Id.Equals(userId) &&
-                                    u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) &&
+                                    u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) && u.IsDelete == false &&
                                     u.Role.Equals(RoleEnum.Technician.GetDescriptionFromEnum()));
 
                 if (userr == null)
