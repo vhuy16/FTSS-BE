@@ -203,7 +203,7 @@ namespace FTSS_API.Service.Implement
                     images = setupPackage.Image,
                     Products = setupPackage.SetupPackageDetails.Select(spd => new ProductResponse
                     {
-                        ProductId = spd.Product.Id,
+                        Id = spd.Product.Id,
                         ProductName = spd.Product.ProductName,
                         Quantity = spd.Quantity,  // Lấy Quantity từ SetupPackageDetail
                         Price = spd.Product.Price,
@@ -277,7 +277,7 @@ namespace FTSS_API.Service.Implement
                         images = sp.Image,
                         Products = sp.SetupPackageDetails.Select(spd => new ProductResponse
                         {
-                            ProductId = spd.Product.Id,
+                            Id = spd.Product.Id,
                             ProductName = spd.Product.ProductName,
                             Quantity = spd.Quantity,  // Lấy Quantity từ SetupPackageDetail
                             Price = spd.Product.Price,
@@ -378,7 +378,7 @@ namespace FTSS_API.Service.Implement
                             images = sp.Image,
                             Products = sp.SetupPackageDetails.Select(spd => new ProductResponse
                             {
-                                ProductId = spd.Product.Id,
+                                Id = spd.Product.Id,
                                 ProductName = spd.Product.ProductName,
                                 Quantity = spd.Quantity,  // Lấy Quantity từ SetupPackageDetail
                                 Price = spd.Product.Price,
@@ -464,7 +464,7 @@ namespace FTSS_API.Service.Implement
                     images = sp.Image,
                     Products = sp.SetupPackageDetails.Select(spd => new ProductResponse
                     {
-                        ProductId = spd.Product.Id,
+                        Id = spd.Product.Id,
                         ProductName = spd.Product.ProductName,
                         Quantity = spd.Quantity,  // Lấy Quantity từ SetupPackageDetail
                         Price = spd.Product.Price,
@@ -552,7 +552,7 @@ namespace FTSS_API.Service.Implement
                     images = setupPackage.Image,
                     Products = setupPackage.SetupPackageDetails.Select(spd => new ProductResponse
                     {
-                        ProductId = spd.Product.Id,
+                        Id = spd.Product.Id,
                         ProductName = spd.Product.ProductName,
                         Quantity = spd.Quantity,  // Lấy Quantity từ SetupPackageDetail
                         Price = spd.Product.Price,
@@ -835,7 +835,7 @@ namespace FTSS_API.Service.Implement
                     images = setupPackage.Image,
                     Products = setupPackage.SetupPackageDetails.Select(spd => new ProductResponse
                     {
-                        ProductId = spd.Product.Id,
+                        Id = spd.Product.Id,
                         ProductName = spd.Product.ProductName,
                         Quantity = spd.Quantity,  // Lấy Quantity từ SetupPackageDetail
                         Price = spd.Product.Price,
