@@ -11,7 +11,7 @@
             public const string UserNotExist = "Người dùng không tồn tại";
             public const string UserIsEmpty = "Không có người dùng";
             public const string AccountNotExist = "Tài khoản không tồn tại";
-
+            public const string UserBeBaned = "Tài khoản đã bị khoá";
         }
         public static class PaymentMessage
         {

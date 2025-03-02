@@ -15,7 +15,7 @@
         public decimal Discount { get; set; }
         public UserResponse userResponse { get; set; } // Fixed property declaration and removed invalid initialization
         public List<OrderDetailCreateResponse> OrderDetails { get; set; } = new List<OrderDetailCreateResponse>();
-
+        public PaymentResponse Payment { get; set; } = new PaymentResponse();
         public class OrderDetailCreateResponse
         {
             public string? ProductName { get; set; }
@@ -29,6 +29,12 @@
             public string Name { get; set; }
             public string Email { get; set; }
             public string? PhoneNumber { get; set; }
+        }
+
+        public class PaymentResponse
+        {
+            public string PaymentMethod { get; set; } = null!;
+            public string PaymentStatus { get; set; } = null!;
         }
     }
 }

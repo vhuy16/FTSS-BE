@@ -18,6 +18,7 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddLazyResolution();
+builder.Services.AddRedis();
 // Add other custom services and configurations
 builder.Services.AddAuthentication();
 // builder.Services.AddInfrastructure();

@@ -12,6 +12,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using MRC_API.Utils;
+using StackExchange.Redis;
 
 namespace FTSS_API;
 
@@ -71,7 +72,14 @@ public static class DependencyInjection
         services.AddHttpClient(); // Registers HttpClient
         return services;
     }
-
+    public static IServiceCollection AddRedis(this IServiceCollection services)
+    {
+        IConfiguration configuration = new ConfigurationBuilder()
+            .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true).Build();
+        var redisConnectionString = configuration.GetConnectionString("Redis");
+        services.AddSingleton<IConnectionMultiplexer>(ConnectionMultiplexer.Connect(redisConnectionString));
+        return services;
+    }
     public static IServiceCollection AddJwtValidation(this IServiceCollection services)
     {
         IConfiguration configuration = new ConfigurationBuilder()

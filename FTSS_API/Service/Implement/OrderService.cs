@@ -306,7 +306,7 @@ public class OrderService : BaseService<OrderService>, IOrderService
                 TotalPrice = 0,
                 CreateDate = TimeUtils.GetCurrentSEATime(),
                 UserId = userId,
-                Status = OrderStatus.PENDING_PAYMENT.GetDescriptionFromEnum(),
+                Status = OrderStatus.PROCESSING.GetDescriptionFromEnum(),
                 Address = createOrderRequest.Address,
                 Shipcost = createOrderRequest.ShipCost,
 
@@ -535,6 +535,7 @@ public class OrderService : BaseService<OrderService>, IOrderService
             var query = _unitOfWork.Context.Set<Order>()
                 .Include(o => o.User)
                 .Include(o => o.Voucher)
+                .Include(o => o.Payments)
                 .Include(o => o.OrderDetails)
                     .ThenInclude(od => od.Product)
                         .ThenInclude(p => p.Images) // Bao gồm ảnh sản phẩm
@@ -575,7 +576,13 @@ public class OrderService : BaseService<OrderService>, IOrderService
                 Address = order.Address,
                 CreateDate = order.CreateDate,
                 ModifyDate = order.ModifyDate,
-                Discount = order.Voucher?.Discount ?? 0, // Lấy giảm giá từ voucher (nếu có)
+                Discount = order.Voucher?.Discount ?? 0,
+                Payment = new GetOrderResponse.PaymentResponse
+                {
+                    PaymentMethod = order.Payments.FirstOrDefault()?.PaymentMethod,
+                    PaymentStatus = order.Payments.FirstOrDefault()?.PaymentStatus,
+                },
+                // Lấy giảm giá từ voucher (nếu có)
                 userResponse = new GetOrderResponse.UserResponse
                 {
                     Name = order.User?.UserName,
@@ -588,7 +595,7 @@ public class OrderService : BaseService<OrderService>, IOrderService
                     Price = od.Price,
                     Quantity = od.Quantity,
                     LinkImage = od.Product.Images.FirstOrDefault()?.LinkImage ?? "NoImageAvailable" // Lấy ảnh đầu tiên hoặc giá trị mặc định
-                }).ToList()
+                }).ToList(),
             }).ToList();
 
             // Tạo response kết quả
@@ -638,6 +645,7 @@ public class OrderService : BaseService<OrderService>, IOrderService
                 .Where(o => o.UserId == userId && (string.IsNullOrEmpty(status) || o.Status.Equals(status)))
                 .Include(o => o.User)
                 .Include(o => o.Voucher)
+                .Include(o => o.Payments)
                 .Include(o => o.OrderDetails)
                     .ThenInclude(od => od.Product)
                         .ThenInclude(p => p.Images) // Bao gồm hình ảnh sản phẩm
@@ -678,7 +686,12 @@ public class OrderService : BaseService<OrderService>, IOrderService
                 Address = order.Address,
                 CreateDate = order.CreateDate,
                 ModifyDate = order.ModifyDate,
-                Discount = order.Voucher?.Discount ?? 0, // Lấy giảm giá từ voucher (nếu có)
+                Discount = order.Voucher?.Discount ?? 0,
+                Payment = new GetOrderResponse.PaymentResponse
+                {
+                    PaymentMethod = order.Payments.FirstOrDefault()?.PaymentMethod,
+                    PaymentStatus = order.Payments.FirstOrDefault()?.PaymentStatus,
+                },// Lấy giảm giá từ voucher (nếu có)
                 userResponse = new GetOrderResponse.UserResponse
                 {
                     Name = order.User?.UserName,
