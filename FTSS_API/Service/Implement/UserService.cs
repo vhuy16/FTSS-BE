@@ -11,18 +11,20 @@ using FTSS_Model.Context;
 using FTSS_Model.Entities;
 using FTSS_Model.Enum;
 using FTSS_Repository.Interface;
+using StackExchange.Redis;
 
 namespace FTSS_API.Service.Implement.Implement;
 
 public class UserService : BaseService<UserService>, IUserService
 {
     public readonly IEmailSender _emailService;
-
+    private readonly IConnectionMultiplexer _redis;
     public UserService(IUnitOfWork<MyDbContext> unitOfWork, ILogger<UserService> logger, IMapper mapper,
-        IHttpContextAccessor httpContextAccessor, IEmailSender emailSender) : base(unitOfWork, logger, mapper,
+        IHttpContextAccessor httpContextAccessor, IEmailSender emailSender, IConnectionMultiplexer redis) : base(unitOfWork, logger, mapper,
         httpContextAccessor)
     {
         _emailService = emailSender;
+        _redis = redis;
     }
 
         public async Task<ApiResponse> CreateNewAccount(CreateNewAccountRequest createNewAccountRequest)
@@ -95,17 +97,7 @@ public class UserService : BaseService<UserService>, IUserService
         if (isSuccessfully)
         {
                 // Tạo cart cho user mới tạo
-                Cart newCart = new Cart
-                {
-                    Id = Guid.NewGuid(),
-                    UserId = newUser.Id,
-                    CreateDate = TimeUtils.GetCurrentSEATime(),
-                    ModifyDate = TimeUtils.GetCurrentSEATime(),
-                    Status = CartEnum.Available.GetDescriptionFromEnum(),
-                    IsDelete = false
-                };
-
-                await _unitOfWork.GetRepository<Cart>().InsertAsync(newCart);
+                
                 await _unitOfWork.CommitAsync();
                 var createNewAccountResponse = new CreateNewAccountResponse
             {
@@ -119,23 +111,27 @@ public class UserService : BaseService<UserService>, IUserService
             };
 
             string otp = OtpUltil.GenerateOtp();
-            var otpRecord = new Otp
-            {
-                Id = Guid.NewGuid(),  // Sử dụng Guid.NewGuid() để tạo một GUID duy nhất
-                UserId = newUser.Id,
-                OtpCode = otp,
-                CreateDate = TimeUtils.GetCurrentSEATime(),
-                ExpiresAt = TimeUtils.GetCurrentSEATime().AddMinutes(10),
-                IsValid = true
-            };
-
-            await _unitOfWork.GetRepository<Otp>().InsertAsync(otpRecord);
+            // var otpRecord = new Otp
+            // {
+            //     Id = Guid.NewGuid(),  // Sử dụng Guid.NewGuid() để tạo một GUID duy nhất
+            //     UserId = newUser.Id,
+            //     OtpCode = otp,
+            //     CreateDate = TimeUtils.GetCurrentSEATime(),
+            //     ExpiresAt = TimeUtils.GetCurrentSEATime().AddMinutes(10),
+            //     IsValid = true
+            // };
+            //
+            // await _unitOfWork.GetRepository<Otp>().InsertAsync(otpRecord);
             await _unitOfWork.CommitAsync();
             // Send OTP email
+            var redisDb = _redis.GetDatabase();
+            if (redisDb == null) throw new RedisServerException("Không thể kết nối tới Redis");
+            var key = "emailOtp:" + createNewAccountRequest.Email;
+            await redisDb.StringSetAsync(key, otp, TimeSpan.FromMinutes(5));
             await _emailService.SendVerificationEmailAsync(newUser.Email, otp);
 
             // Optionally, handle OTP expiration as discussed
-            ScheduleOtpCancellation(otpRecord.Id, TimeSpan.FromMinutes(10));
+            // ScheduleOtpCancellation(otpRecord.Id, TimeSpan.FromMinutes(10));
 
             return new ApiResponse
             {
@@ -182,6 +178,17 @@ public class UserService : BaseService<UserService>, IUserService
                 status = StatusCodes.Status401Unauthorized.ToString(),
                 message = MessageConstant.LoginMessage.InvalidUsernameOrPassword,
                 data = null
+            };
+        }
+
+        if (user.Status.Equals(UserStatusEnum.Baned.GetDescriptionFromEnum()))
+        {
+            return new ApiResponse()
+            {
+                status = StatusCodes.Status200OK.ToString(),
+                message = MessageConstant.UserMessage.UserBeBaned,
+                data = null
+
             };
         }
 
@@ -398,6 +405,7 @@ public class UserService : BaseService<UserService>, IUserService
         user.ModifyDate = TimeUtils.GetCurrentSEATime();
         user.Address = string.IsNullOrEmpty(updateUserRequest.Address) ? user.Address : updateUserRequest.Address;
         user.Role = string.IsNullOrEmpty(updateUserRequest.Role) ? user.Role : updateUserRequest.Role;
+        user.Status = string.IsNullOrEmpty(updateUserRequest.Status) ? user.Status : updateUserRequest.Status;
         _unitOfWork.GetRepository<User>().UpdateAsync(user);
 
         bool isSuccessful = await _unitOfWork.CommitAsync() > 0;
@@ -449,31 +457,93 @@ public class UserService : BaseService<UserService>, IUserService
     }
 
     #region verifyOtp
-
-    public async Task<bool> VerifyOtp(Guid UserId, string otpCheck)
+    //
+    // public async Task<bool> VerifyOtp(Guid UserId, string otpCheck)
+    // {
+    //     var otp = await _unitOfWork.GetRepository<Otp>()
+    //         .SingleOrDefaultAsync(predicate: p => p.OtpCode.Equals(otpCheck) && p.UserId.Equals(UserId));
+    //     if (otp != null && TimeUtils.GetCurrentSEATime() < otp.ExpiresAt && otp.IsValid == true)
+    //     {
+    //         var user = await _unitOfWork.GetRepository<User>()
+    //             .SingleOrDefaultAsync(predicate: u => u.Id.Equals(UserId));
+    //         if (user != null)
+    //         {
+    //             user.Status = UserStatusEnum.Available.GetDescriptionFromEnum();
+    //             _unitOfWork.GetRepository<User>().UpdateAsync(user);
+    //             _unitOfWork.GetRepository<Otp>().DeleteAsync(otp); // Delete the OTP record
+    //
+    //
+    //             await _unitOfWork.CommitAsync();
+    //             return true;
+    //         }
+    //     }
+    //
+    //     return false;
+    // }
+    //
+    public async Task<ApiResponse> VerifyOtp(string email, string otp)
     {
-        var otp = await _unitOfWork.GetRepository<Otp>()
-            .SingleOrDefaultAsync(predicate: p => p.OtpCode.Equals(otpCheck) && p.UserId.Equals(UserId));
-        if (otp != null && TimeUtils.GetCurrentSEATime() < otp.ExpiresAt && otp.IsValid == true)
+        var redisDb = _redis.GetDatabase();
+        if (redisDb == null) throw new RedisServerException("Không thể kết nối tới Redis");
+
+        var key = "emailOtp:" + email;
+        var storedOtp = await redisDb.StringGetAsync(key);
+        if (storedOtp.IsNullOrEmpty)
         {
-            var user = await _unitOfWork.GetRepository<User>()
-                .SingleOrDefaultAsync(predicate: u => u.Id.Equals(UserId));
-            if (user != null)
+            return new ApiResponse()
             {
-                user.Status = UserStatusEnum.Available.GetDescriptionFromEnum();
-                _unitOfWork.GetRepository<User>().UpdateAsync(user);
-                _unitOfWork.GetRepository<Otp>().DeleteAsync(otp); // Delete the OTP record
-
-
-                await _unitOfWork.CommitAsync();
-                return true;
-            }
+                status = StatusCodes.Status400BadRequest.ToString(),
+                message = "OTP đã hết hạn hoặc không tồn tại",
+                data = null
+            };
         }
 
-        return false;
-    }
-    
+        if (!storedOtp.Equals(otp))
+        {
+            return new ApiResponse()
+            {
+                status = StatusCodes.Status400BadRequest.ToString(),
+                message = "OTP không chính xác",
+                data = null
+            };
+        }
 
+        var user = await _unitOfWork.GetRepository<User>()
+            .SingleOrDefaultAsync(predicate: a => a.Email.Equals(email));
+        if (user == null)
+        {
+            return new ApiResponse()
+            {
+                status = StatusCodes.Status404NotFound.ToString(),
+                message = "Tài khoản không tồn tại",
+                data = null
+            };
+        }
+
+        user.Status = UserStatusEnum.Available.GetDescriptionFromEnum();
+        Cart newCart = new Cart
+        {
+            Id = Guid.NewGuid(),
+            UserId = user.Id,
+            CreateDate = TimeUtils.GetCurrentSEATime(),
+            ModifyDate = TimeUtils.GetCurrentSEATime(),
+            Status = CartEnum.Available.GetDescriptionFromEnum(),
+            IsDelete = false
+        };
+
+        await _unitOfWork.GetRepository<Cart>().InsertAsync(newCart);
+        _unitOfWork.GetRepository<User>().UpdateAsync(user);
+        await _unitOfWork.CommitAsync();
+
+        await redisDb.KeyDeleteAsync(key);
+
+        return new ApiResponse()
+        {
+            status = StatusCodes.Status200OK.ToString(),
+            message = "Tài khoản đã được xác thực thành công",
+            data = true
+        };
+    }
     #endregion
     public async Task<ApiResponse> CreateNewUserAccountByGoogle(GoogleAuthResponse request)
     {
@@ -546,7 +616,56 @@ public class UserService : BaseService<UserService>, IUserService
             };
         }
     }
+    public async Task<ApiResponse> ResendOtp(string email)
+    {
+        string emailPattern = @"^[^@\s]+@[^@\s]+\.[^@\s]+$";
+        if (!Regex.IsMatch(email, emailPattern))
+        {
+            return new ApiResponse()
+            {
+                status = StatusCodes.Status400BadRequest.ToString(),
+                message = "Email không đúng định dạng",
+                data = false
+            };
+        }
 
+        var account = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
+            predicate: u => u.Email.Equals(email));
+        if (account == null)
+        {
+            return new ApiResponse()
+            {
+                status = StatusCodes.Status404NotFound.ToString(),
+                message = "Email không tồn tại trong hệ thống",
+                data = null
+            };
+        }
+
+        var redisDb = _redis.GetDatabase();
+        if (redisDb == null)
+            throw new RedisServerException("Không thể kết nối tới Redis");
+
+        var key = "emailOtp:" + email;
+
+        await redisDb.KeyDeleteAsync(key);
+
+        
+
+        string otp = OtpUltil.GenerateOtp();
+
+        await _emailService.SendVerificationEmailAsync(email, otp);
+
+        await redisDb.StringSetAsync(key, otp, TimeSpan.FromMinutes(5));
+
+        return new ApiResponse()
+        {
+            status = StatusCodes.Status200OK.ToString(),
+            message = "Gửi lại OTP thành công",
+            data = true
+        };
+
+
+    }
     public async Task<ApiResponse> ForgotPassword(ForgotPasswordRequest request)
     {
         string emailPattern = @"^[^@\s]+@[^@\s]+\.[^@\s]+$";

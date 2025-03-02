@@ -24,7 +24,9 @@ public static class ApiEndPointConstant
         public const string ForgotPassword = UserEndPoint + "/forgot-password";
         public const string ResetPassword = UserEndPoint + "/reset-password";
         public const string VerifyForgotPassword = UserEndPoint + "/verify-forgot-password";
+        public const string ResendOtp = UserEndPoint + "/resend-otp";
         public const string ChangePassword = UserEndPoint + "/change-password";
+        
     }
     public static class PaymentOS
     {
