@@ -175,7 +175,7 @@ public class UserService : BaseService<UserService>, IUserService
         {
             return new ApiResponse()
             {
-                status = StatusCodes.Status401Unauthorized.ToString(),
+                status = StatusCodes.Status200OK.ToString(),
                 message = MessageConstant.LoginMessage.InvalidUsernameOrPassword,
                 data = null
             };
