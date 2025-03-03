@@ -730,12 +730,20 @@ namespace FTSS_API.Service.Implement
                     return new ApiResponse { status = StatusCodes.Status400BadRequest.ToString(), message = "Description cannot be empty.", data = null };
                 }
 
-                bool isSetupNameExists = await _unitOfWork.Context.Set<SetupPackage>()
+                if (request.SetupName != setupPackage.SetupName)
+                {
+                    bool isSetupNameExists = await _unitOfWork.Context.Set<SetupPackage>()
                         .AnyAsync(sp => sp.SetupName == request.SetupName && sp.Id != setupPackageId && sp.IsDelete != true);
 
-                if (isSetupNameExists)
-                {
-                    return new ApiResponse { status = StatusCodes.Status400BadRequest.ToString(), message = "Setup name already exists.", data = null };
+                    if (isSetupNameExists)
+                    {
+                        return new ApiResponse 
+                        { 
+                            status = StatusCodes.Status400BadRequest.ToString(), 
+                            message = "Setup name already exists.", 
+                            data = null 
+                        };
+                    }
                 }
 
                 // Handle Image Upload
