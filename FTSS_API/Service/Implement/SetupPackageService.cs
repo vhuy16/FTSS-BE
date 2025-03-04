@@ -31,7 +31,7 @@ namespace FTSS_API.Service.Implement
                     predicate: u => u.Id.Equals(userId) &&
                                     u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) &&
                                     u.IsDelete == false &&
-                                    (u.Role == RoleEnum.Admin.GetDescriptionFromEnum() ||
+                                    (
                                      u.Role == RoleEnum.Manager.GetDescriptionFromEnum() ||
                                      u.Role == RoleEnum.Customer.GetDescriptionFromEnum()));
 
@@ -88,8 +88,8 @@ namespace FTSS_API.Service.Implement
                     return new ApiResponse { status = StatusCodes.Status400BadRequest.ToString(), message = "Setup name already exists.", data = null };
                 }
 
-                bool isAdminOrManager = user.Role == RoleEnum.Admin.GetDescriptionFromEnum() || user.Role == RoleEnum.Manager.GetDescriptionFromEnum();
-                if (isAdminOrManager && request.ImageFile == null)
+                bool isManager = user.Role == RoleEnum.Manager.GetDescriptionFromEnum();
+                if (isManager && request.ImageFile == null)
                 {
                     return new ApiResponse { status = StatusCodes.Status400BadRequest.ToString(), message = "Image is required for Admin and Manager.", data = null };
                 }
@@ -201,6 +201,7 @@ namespace FTSS_API.Service.Implement
                     ModifyDate = setupPackage.ModifyDate,
                     Size = tankSize,
                     images = setupPackage.Image,
+                    IsDelete = setupPackage.IsDelete,
                     Products = setupPackage.SetupPackageDetails.Select(spd => new ProductResponse
                     {
                         Id = spd.Product.Id,
@@ -275,6 +276,7 @@ namespace FTSS_API.Service.Implement
                         .Select(spd => spd.Product.Size)                 // Lấy Size của sản phẩm
                         .FirstOrDefault(),
                         images = sp.Image,
+                        IsDelete = sp.IsDelete,
                         Products = sp.SetupPackageDetails.Select(spd => new ProductResponse
                         {
                             Id = spd.Product.Id,
@@ -320,7 +322,7 @@ namespace FTSS_API.Service.Implement
                 var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
                     predicate: u => u.Id.Equals(userId) &&
                                     u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) && u.IsDelete == false &&
-                                    (u.Role == RoleEnum.Admin.GetDescriptionFromEnum() || u.Role == RoleEnum.Manager.GetDescriptionFromEnum()));
+                                    (u.Role == RoleEnum.Manager.GetDescriptionFromEnum()));
 
                 if (user == null)
                 {
@@ -376,6 +378,7 @@ namespace FTSS_API.Service.Implement
                                 .Select(spd => spd.Product)
                                 .FirstOrDefault(p => p.SubCategory != null && p.SubCategory.Category != null && p.SubCategory.Category.CategoryName == "Bể")?.Size, // Lấy Size từ sản phẩm có Category "Bể"
                             images = sp.Image,
+                            IsDelete = sp.IsDelete,
                             Products = sp.SetupPackageDetails.Select(spd => new ProductResponse
                             {
                                 Id = spd.Product.Id,
@@ -428,8 +431,8 @@ namespace FTSS_API.Service.Implement
                         .ThenInclude(spd => spd.Product)
                         .ThenInclude(p => p.Images)
                                     .Where(sp => sp.User != null &&
-                                         (sp.User.Role == RoleEnum.Admin.GetDescriptionFromEnum() ||
-                                          sp.User.Role == RoleEnum.Manager.GetDescriptionFromEnum()) &&
+                                         (
+                                         sp.User.Role == RoleEnum.Manager.GetDescriptionFromEnum()) &&
                                          sp.IsDelete == false);
 
 
@@ -462,6 +465,7 @@ namespace FTSS_API.Service.Implement
                         .Select(spd => spd.Product.Size)
                         .FirstOrDefault(),
                     images = sp.Image,
+                    IsDelete = sp.IsDelete,
                     Products = sp.SetupPackageDetails.Select(spd => new ProductResponse
                     {
                         Id = spd.Product.Id,
@@ -550,6 +554,7 @@ namespace FTSS_API.Service.Implement
                     ModifyDate = setupPackage.ModifyDate,
                     Size = size, // Lấy kích thước từ sản phẩm thuộc Category "Bể"
                     images = setupPackage.Image,
+                    IsDelete = setupPackage.IsDelete,
                     Products = setupPackage.SetupPackageDetails.Select(spd => new ProductResponse
                     {
                         Id = spd.Product.Id,
@@ -685,16 +690,16 @@ namespace FTSS_API.Service.Implement
                 }
 
                 // Role-based access control
-                bool isAdminOrManager = user.Role == RoleEnum.Admin.GetDescriptionFromEnum() || user.Role == RoleEnum.Manager.GetDescriptionFromEnum();
+                bool isManager =  user.Role == RoleEnum.Manager.GetDescriptionFromEnum();
                 bool isCustomer = user.Role == RoleEnum.Customer.GetDescriptionFromEnum();
-                bool ownerIsAdminOrManager = setupOwner.Role == RoleEnum.Admin.GetDescriptionFromEnum() || setupOwner.Role == RoleEnum.Manager.GetDescriptionFromEnum();
+                bool ownerIsManager =  setupOwner.Role == RoleEnum.Manager.GetDescriptionFromEnum();
 
-                if (isAdminOrManager && !ownerIsAdminOrManager)
+                if (isManager && !ownerIsManager)
                 {
                     return new ApiResponse
                     {
                         status = StatusCodes.Status403Forbidden.ToString(),
-                        message = "You can only update setups of Admin or Manager accounts.",
+                        message = "You can only update setups of Shop.",
                         data = null
                     };
                 }
@@ -750,7 +755,7 @@ namespace FTSS_API.Service.Implement
                 string? imageUrl = setupPackage.Image;
                 if (request.ImageFile != null)
                 {
-                    if (isAdminOrManager)
+                    if (isManager)
                     {
                         imageUrl = (await _supabaseImageService.SendImagesAsync(new List<IFormFile> { request.ImageFile }, client)).FirstOrDefault();
                         if (string.IsNullOrEmpty(imageUrl))
@@ -841,6 +846,7 @@ namespace FTSS_API.Service.Implement
                                 .Select(spd => spd.Product)
                                 .FirstOrDefault(p => p.SubCategory != null && p.SubCategory.Category != null && p.SubCategory.Category.CategoryName == "Bể")?.Size,
                     images = setupPackage.Image,
+                    IsDelete = setupPackage.IsDelete,
                     Products = setupPackage.SetupPackageDetails.Select(spd => new ProductResponse
                     {
                         Id = spd.Product.Id,

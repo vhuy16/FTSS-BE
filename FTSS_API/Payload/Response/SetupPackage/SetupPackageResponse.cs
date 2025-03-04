@@ -10,6 +10,7 @@
         public DateTime? ModifyDate { get; set; }
         public string? Size { get; set; }
         public string images { get; set; } = null!;
+        public bool? IsDelete { get; set; }
         public List<ProductResponse> Products { get; set; } = new();
     }
 
