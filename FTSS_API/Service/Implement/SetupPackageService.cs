@@ -1,5 +1,6 @@
 ﻿using AutoMapper;
 using FTSS_API.Payload;
+using FTSS_API.Payload.Request.Product;
 using FTSS_API.Payload.Request.SetupPackage;
 using FTSS_API.Payload.Response.SetupPackage;
 using FTSS_API.Service.Interface;
@@ -22,213 +23,6 @@ namespace FTSS_API.Service.Implement
             _supabaseImageService = supabaseImageService;
         }
 
-        public async Task<ApiResponse> AddSetupPackage(List<Guid> productIds, AddSetupPackageRequest request, Supabase.Client client)
-        {
-            try
-            {
-                Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
-                var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
-                    predicate: u => u.Id.Equals(userId) &&
-                                    u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) &&
-                                    u.IsDelete == false &&
-                                    (
-                                     u.Role == RoleEnum.Manager.GetDescriptionFromEnum() ||
-                                     u.Role == RoleEnum.Customer.GetDescriptionFromEnum()));
-
-                if (user == null)
-                {
-                    return new ApiResponse
-                    {
-                        status = StatusCodes.Status401Unauthorized.ToString(),
-                        message = "Unauthorized: Token is missing or expired.",
-                        data = null
-                    };
-                }
-
-                if (string.IsNullOrWhiteSpace(request.SetupName))
-                {
-                    return new ApiResponse
-                    {
-                        status = StatusCodes.Status400BadRequest.ToString(),
-                        message = "Setup name cannot be empty.",
-                        data = null
-                    };
-                }
-
-                if (request.SetupName.Length > 10)
-                {
-                    return new ApiResponse
-                    {
-                        status = StatusCodes.Status400BadRequest.ToString(),
-                        message = "Setup name must not exceed 10 characters.",
-                        data = null
-                    };
-                }
-
-                if (!char.IsUpper(request.SetupName.Trim()[0]))
-                {
-                    return new ApiResponse
-                    {
-                        status = StatusCodes.Status400BadRequest.ToString(),
-                        message = "Setup name must start with an uppercase letter.",
-                        data = null
-                    };
-                }
-
-                if (string.IsNullOrWhiteSpace(request.Description))
-                {
-                    return new ApiResponse { status = StatusCodes.Status400BadRequest.ToString(), message = "Description cannot be empty.", data = null };
-                }
-
-                bool isSetupNameExists = await _unitOfWork.Context.Set<SetupPackage>()
-                    .AnyAsync(sp => sp.SetupName == request.SetupName && sp.IsDelete == false);
-
-                if (isSetupNameExists)
-                {
-                    return new ApiResponse { status = StatusCodes.Status400BadRequest.ToString(), message = "Setup name already exists.", data = null };
-                }
-
-                bool isManager = user.Role == RoleEnum.Manager.GetDescriptionFromEnum();
-                if (isManager && request.ImageFile == null)
-                {
-                    return new ApiResponse { status = StatusCodes.Status400BadRequest.ToString(), message = "Image is required for Manager.", data = null };
-                }
-
-                string? imageUrl = null;
-                if (request.ImageFile != null)
-                {
-                    imageUrl = (await _supabaseImageService.SendImagesAsync(new List<IFormFile> { request.ImageFile }, client)).FirstOrDefault();
-                    if (string.IsNullOrEmpty(imageUrl))
-                    {
-                        return new ApiResponse { status = StatusCodes.Status500InternalServerError.ToString(), message = "Failed to upload image.", data = null };
-                    }
-                }
-
-                var productCount = productIds.GroupBy(id => id).ToDictionary(g => g.Key, g => g.Count());
-                var allProducts = await _unitOfWork.Context.Set<Product>()
-                        .Where(p => productCount.Keys.Contains(p.Id))
-                        .Include(p => p.SubCategory) // Load bảng SubCategory
-                        .ThenInclude(sc => sc.Category) // Load bảng Category từ SubCategory
-                        .Include(p => p.Images) // Load danh sách Image
-                        .ToListAsync();
-
-                if (!allProducts.Any())
-                {
-                    return new ApiResponse { status = StatusCodes.Status400BadRequest.ToString(), message = "No valid products found.", data = null };
-                }
-
-                // ✅ Kiểm tra xem có product nào không hợp lệ không (Status = Unavailable hoặc IsDelete = true)
-                var invalidProducts = allProducts.Where(p =>
-                    p.Status == ProductStatusEnum.Unavailable.GetDescriptionFromEnum() || p.IsDelete == true).ToList();
-
-                if (invalidProducts.Any())
-                {
-                    var invalidProductNames = string.Join(", ", invalidProducts.Select(p => p.ProductName));
-                    return new ApiResponse
-                    {
-                        status = StatusCodes.Status400BadRequest.ToString(),
-                        message = $"Invalid products detected: {invalidProductNames}. Please remove them before proceeding.",
-                        data = null
-                    };
-                }
-
-                var categoryIds = allProducts.Select(p => p.SubCategoryId).Distinct().ToList();
-                var categories = await _unitOfWork.Context.Set<SubCategory>()
-                    .Where(sc => categoryIds.Contains(sc.Id))
-                    .Select(sc => new { sc.Id, sc.Category.CategoryName })
-                    .ToListAsync();
-
-                var requiredCategories = new List<string> { "Bể", "Lọc", "Đèn" };
-                var existingCategories = categories.Select(c => c.CategoryName).ToList();
-                var missingCategories = requiredCategories.Except(existingCategories).ToList();
-
-                if (missingCategories.Any())
-                {
-                    return new ApiResponse { status = StatusCodes.Status400BadRequest.ToString(), message = "Missing required product categories: " + string.Join(", ", missingCategories), data = null };
-                }
-
-                var tankProducts = allProducts.Where(p => categories.Any(c => c.Id == p.SubCategoryId && c.CategoryName == "Bể")).ToList();
-                int totalTankCount = tankProducts.Sum(p => productCount[p.Id]);
-
-                if (totalTankCount > 1)
-                {
-                    return new ApiResponse
-                    {
-                        status = StatusCodes.Status400BadRequest.ToString(),
-                        message = "Only one product from category 'Bể' is allowed.",
-                        data = null
-                    };
-                }
-
-                string? tankSize = tankProducts.FirstOrDefault()?.Size;
-                decimal totalPrice = allProducts.Sum(p => p.Price * productCount[p.Id]);
-
-                var setupPackage = new SetupPackage
-                {
-                    Id = Guid.NewGuid(),
-                    SetupName = request.SetupName,
-                    Description = request.Description,
-                    Price = totalPrice,
-                    CreateDate = TimeUtils.GetCurrentSEATime(),
-                    ModifyDate = TimeUtils.GetCurrentSEATime(),
-                    IsDelete = false,
-                    Userid = userId,
-                    Image = imageUrl
-                };
-
-                await _unitOfWork.Context.Set<SetupPackage>().AddAsync(setupPackage);
-                await _unitOfWork.CommitAsync();
-
-                var setupPackageDetails = allProducts.Select(p => new SetupPackageDetail
-                {
-                    Id = Guid.NewGuid(),
-                    ProductId = p.Id,
-                    SetupPackageId = setupPackage.Id,
-                    Quantity = productCount[p.Id],
-                    Price = p.Price * productCount[p.Id]
-                }).ToList();
-
-                await _unitOfWork.Context.Set<SetupPackageDetail>().AddRangeAsync(setupPackageDetails);
-                await _unitOfWork.CommitAsync();
-
-                var response = new SetupPackageResponse
-                {
-                    SetupPackageId = setupPackage.Id,
-                    SetupName = setupPackage.SetupName,
-                    Description = setupPackage.Description,
-                    TotalPrice = setupPackage.Price,
-                    CreateDate = setupPackage.CreateDate,
-                    ModifyDate = setupPackage.ModifyDate,
-                    Size = tankSize,
-                    images = setupPackage.Image,
-                    IsDelete = setupPackage.IsDelete,
-                    Products = setupPackage.SetupPackageDetails.Select(spd => new ProductResponse
-                    {
-                        Id = spd.Product.Id,
-                        ProductName = spd.Product.ProductName,
-                        Quantity = spd.Quantity,  // Lấy Quantity từ SetupPackageDetail
-                        Price = spd.Product.Price,
-                        Status = spd.Product.Status,
-                        IsDelete = setupPackage.IsDelete,
-                        CategoryName = spd.Product.SubCategory.Category.CategoryName,
-                        images = spd.Product.Images
-                                .Where(img => img.IsDelete == false)
-                                .OrderBy(img => img.CreateDate)
-                                .Select(img => img.LinkImage)
-                                .FirstOrDefault()
-                    }).ToList()
-                };
-
-
-                return new ApiResponse { status = StatusCodes.Status201Created.ToString(), message = "Setup package added successfully.", data = response };
-            }
-            catch (Exception ex)
-            {
-                return new ApiResponse { status = StatusCodes.Status500InternalServerError.ToString(), message = "An error occurred while adding setup package.", data = ex.Message };
-            }
-        }
-
-
         public async Task<ApiResponse> GetListSetupPackage(int pageNumber, int pageSize, bool? isAscending)
         {
             try
@@ -237,8 +31,9 @@ namespace FTSS_API.Service.Implement
                 Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
                 var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
                     predicate: u => u.Id.Equals(userId) &&
-                                    u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) && u.IsDelete == false &&
-                                    (u.Role == RoleEnum.Customer.GetDescriptionFromEnum()));
+                                    u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) &&
+                                    u.IsDelete == false &&
+                                    u.Role == RoleEnum.Customer.GetDescriptionFromEnum());
 
                 if (user == null)
                 {
@@ -250,56 +45,64 @@ namespace FTSS_API.Service.Implement
                     };
                 }
 
-                // Lấy danh sách SetupPackage của userId
-                var query = _unitOfWork.Context.Set<SetupPackage>()
-                    .Where(sp => sp.Userid == userId && sp.IsDelete == false);
+                // Truy vấn danh sách SetupPackage của userId bằng Generic Repository
+                var setupPackagesQuery = await _unitOfWork.GetRepository<SetupPackage>().GetListAsync(
+                    predicate: sp => sp.Userid == userId && sp.IsDelete == false,
+                    orderBy: sp => isAscending.HasValue && isAscending.Value
+                        ? sp.OrderBy(sp => sp.CreateDate)
+                        : sp.OrderByDescending(sp => sp.CreateDate),
+                    include: sp => sp.Include(sp => sp.SetupPackageDetails)
+                                     .ThenInclude(spd => spd.Product)
+                                     .ThenInclude(p => p.SubCategory)
+                                     .ThenInclude(sc => sc.Category)
+                                     .Include(sp => sp.SetupPackageDetails)
+                                     .ThenInclude(spd => spd.Product)
+                                     .ThenInclude(p => p.Images)
+                );
 
-                // Sắp xếp dữ liệu theo CreateDate
-                query = isAscending.HasValue && isAscending.Value
-                    ? query.OrderBy(sp => sp.CreateDate)
-                    : query.OrderByDescending(sp => sp.CreateDate);
-
-                // Phân trang
-                var setupPackages = await query
+                // Áp dụng phân trang sau khi lấy danh sách
+                var pagedSetupPackages = setupPackagesQuery
                     .Skip((pageNumber - 1) * pageSize)
                     .Take(pageSize)
-                    .Select(sp => new SetupPackageResponse
-                    {
-                        SetupPackageId = sp.Id,
-                        SetupName = sp.SetupName,
-                        Description = sp.Description,
-                        TotalPrice = sp.Price,
-                        CreateDate = sp.CreateDate,
-                        ModifyDate = sp.ModifyDate,
-                        Size = sp.SetupPackageDetails
-                        .Where(spd => spd.Product.SubCategory.Category.CategoryName == "Bể")  // Lọc sản phẩm có Category là "Bể"
-                        .Select(spd => spd.Product.Size)                 // Lấy Size của sản phẩm
+                    .ToList();
+
+                // Chuyển đổi sang danh sách response
+                var setupPackageResponses = pagedSetupPackages.Select(sp => new SetupPackageResponse
+                {
+                    SetupPackageId = sp.Id,
+                    SetupName = sp.SetupName,
+                    Description = sp.Description,
+                    TotalPrice = sp.Price,
+                    CreateDate = sp.CreateDate,
+                    ModifyDate = sp.ModifyDate,
+                    Size = sp.SetupPackageDetails
+                        .Where(spd => spd.Product.SubCategory.Category.CategoryName == "Bể")
+                        .Select(spd => spd.Product.Size)
                         .FirstOrDefault(),
-                        images = sp.Image,
+                    images = sp.Image,
+                    IsDelete = sp.IsDelete,
+                    Products = sp.SetupPackageDetails.Select(spd => new ProductResponse
+                    {
+                        Id = spd.Product.Id,
+                        ProductName = spd.Product.ProductName,
+                        Quantity = spd.Quantity,
+                        Price = spd.Product.Price,
+                        Status = spd.Product.Status,
                         IsDelete = sp.IsDelete,
-                        Products = sp.SetupPackageDetails.Select(spd => new ProductResponse
-                        {
-                            Id = spd.Product.Id,
-                            ProductName = spd.Product.ProductName,
-                            Quantity = spd.Quantity,  // Lấy Quantity từ SetupPackageDetail
-                            Price = spd.Product.Price,
-                            Status = spd.Product.Status,
-                            IsDelete = sp.IsDelete,
-                            CategoryName = spd.Product.SubCategory.Category.CategoryName,
-                            images = spd.Product.Images
-                        .Where(img => img.IsDelete == false)
-                        .OrderBy(img => img.CreateDate)
-                        .Select(img => img.LinkImage)
-                        .FirstOrDefault()
-                        }).ToList()
-                    })
-                    .ToListAsync();
+                        CategoryName = spd.Product.SubCategory.Category.CategoryName,
+                        images = spd.Product.Images
+                            .Where(img => img.IsDelete == false)
+                            .OrderBy(img => img.CreateDate)
+                            .Select(img => img.LinkImage)
+                            .FirstOrDefault()
+                    }).ToList()
+                }).ToList();
 
                 return new ApiResponse
                 {
                     status = StatusCodes.Status200OK.ToString(),
                     message = "Setup packages retrieved successfully.",
-                    data = setupPackages
+                    data = setupPackageResponses
                 };
             }
             catch (Exception ex)
@@ -313,6 +116,7 @@ namespace FTSS_API.Service.Implement
             }
         }
 
+
         public async Task<ApiResponse> GetListSetupPackageAllUser(int pageNumber, int pageSize, bool? isAscending)
         {
             try
@@ -321,8 +125,9 @@ namespace FTSS_API.Service.Implement
                 Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
                 var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
                     predicate: u => u.Id.Equals(userId) &&
-                                    u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) && u.IsDelete == false &&
-                                    (u.Role == RoleEnum.Manager.GetDescriptionFromEnum()));
+                                    u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) &&
+                                    u.IsDelete == false &&
+                                    u.Role == RoleEnum.Manager.GetDescriptionFromEnum());
 
                 if (user == null)
                 {
@@ -334,33 +139,32 @@ namespace FTSS_API.Service.Implement
                     };
                 }
 
-                // Lấy danh sách SetupPackage của user có Role là Customer, bao gồm thông tin User
-                var query = _unitOfWork.Context.Set<SetupPackage>()
-                    .Include(sp => sp.User) // Bao gồm thông tin User
-                    .Include(sp => sp.SetupPackageDetails)
-                        .ThenInclude(spd => spd.Product)
-                            .ThenInclude(p => p.SubCategory)
-                                .ThenInclude(sc => sc.Category) // Truy vấn đến Category
-                                .Include(sp => sp.SetupPackageDetails)
-                                    .ThenInclude(spd => spd.Product)
-                                    .ThenInclude(p => p.Images) // Bao gồm 
-                    .Where(sp => sp.User != null &&
-                                 sp.User.Role == RoleEnum.Customer.GetDescriptionFromEnum() &&
-                                 sp.IsDelete == false);
+                // Lấy danh sách SetupPackage của tất cả user có Role là Customer
+                var setupPackagesQuery = await _unitOfWork.GetRepository<SetupPackage>().GetListAsync(
+                    predicate: sp => sp.User != null &&
+                                     sp.User.Role == RoleEnum.Customer.GetDescriptionFromEnum() &&
+                                     sp.IsDelete == false,
+                    orderBy: sp => isAscending == true
+                        ? sp.OrderBy(sp => sp.CreateDate)
+                        : sp.OrderByDescending(sp => sp.CreateDate),
+                    include: sp => sp.Include(sp => sp.User) // Bao gồm thông tin User
+                                     .Include(sp => sp.SetupPackageDetails)
+                                     .ThenInclude(spd => spd.Product)
+                                     .ThenInclude(p => p.SubCategory)
+                                     .ThenInclude(sc => sc.Category)
+                                     .Include(sp => sp.SetupPackageDetails)
+                                     .ThenInclude(spd => spd.Product)
+                                     .ThenInclude(p => p.Images)
+                );
 
-                // Sắp xếp theo CreateDate
-                query = isAscending == true
-                    ? query.OrderBy(sp => sp.CreateDate)
-                    : query.OrderByDescending(sp => sp.CreateDate);
-
-                // Phân trang
-                var setupPackages = await query
+                // Áp dụng phân trang
+                var pagedSetupPackages = setupPackagesQuery
                     .Skip((pageNumber - 1) * pageSize)
                     .Take(pageSize)
-                    .ToListAsync();
+                    .ToList();
 
                 // Nhóm danh sách theo UserId và UserName
-                var groupedSetupPackages = setupPackages
+                var groupedSetupPackages = pagedSetupPackages
                     .GroupBy(sp => new { sp.User.Id, sp.User.UserName })
                     .Select(group => new UserSetupPackageResponse
                     {
@@ -375,24 +179,25 @@ namespace FTSS_API.Service.Implement
                             CreateDate = sp.CreateDate,
                             ModifyDate = sp.ModifyDate,
                             Size = sp.SetupPackageDetails
-                                .Select(spd => spd.Product)
-                                .FirstOrDefault(p => p.SubCategory != null && p.SubCategory.Category != null && p.SubCategory.Category.CategoryName == "Bể")?.Size, // Lấy Size từ sản phẩm có Category "Bể"
+                                .Where(spd => spd.Product.SubCategory.Category.CategoryName == "Bể")
+                                .Select(spd => spd.Product.Size)
+                                .FirstOrDefault(),
                             images = sp.Image,
                             IsDelete = sp.IsDelete,
                             Products = sp.SetupPackageDetails.Select(spd => new ProductResponse
                             {
                                 Id = spd.Product.Id,
                                 ProductName = spd.Product.ProductName,
-                                Quantity = spd.Quantity,  // Lấy Quantity từ SetupPackageDetail
+                                Quantity = spd.Quantity,
                                 Price = spd.Product.Price,
                                 Status = spd.Product.Status,
                                 IsDelete = sp.IsDelete,
                                 CategoryName = spd.Product.SubCategory.Category.CategoryName,
                                 images = spd.Product.Images
-                            .Where(img => img.IsDelete == false)
-                            .OrderBy(img => img.CreateDate)
-                            .Select(img => img.LinkImage)
-                            .FirstOrDefault()
+                                    .Where(img => img.IsDelete == false)
+                                    .OrderBy(img => img.CreateDate)
+                                    .Select(img => img.LinkImage)
+                                    .FirstOrDefault()
                             }).ToList()
                         }).ToList()
                     }).ToList();
@@ -414,42 +219,38 @@ namespace FTSS_API.Service.Implement
                 };
             }
         }
-
-
-
         public async Task<ApiResponse> GetListSetupPackageAllShop(int pageNumber, int pageSize, bool? isAscending)
         {
             try
             {
-                // Lấy danh sách SetupPackage của User có Role là Manager, bao gồm danh sách sản phẩm
-                var query = _unitOfWork.Context.Set<SetupPackage>()
-                                .Include(sp => sp.SetupPackageDetails)
-                                .ThenInclude(spd => spd.Product)
-                                .ThenInclude(p => p.SubCategory)
-                                .ThenInclude(sc => sc.Category)  // Đảm bảo có Category
-                                .Include(sp => sp.SetupPackageDetails)
-                        .ThenInclude(spd => spd.Product)
-                        .ThenInclude(p => p.Images)
-                                    .Where(sp => sp.User != null &&
-                                         (
-                                         sp.User.Role == RoleEnum.Manager.GetDescriptionFromEnum()) &&
-                                         sp.IsDelete == false);
+                // Lấy danh sách SetupPackage của User có Role là Manager
+                var setupPackagesQuery = await _unitOfWork.GetRepository<SetupPackage>().GetListAsync(
+                    predicate: sp => sp.User != null &&
+                                     sp.User.Role == RoleEnum.Manager.GetDescriptionFromEnum() &&
+                                     sp.IsDelete == false,
+                    orderBy: sp => isAscending == true
+                        ? sp.OrderBy(sp => sp.CreateDate)
+                        : sp.OrderByDescending(sp => sp.CreateDate),
+                    include: sp => sp.Include(sp => sp.SetupPackageDetails)
+                                     .ThenInclude(spd => spd.Product)
+                                     .ThenInclude(p => p.SubCategory)
+                                     .ThenInclude(sc => sc.Category)
+                                     .Include(sp => sp.SetupPackageDetails)
+                                     .ThenInclude(spd => spd.Product)
+                                     .ThenInclude(p => p.Images)
+                );
 
+                // Tổng số bản ghi
+                var totalRecords = setupPackagesQuery.Count;
 
-                // Sắp xếp kết quả theo CreateDate
-                query = isAscending == true
-                    ? query.OrderBy(sp => sp.CreateDate)
-                    : query.OrderByDescending(sp => sp.CreateDate);
-
-                // Thực hiện phân trang
-                var totalRecords = await query.CountAsync();
-                var setupPackages = await query
+                // Phân trang
+                var pagedSetupPackages = setupPackagesQuery
                     .Skip((pageNumber - 1) * pageSize)
                     .Take(pageSize)
-                    .ToListAsync();
+                    .ToList();
 
                 // Chuyển đổi dữ liệu sang SetupPackageResponse
-                var responseList = setupPackages.Select(sp => new SetupPackageResponse
+                var responseList = pagedSetupPackages.Select(sp => new SetupPackageResponse
                 {
                     SetupPackageId = sp.Id,
                     SetupName = sp.SetupName,
@@ -458,10 +259,7 @@ namespace FTSS_API.Service.Implement
                     CreateDate = sp.CreateDate,
                     ModifyDate = sp.ModifyDate,
                     Size = sp.SetupPackageDetails
-                        .Where(spd => spd.Product != null &&
-                                      spd.Product.SubCategory != null &&
-                                      spd.Product.SubCategory.Category != null &&
-                                      spd.Product.SubCategory.Category.CategoryName == "Bể")  // Kiểm tra null trước khi truy cập CategoryName
+                        .Where(spd => spd.Product.SubCategory?.Category?.CategoryName == "Bể")
                         .Select(spd => spd.Product.Size)
                         .FirstOrDefault(),
                     images = sp.Image,
@@ -470,16 +268,16 @@ namespace FTSS_API.Service.Implement
                     {
                         Id = spd.Product.Id,
                         ProductName = spd.Product.ProductName,
-                        Quantity = spd.Quantity,  // Lấy Quantity từ SetupPackageDetail
+                        Quantity = spd.Quantity,
                         Price = spd.Product.Price,
                         Status = spd.Product.Status,
                         IsDelete = sp.IsDelete,
-                        CategoryName = spd.Product.SubCategory.Category.CategoryName,
+                        CategoryName = spd.Product.SubCategory?.Category?.CategoryName,
                         images = spd.Product.Images
-                    .Where(img => img.IsDelete == false)
-                    .OrderBy(img => img.CreateDate)
-                    .Select(img => img.LinkImage)
-                    .FirstOrDefault()
+                            .Where(img => img.IsDelete == false)
+                            .OrderBy(img => img.CreateDate)
+                            .Select(img => img.LinkImage)
+                            .FirstOrDefault()
                     }).ToList()
                 }).ToList();
 
@@ -511,21 +309,50 @@ namespace FTSS_API.Service.Implement
         {
             try
             {
-                // Lấy thông tin setup package theo ID
-                var setupPackage = await _unitOfWork.GetRepository<SetupPackage>()
-                    .SingleOrDefaultAsync(
-                        predicate: sp => sp.Id == id && sp.IsDelete == false,
-                        include: source => source
-                            .Include(sp => sp.SetupPackageDetails)
-                            .ThenInclude(d => d.Product)
+                // Truy vấn SetupPackage theo ID với selector
+                var setupPackage = await _unitOfWork.GetRepository<SetupPackage>().SingleOrDefaultAsync(
+                    selector: sp => new SetupPackageResponse
+                    {
+                        SetupPackageId = sp.Id,
+                        SetupName = sp.SetupName,
+                        Description = sp.Description,
+                        TotalPrice = sp.Price,
+                        CreateDate = sp.CreateDate,
+                        ModifyDate = sp.ModifyDate,
+                        Size = sp.SetupPackageDetails
+                            .Where(spd => spd.Product.SubCategory.Category.CategoryName == "Bể")
+                            .Select(spd => spd.Product.Size)
+                            .FirstOrDefault(),
+                        images = sp.Image,
+                        IsDelete = sp.IsDelete,
+                        Products = sp.SetupPackageDetails.Select(spd => new ProductResponse
+                        {
+                            Id = spd.Product.Id,
+                            ProductName = spd.Product.ProductName,
+                            Quantity = spd.Quantity,
+                            Price = spd.Product.Price,
+                            Status = spd.Product.Status,
+                            IsDelete = spd.Product.IsDelete,
+                            CategoryName = spd.Product.SubCategory.Category.CategoryName,
+                            images = spd.Product.Images
+                                .Where(img => img.IsDelete == false)
+                                .OrderBy(img => img.CreateDate)
+                                .Select(img => img.LinkImage)
+                                .FirstOrDefault()
+                        }).ToList()
+                    },
+                    predicate: sp => sp.Id == id && sp.IsDelete == false,
+                    include: source => source
+                        .Include(sp => sp.SetupPackageDetails)
+                            .ThenInclude(spd => spd.Product)
                             .ThenInclude(p => p.SubCategory)
-                            .ThenInclude(sc => sc.Category) // Bảo đảm truy vấn đến Category
-                            .Include(sp => sp.SetupPackageDetails)
-                        .ThenInclude(spd => spd.Product)
-                        .ThenInclude(p => p.Images)
-                    );
+                            .ThenInclude(sc => sc.Category)
+                        .Include(sp => sp.SetupPackageDetails)
+                            .ThenInclude(spd => spd.Product)
+                            .ThenInclude(p => p.Images)
+                );
 
-                // Kiểm tra nếu không tìm thấy gói setup
+                // Kiểm tra nếu không tìm thấy
                 if (setupPackage == null)
                 {
                     return new ApiResponse
@@ -536,47 +363,11 @@ namespace FTSS_API.Service.Implement
                     };
                 }
 
-                // Lấy kích thước từ sản phẩm có CategoryName là "Bể"
-                var productWithCategoryBe = setupPackage.SetupPackageDetails
-                    .Select(d => d.Product)
-                    .FirstOrDefault(p => p.SubCategory != null && p.SubCategory.Category != null && p.SubCategory.Category.CategoryName == "Bể");
-
-                string? size = productWithCategoryBe?.Size; // Nếu không tìm thấy, size sẽ là null
-
-                // Chuyển dữ liệu sang response
-                var response = new SetupPackageResponse
-                {
-                    SetupPackageId = setupPackage.Id,
-                    SetupName = setupPackage.SetupName,
-                    Description = setupPackage.Description,
-                    TotalPrice = setupPackage.Price,
-                    CreateDate = setupPackage.CreateDate,
-                    ModifyDate = setupPackage.ModifyDate,
-                    Size = size, // Lấy kích thước từ sản phẩm thuộc Category "Bể"
-                    images = setupPackage.Image,
-                    IsDelete = setupPackage.IsDelete,
-                    Products = setupPackage.SetupPackageDetails.Select(spd => new ProductResponse
-                    {
-                        Id = spd.Product.Id,
-                        ProductName = spd.Product.ProductName,
-                        Quantity = spd.Quantity,  // Lấy Quantity từ SetupPackageDetail
-                        Price = spd.Product.Price,
-                        Status = spd.Product.Status,
-                        IsDelete = setupPackage.IsDelete,
-                        CategoryName = spd.Product.SubCategory.Category.CategoryName,
-                        images = spd.Product.Images
-                                .Where(img => img.IsDelete == false)
-                                .OrderBy(img => img.CreateDate)
-                                .Select(img => img.LinkImage)
-                                .FirstOrDefault()
-                    }).ToList()
-                };
-
                 return new ApiResponse
                 {
                     status = StatusCodes.Status200OK.ToString(),
                     message = "Setup package details retrieved successfully.",
-                    data = response
+                    data = setupPackage
                 };
             }
             catch (Exception ex)
@@ -589,7 +380,6 @@ namespace FTSS_API.Service.Implement
                 };
             }
         }
-
         public async Task<ApiResponse> RemoveSetupPackage(Guid id)
         {
             try
@@ -644,196 +434,153 @@ namespace FTSS_API.Service.Implement
                 };
             }
         }
-        public async Task<ApiResponse> UpdateSetupPackage(Guid setupPackageId, List<Guid>? productIds, AddSetupPackageRequest request, Supabase.Client client)
+
+        public async Task<ApiResponse> AddSetupPackage(List<ProductSetupItem> productids, AddSetupPackageRequest request, Client client)
         {
             try
             {
                 Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
                 var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
-                    predicate: u => u.Id == userId &&
-                                    u.Status == UserStatusEnum.Available.GetDescriptionFromEnum() &&
-                                    u.IsDelete == false);
+                    predicate: u => u.Id.Equals(userId) &&
+                                    u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) &&
+                                    u.IsDelete == false &&
+                                    (u.Role == RoleEnum.Manager.GetDescriptionFromEnum() ||
+                                     u.Role == RoleEnum.Customer.GetDescriptionFromEnum()));
 
                 if (user == null)
                 {
-                    return new ApiResponse
-                    {
-                        status = StatusCodes.Status401Unauthorized.ToString(),
-                        message = "Unauthorized: Token is missing or expired.",
-                        data = null
-                    };
+                    return new ApiResponse { status = StatusCodes.Status401Unauthorized.ToString(), message = "Unauthorized: Token is missing or expired.", data = null };
                 }
 
-                var setupPackage = await _unitOfWork.Context.Set<SetupPackage>()
-                    .Include(sp => sp.User) // Load thông tin User đi kèm SetupPackage
-                    .SingleOrDefaultAsync(sp => sp.Id == setupPackageId && (sp.IsDelete != true));
-
-                if (setupPackage == null)
+                if (string.IsNullOrWhiteSpace(request.SetupName) || request.SetupName.Length > 10 || !char.IsUpper(request.SetupName.Trim()[0]))
                 {
-                    return new ApiResponse
-                    {
-                        status = StatusCodes.Status404NotFound.ToString(),
-                        message = "Setup package not found.",
-                        data = null
-                    };
-                }
-
-                var setupOwner = setupPackage.User;
-                if (setupOwner == null)
-                {
-                    return new ApiResponse
-                    {
-                        status = StatusCodes.Status400BadRequest.ToString(),
-                        message = "Setup package has no associated user.",
-                        data = null
-                    };
-                }
-
-                // Role-based access control
-                bool isManager =  user.Role == RoleEnum.Manager.GetDescriptionFromEnum();
-                bool isCustomer = user.Role == RoleEnum.Customer.GetDescriptionFromEnum();
-                bool ownerIsManager =  setupOwner.Role == RoleEnum.Manager.GetDescriptionFromEnum();
-
-                if (isManager && !ownerIsManager)
-                {
-                    return new ApiResponse
-                    {
-                        status = StatusCodes.Status403Forbidden.ToString(),
-                        message = "You can only update setups of Shop.",
-                        data = null
-                    };
-                }
-
-                if (isCustomer && setupPackage.Userid != userId)
-                {
-                    return new ApiResponse
-                    {
-                        status = StatusCodes.Status403Forbidden.ToString(),
-                        message = "Customers can only update their own setups.",
-                        data = null
-                    };
-                }
-
-                // Validate Setup Name
-                if (string.IsNullOrWhiteSpace(request.SetupName))
-                {
-                    return new ApiResponse { status = StatusCodes.Status400BadRequest.ToString(), message = "Setup name cannot be empty.", data = null };
-                }
-
-                if (request.SetupName.Length > 10)
-                {
-                    return new ApiResponse { status = StatusCodes.Status400BadRequest.ToString(), message = "Setup name must not exceed 10 characters.", data = null };
-                }
-
-                if (!char.IsUpper(request.SetupName.Trim()[0]))
-                {
-                    return new ApiResponse { status = StatusCodes.Status400BadRequest.ToString(), message = "Setup name must start with an uppercase letter.", data = null };
+                    return new ApiResponse { status = StatusCodes.Status400BadRequest.ToString(), message = "SetupName cannot be empty, must be uppercase, and must be less than 10 characters.", data = null };
                 }
 
                 if (string.IsNullOrWhiteSpace(request.Description))
                 {
                     return new ApiResponse { status = StatusCodes.Status400BadRequest.ToString(), message = "Description cannot be empty.", data = null };
                 }
-
-                if (request.SetupName != setupPackage.SetupName)
+                if (productids == null || !productids.Any())
                 {
-                    bool isSetupNameExists = await _unitOfWork.Context.Set<SetupPackage>()
-                        .AnyAsync(sp => sp.SetupName == request.SetupName && sp.Id != setupPackageId && sp.IsDelete != true);
+                    return new ApiResponse { status = StatusCodes.Status400BadRequest.ToString(), message = "Product list cannot be empty.", data = null };
+                }
 
-                    if (isSetupNameExists)
+                if (productids.Any(p => p.Quantity == null || p.Quantity <= 0))
+                {
+                    return new ApiResponse { status = StatusCodes.Status400BadRequest.ToString(), message = "Each product must have a positive integer quantity.", data = null };
+                }
+
+                var isSetupNameExists = await _unitOfWork.GetRepository<SetupPackage>()
+                    .SingleOrDefaultAsync(predicate: p => p.SetupName.Equals(request.SetupName));
+                if (isSetupNameExists != null)
+                {
+                    return new ApiResponse { status = StatusCodes.Status400BadRequest.ToString(), message = "Setup name already exists.", data = null };
+                }
+
+                bool isManager = user.Role == RoleEnum.Manager.GetDescriptionFromEnum();
+                if (isManager && request.ImageFile == null)
+                {
+                    return new ApiResponse { status = StatusCodes.Status400BadRequest.ToString(), message = "Image is required for Manager.", data = null };
+                }
+
+                string? imageUrl = null;
+                if (request.ImageFile != null)
+                {
+                    imageUrl = (await _supabaseImageService.SendImagesAsync(new List<IFormFile> { request.ImageFile }, client)).FirstOrDefault();
+                    if (string.IsNullOrEmpty(imageUrl))
                     {
-                        return new ApiResponse 
-                        { 
-                            status = StatusCodes.Status400BadRequest.ToString(), 
-                            message = "Setup name already exists.", 
-                            data = null 
+                        return new ApiResponse { status = StatusCodes.Status500InternalServerError.ToString(), message = "Failed to upload image.", data = null };
+                    }
+                }
+
+                var productIds = productids.Select(p => p.ProductId).ToList();
+                var allProducts = await _unitOfWork.GetRepository<Product>().GetListAsync(
+                        predicate: p => productIds.Contains(p.Id),
+                        include: p => p.Include(p => p.SubCategory)
+                                       .ThenInclude(sc => sc.Category)
+                                       .Include(p => p.Images)
+                                       .Include(p => p.SetupPackageDetails) 
+                    );
+
+                if (!allProducts.Any())
+                {
+                    return new ApiResponse { status = StatusCodes.Status400BadRequest.ToString(), message = "No valid products found.", data = null };
+                }
+                // Lọc danh sách sản phẩm có CategoryName = "Bể"
+                var categoryBeProducts = allProducts.Where(p => p.SubCategory.Category.CategoryName == "Bể").ToList();
+
+                // Kiểm tra nếu có nhiều hơn 1 sản phẩm thuộc Category "Bể"
+                if (categoryBeProducts.Count > 1)
+                {
+                    return new ApiResponse
+                    {
+                        status = StatusCodes.Status400BadRequest.ToString(),
+                        message = "Only one product from category 'Bể' can be added.",
+                        data = null
+                    };
+                }
+
+                // Kiểm tra nếu sản phẩm thuộc Category "Bể" có số lượng > 1
+                foreach (var product in categoryBeProducts)
+                {
+                    var requestedProduct = productids.FirstOrDefault(p => p.ProductId == product.Id);
+                    if (requestedProduct != null && requestedProduct.Quantity > 1)
+                    {
+                        return new ApiResponse
+                        {
+                            status = StatusCodes.Status400BadRequest.ToString(),
+                            message = $"Product '{product.ProductName}' in category 'Bể' can only have a quantity of 1.",
+                            data = null
                         };
                     }
                 }
 
-                // Handle Image Upload
-                string? imageUrl = setupPackage.Image;
-                if (request.ImageFile != null)
+                var invalidProducts = allProducts.Where(p => p.Status == ProductStatusEnum.Unavailable.GetDescriptionFromEnum() || p.IsDelete == true).ToList();
+                if (invalidProducts.Any())
                 {
-                    if (isManager)
-                    {
-                        imageUrl = (await _supabaseImageService.SendImagesAsync(new List<IFormFile> { request.ImageFile }, client)).FirstOrDefault();
-                        if (string.IsNullOrEmpty(imageUrl))
-                        {
-                            return new ApiResponse { status = StatusCodes.Status500InternalServerError.ToString(), message = "Failed to upload image.", data = null };
-                        }
-                    }
-                    else
-                    {
-                        return new ApiResponse { status = StatusCodes.Status403Forbidden.ToString(), message = "Only Manager can update images.", data = null };
-                    }
+                    var invalidProductNames = string.Join(", ", invalidProducts.Select(p => p.ProductName));
+                    return new ApiResponse { status = StatusCodes.Status400BadRequest.ToString(), message = $"Invalid products detected: {invalidProductNames}.", data = null };
                 }
 
-                if (productIds != null && productIds.Any())
+                decimal totalPrice = productids.Sum(p => allProducts.First(prod => prod.Id == p.ProductId).Price * (p.Quantity ?? 1));
+
+                var setupPackage = new SetupPackage
                 {
-                    var productCount = productIds.GroupBy(id => id).ToDictionary(g => g.Key, g => g.Count());
-                    var allProducts = await _unitOfWork.Context.Set<Product>()
-                        .Where(p => productCount.Keys.Contains(p.Id))
-                        .Include(p => p.SubCategory) // Load bảng SubCategory
-                        .ThenInclude(sc => sc.Category) // Load bảng Category từ SubCategory
-                        .Include(p => p.Images) // Load danh sách Image
-                        .ToListAsync();
+                    Id = Guid.NewGuid(),
+                    SetupName = request.SetupName,
+                    Description = request.Description,
+                    Price = totalPrice,
+                    CreateDate = TimeUtils.GetCurrentSEATime(),
+                    ModifyDate = TimeUtils.GetCurrentSEATime(),
+                    IsDelete = false,
+                    Userid = userId,
+                    Image = imageUrl
+                };
 
-                    if (!allProducts.Any())
-                    {
-                        return new ApiResponse { status = StatusCodes.Status400BadRequest.ToString(), message = "No valid products found.", data = null };
-                    }
+                await _unitOfWork.GetRepository<SetupPackage>().InsertAsync(setupPackage);
+                await _unitOfWork.CommitAsync();
 
-                    var categoryIds = allProducts.Select(p => p.SubCategoryId).Distinct().ToList();
-                    var categories = await _unitOfWork.Context.Set<SubCategory>()
-                        .Where(sc => categoryIds.Contains(sc.Id))
-                        .Select(sc => new { sc.Id, sc.Category.CategoryName })
-                        .ToListAsync();
+                var setupPackageDetails = productids.Select(p => new SetupPackageDetail
+                {
+                    Id = Guid.NewGuid(),
+                    ProductId = p.ProductId,
+                    SetupPackageId = setupPackage.Id,
+                    Quantity = p.Quantity ?? 1,
+                    Price = allProducts.First(prod => prod.Id == p.ProductId).Price * (p.Quantity ?? 1)
+                }).ToList();
 
-                    var requiredCategories = new List<string> { "Bể", "Lọc", "Đèn" };
-                    var existingCategories = categories.Select(c => c.CategoryName).ToList();
-                    var missingCategories = requiredCategories.Except(existingCategories).ToList();
+                await _unitOfWork.GetRepository<SetupPackageDetail>().InsertRangeAsync(setupPackageDetails);
+                await _unitOfWork.CommitAsync();
 
-                    if (missingCategories.Any())
-                    {
-                        return new ApiResponse { status = StatusCodes.Status400BadRequest.ToString(), message = "Missing required product categories: " + string.Join(", ", missingCategories), data = null };
-                    }
-
-                    var tankProducts = allProducts.Where(p => categories.Any(c => c.Id == p.SubCategoryId && c.CategoryName == "Bể")).ToList();
-                    int totalTankCount = tankProducts.Sum(p => productCount[p.Id]);
-
-                    if (totalTankCount > 1)
-                    {
-                        return new ApiResponse { status = StatusCodes.Status400BadRequest.ToString(), message = "Only one product from category 'Bể' is allowed.", data = null };
-                    }
-
-                    decimal totalPrice = allProducts.Sum(p => p.Price * productCount[p.Id]);
-
-                    using var transaction = await _unitOfWork.Context.Database.BeginTransactionAsync();
-
-                    setupPackage.SetupName = request.SetupName;
-                    setupPackage.Description = request.Description;
-                    setupPackage.Image = imageUrl;
-                    setupPackage.Price = totalPrice;
-                    setupPackage.ModifyDate = TimeUtils.GetCurrentSEATime();
-
-                    _unitOfWork.Context.Set<SetupPackageDetail>().RemoveRange(
-                        _unitOfWork.Context.Set<SetupPackageDetail>().Where(spd => spd.SetupPackageId == setupPackage.Id));
-
-                    var setupPackageDetails = allProducts.Select(p => new SetupPackageDetail
-                    {
-                        Id = Guid.NewGuid(),
-                        ProductId = p.Id,
-                        SetupPackageId = setupPackage.Id,
-                        Quantity = productCount[p.Id],
-                        Price = p.Price * productCount[p.Id]
-                    }).ToList();
-
-                    await _unitOfWork.Context.Set<SetupPackageDetail>().AddRangeAsync(setupPackageDetails);
-                    await _unitOfWork.CommitAsync();
-                    await transaction.CommitAsync();
-                }
-
+                setupPackage = await _unitOfWork.GetRepository<SetupPackage>().SingleOrDefaultAsync(
+                                predicate: sp => sp.Id == setupPackage.Id,
+                                include: sp => sp.Include(sp => sp.SetupPackageDetails)
+                                                 .ThenInclude(spd => spd.Product)
+                                                     .ThenInclude(p => p.SubCategory)
+                                                         .ThenInclude(sc => sc.Category)
+                            );
+                // 🔹 **Chuẩn bị response `SetupPackageResponse`**
                 var response = new SetupPackageResponse
                 {
                     SetupPackageId = setupPackage.Id,
@@ -843,39 +590,45 @@ namespace FTSS_API.Service.Implement
                     CreateDate = setupPackage.CreateDate,
                     ModifyDate = setupPackage.ModifyDate,
                     Size = setupPackage.SetupPackageDetails
-                                .Select(spd => spd.Product)
-                                .FirstOrDefault(p => p.SubCategory != null && p.SubCategory.Category != null && p.SubCategory.Category.CategoryName == "Bể")?.Size,
+                                .Where(spd => spd.Product.SubCategory.Category.CategoryName == "Bể")
+                                .Select(spd => spd.Product.Size)
+                                .FirstOrDefault(),
                     images = setupPackage.Image,
                     IsDelete = setupPackage.IsDelete,
-                    Products = setupPackage.SetupPackageDetails.Select(spd => new ProductResponse
+                    Products = setupPackageDetails.Select(d =>
                     {
-                        Id = spd.Product.Id,
-                        ProductName = spd.Product.ProductName,
-                        Quantity = spd.Quantity,  // Lấy Quantity từ SetupPackageDetail
-                        Price = spd.Product.Price,
-                        Status = spd.Product.Status,
-                        IsDelete = setupPackage.IsDelete,
-                        CategoryName = spd.Product.SubCategory.Category.CategoryName,
-                        images = spd.Product.Images
-                                .Where(img => img.IsDelete == false)
-                                .OrderBy(img => img.CreateDate)
-                                .Select(img => img.LinkImage)
-                                .FirstOrDefault()
+                        var product = allProducts.First(p => p.Id == d.ProductId);
+                        return new ProductResponse
+                        {
+                            Id = d.ProductId,
+                            ProductName = product.ProductName,
+                            Price = product.Price,
+                            Quantity = d.Quantity,
+                            Status = product.Status,
+                            IsDelete = product.IsDelete,
+                            CategoryName = product.SubCategory.Category.CategoryName,  // Bỏ kiểm tra null
+                            images = product.Images.OrderBy(img => img.CreateDate).First().LinkImage  // Bỏ kiểm tra null
+                        };
                     }).ToList()
                 };
 
-                return new ApiResponse 
-                { status = StatusCodes.Status200OK.ToString(),
-                    message = "Setup package updated successfully.", 
+
+                return new ApiResponse
+                {
+                    status = StatusCodes.Status201Created.ToString(),
+                    message = "Setup package added successfully.",
                     data = response
                 };
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error occurred in UpdateSetupPackage.");
-                return new ApiResponse { status = StatusCodes.Status500InternalServerError.ToString(), message = "An error occurred while updating the setup package.", data = null };
+                return new ApiResponse { status = StatusCodes.Status500InternalServerError.ToString(), message = "An error occurred while adding setup package.", data = ex.Message };
             }
         }
 
+        public Task<ApiResponse> UpdateSetupPackage(Guid setupPackageId, List<ProductSetupItem> productids, AddSetupPackageRequest request, Client client)
+        {
+            throw new NotImplementedException();
+        }
     }
 }
