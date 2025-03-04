@@ -7,12 +7,12 @@ namespace FTSS_API.Service.Interface
 {
     public interface ISetupPackageService
     {
-        Task<ApiResponse> AddSetupPackage(List<Guid> productids, AddSetupPackageRequest request, Supabase.Client client);
+        Task<ApiResponse> AddSetupPackage(List<ProductSetupItem> productids, AddSetupPackageRequest request, Supabase.Client client);
         Task<ApiResponse> GetListSetupPackage(int pageNumber, int pageSize, bool? isAscending);
         Task<ApiResponse> GetListSetupPackageAllUser(int pageNumber, int pageSize, bool? isAscending);
         Task<ApiResponse> GetListSetupPackageAllShop(int pageNumber, int pageSize, bool? isAscending);
         Task<ApiResponse> GetSetUpById(Guid id);
         Task<ApiResponse> RemoveSetupPackage(Guid id);
-        Task<ApiResponse> UpdateSetupPackage(Guid setupPackageId, List<Guid> productIds, AddSetupPackageRequest request, Supabase.Client client);
+        Task<ApiResponse> UpdateSetupPackage(Guid setupPackageId, List<ProductSetupItem> productids, AddSetupPackageRequest request, Supabase.Client client);
     }
 }
