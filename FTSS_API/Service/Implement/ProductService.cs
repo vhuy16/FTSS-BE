@@ -110,6 +110,7 @@ public class ProductService : BaseService<ProductService>, IProductService
             ModifyDate = TimeUtils.GetCurrentSEATime(),
             Price = createProductRequest.Price,
             Quantity = createProductRequest.Quantity,
+            Size = createProductRequest.Size,
             Status = ProductStatusEnum.Available.GetDescriptionFromEnum(),
             Images = new List<Image>()
         };
@@ -166,6 +167,7 @@ public class ProductService : BaseService<ProductService>, IProductService
                         SubCategoryName = subCategory.SubCategoryName,
                         CategoryName = subCategory.Category?.CategoryName ?? "N/A",
                         Price = product.Price,
+                        Size = product.Size,
                         Status = product.Status.ToString(),
                     }
                 };
@@ -224,6 +226,7 @@ public class ProductService : BaseService<ProductService>, IProductService
                 ProductName = s.ProductName,
                 Quantity = s.Quantity,
                 Price = s.Price,
+                Size = s.Size,
                 Status = s.Status
             },
             include: i => i.Include(p => p.SubCategory)
@@ -293,6 +296,7 @@ public class ProductService : BaseService<ProductService>, IProductService
                 ProductName = s.ProductName,
                 Quantity = s.Quantity,
                 Price = s.Price,
+                Size = s.Size,
                 Status = s.Status
             },
             include: i => i.Include(p => p.SubCategory)
@@ -361,7 +365,7 @@ public class ProductService : BaseService<ProductService>, IProductService
                 Images = s.Images.Select(i => i.LinkImage).ToList(),
                 ProductName = s.ProductName,
                 Quantity = s.Quantity,
-
+                Size = s.Size,
                 Price = s.Price,
 
                 Status = s.Status
@@ -625,7 +629,7 @@ public class ProductService : BaseService<ProductService>, IProductService
                 Images = s.Images.Select(i => i.LinkImage).ToList(),
                 ProductName = s.ProductName,
                 Quantity = s.Quantity,
-
+                Size = s.Size,
                 Price = s.Price,
 
                 Status = s.Status
