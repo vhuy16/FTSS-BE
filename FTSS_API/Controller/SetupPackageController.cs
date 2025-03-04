@@ -32,7 +32,7 @@ namespace FTSS_API.Controller
             return StatusCode(int.Parse(response.status), response);
         }
         /// <summary>
-        /// API delete setup cho admin, manager, customer.
+        /// API delete setup cho manager, customer.
         /// </summary>
         [HttpDelete(ApiEndPointConstant.SetupPackage.RemoveSetupPackage)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
@@ -91,7 +91,7 @@ namespace FTSS_API.Controller
         }
 
         /// <summary>
-        /// API lấy danh sách SetupPackage của user cho admin, manager.
+        /// API lấy danh sách SetupPackage của user cho manager.
         /// </summary>
         [HttpGet(ApiEndPointConstant.SetupPackage.GetListSetupPackageAllUser)]
         [ProducesResponseType(typeof(IPaginate<ApiResponse>), StatusCodes.Status200OK)]
@@ -113,7 +113,7 @@ namespace FTSS_API.Controller
             return Ok(response);
         }
         /// <summary>
-        /// API cập nhập Setup cho admin, manager, customer.
+        /// API cập nhập Setup cho manager, customer.
         /// </summary>
         [HttpPut(ApiEndPointConstant.SetupPackage.UpdateSetupPackage)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]

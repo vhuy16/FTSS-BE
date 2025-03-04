@@ -91,7 +91,7 @@ namespace FTSS_API.Service.Implement
                 bool isManager = user.Role == RoleEnum.Manager.GetDescriptionFromEnum();
                 if (isManager && request.ImageFile == null)
                 {
-                    return new ApiResponse { status = StatusCodes.Status400BadRequest.ToString(), message = "Image is required for Admin and Manager.", data = null };
+                    return new ApiResponse { status = StatusCodes.Status400BadRequest.ToString(), message = "Image is required for Manager.", data = null };
                 }
 
                 string? imageUrl = null;
@@ -421,7 +421,7 @@ namespace FTSS_API.Service.Implement
         {
             try
             {
-                // Lấy danh sách SetupPackage của User có Role là Admin hoặc Manager, bao gồm danh sách sản phẩm
+                // Lấy danh sách SetupPackage của User có Role là Manager, bao gồm danh sách sản phẩm
                 var query = _unitOfWork.Context.Set<SetupPackage>()
                                 .Include(sp => sp.SetupPackageDetails)
                                 .ThenInclude(spd => spd.Product)
@@ -599,7 +599,7 @@ namespace FTSS_API.Service.Implement
                 var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
                     predicate: u => u.Id.Equals(userId) &&
                                     u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) && u.IsDelete == false &&
-                                    (u.Role == RoleEnum.Admin.GetDescriptionFromEnum() || u.Role == RoleEnum.Manager.GetDescriptionFromEnum() || u.Role == RoleEnum.Customer.GetDescriptionFromEnum()));
+                                    (u.Role == RoleEnum.Manager.GetDescriptionFromEnum() || u.Role == RoleEnum.Customer.GetDescriptionFromEnum()));
 
                 if (user == null)
                 {
@@ -765,7 +765,7 @@ namespace FTSS_API.Service.Implement
                     }
                     else
                     {
-                        return new ApiResponse { status = StatusCodes.Status403Forbidden.ToString(), message = "Only Admin and Manager can update images.", data = null };
+                        return new ApiResponse { status = StatusCodes.Status403Forbidden.ToString(), message = "Only Manager can update images.", data = null };
                     }
                 }
 
