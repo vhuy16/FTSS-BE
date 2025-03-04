@@ -4,4 +4,5 @@ public enum UserStatusEnum
 {
     Available,
     Unavailable,
+    Baned,
 }

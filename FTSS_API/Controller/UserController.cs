@@ -126,7 +126,7 @@ public class UserController : BaseController<UserController>
     [ProducesErrorResponseType(typeof(ProblemDetails))]
     public async Task<IActionResult> VerifyOtp([FromBody] VerifyOtpRequest verifyOtpRequest)
     {
-        bool isOtpValid = await _userService.VerifyOtp(verifyOtpRequest.UserId, verifyOtpRequest.otpCheck);
+        var isOtpValid = await _userService.VerifyOtp(verifyOtpRequest.email, verifyOtpRequest.otpCheck);
         return Ok(isOtpValid);
     }
 
@@ -181,4 +181,18 @@ public class UserController : BaseController<UserController>
         var response = await _userService.ChangePassword(request);
         return StatusCode(int.Parse(response.status), response);
     }
+    /// <summary>
+    /// Gửi lại otp
+    /// </summary>
+    [HttpPost(ApiEndPointConstant.User.ResendOtp)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
+    [ProducesErrorResponseType(typeof(ProblemDetails))]
+    public async Task<IActionResult> ResendOtp([FromBody] string email)
+    {
+        var response = await _userService.ResendOtp(email);
+        return StatusCode(int.Parse(response.status), response);
+    }
+
 }
