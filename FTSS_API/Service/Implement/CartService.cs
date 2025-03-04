@@ -352,7 +352,7 @@ public async Task<ApiResponse> AddSetupPackageToCart(Guid setupPackageId)
         if (existingCartItem != null)
         {
             // Nếu sản phẩm đã tồn tại trong giỏ hàng với trạng thái Odd, cộng thêm số lượng
-            int newQuantity = existingCartItem.Quantity + packageItem.Quantity;
+            int? newQuantity = existingCartItem.Quantity + packageItem.Quantity;
 
             if (newQuantity > product.Quantity)
             {
@@ -364,7 +364,7 @@ public async Task<ApiResponse> AddSetupPackageToCart(Guid setupPackageId)
                 };
             }
 
-            existingCartItem.Quantity = newQuantity;
+            existingCartItem.Quantity = (int)newQuantity;
             existingCartItem.ModifyDate = TimeUtils.GetCurrentSEATime();
             _unitOfWork.GetRepository<CartItem>().UpdateAsync(existingCartItem);
         }
@@ -386,7 +386,7 @@ public async Task<ApiResponse> AddSetupPackageToCart(Guid setupPackageId)
                 Id = Guid.NewGuid(),
                 CartId = cart.Id,
                 ProductId = product.Id,
-                Quantity = packageItem.Quantity,
+                Quantity = (int)packageItem.Quantity,
                 Status = CartItemEnum.Setup.ToString(),
                 CreateDate = TimeUtils.GetCurrentSEATime(),
                 ModifyDate = TimeUtils.GetCurrentSEATime()
@@ -401,7 +401,7 @@ public async Task<ApiResponse> AddSetupPackageToCart(Guid setupPackageId)
             ProductId = product.Id,
             ProductName = product.ProductName,
             Price = product.Price * packageItem.Quantity,
-            Quantity = packageItem.Quantity,
+            Quantity = (int)packageItem.Quantity,
         });
     }
 
