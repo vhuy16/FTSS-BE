@@ -87,6 +87,7 @@ namespace FTSS_API.Service.Implement
                         ProductName = spd.Product.ProductName,
                         Quantity = spd.Quantity,
                         Price = spd.Product.Price,
+                        InventoryQuantity = spd.Product.Quantity,
                         Status = spd.Product.Status,
                         IsDelete = sp.IsDelete,
                         CategoryName = spd.Product.SubCategory.Category.CategoryName,
@@ -189,6 +190,7 @@ namespace FTSS_API.Service.Implement
                                 Id = spd.Product.Id,
                                 ProductName = spd.Product.ProductName,
                                 Quantity = spd.Quantity,
+                                InventoryQuantity = spd.Product.Quantity,
                                 Price = spd.Product.Price,
                                 Status = spd.Product.Status,
                                 IsDelete = sp.IsDelete,
@@ -269,6 +271,7 @@ namespace FTSS_API.Service.Implement
                         Id = spd.Product.Id,
                         ProductName = spd.Product.ProductName,
                         Quantity = spd.Quantity,
+                        InventoryQuantity = spd.Product.Quantity,
                         Price = spd.Product.Price,
                         Status = spd.Product.Status,
                         IsDelete = sp.IsDelete,
@@ -330,6 +333,7 @@ namespace FTSS_API.Service.Implement
                             Id = spd.Product.Id,
                             ProductName = spd.Product.ProductName,
                             Quantity = spd.Quantity,
+                            InventoryQuantity = spd.Product.Quantity,
                             Price = spd.Product.Price,
                             Status = spd.Product.Status,
                             IsDelete = spd.Product.IsDelete,
@@ -502,6 +506,20 @@ namespace FTSS_API.Service.Implement
                                        .Include(p => p.Images)
                                        .Include(p => p.SetupPackageDetails) 
                     );
+                var insufficientStockProducts = allProducts
+                        .Where(p => productids.First(pi => pi.ProductId == p.Id).Quantity > p.Quantity)
+                        .Select(p => p.ProductName)
+                        .ToList();
+
+                if (insufficientStockProducts.Any())
+                {
+                    return new ApiResponse
+                    {
+                        status = StatusCodes.Status400BadRequest.ToString(),
+                        message = $"Insufficient stock for products: {string.Join(", ", insufficientStockProducts)}.",
+                        data = null
+                    };
+                }
 
                 var requiredCategories = new List<string> { "Bể", "Lọc", "Đèn" };
                 var foundCategories = allProducts.Select(p => p.SubCategory.Category.CategoryName).Distinct().ToList();
@@ -613,6 +631,7 @@ namespace FTSS_API.Service.Implement
                             ProductName = product.ProductName,
                             Price = product.Price,
                             Quantity = d.Quantity,
+                            InventoryQuantity = d.Product.Quantity,
                             Status = product.Status,
                             IsDelete = product.IsDelete,
                             CategoryName = product.SubCategory.Category.CategoryName,  // Bỏ kiểm tra null
