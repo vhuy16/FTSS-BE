@@ -503,9 +503,18 @@ namespace FTSS_API.Service.Implement
                                        .Include(p => p.SetupPackageDetails) 
                     );
 
-                if (!allProducts.Any())
+                var requiredCategories = new List<string> { "Bể", "Lọc", "Đèn" };
+                var foundCategories = allProducts.Select(p => p.SubCategory.Category.CategoryName).Distinct().ToList();
+                var missingCategories = requiredCategories.Except(foundCategories).ToList();
+
+                if (missingCategories.Any())
                 {
-                    return new ApiResponse { status = StatusCodes.Status400BadRequest.ToString(), message = "No valid products found.", data = null };
+                    return new ApiResponse
+                    {
+                        status = StatusCodes.Status400BadRequest.ToString(),
+                        message = $"Missing required category: {string.Join(", ", missingCategories)}.",
+                        data = null
+                    };
                 }
                 // Lọc danh sách sản phẩm có CategoryName = "Bể"
                 var categoryBeProducts = allProducts.Where(p => p.SubCategory.Category.CategoryName == "Bể").ToList();
