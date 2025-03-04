@@ -12,5 +12,6 @@ namespace FTSS_API.Service.Interface
         Task<ApiResponse> GetCartSummary();
         Task<ApiResponse> UpdateCartItem(Guid id, UpdateCartItemRequest updateCartItemRequest);
         Task<ApiResponse> AddCartItem(List<AddCartItemRequest> addCartItemRequest);
+        Task<ApiResponse> AddSetupPackageToCart(Guid setupPackageId);
     }
 }

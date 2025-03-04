@@ -8,6 +8,7 @@ public class GetProductResponse
     public string Description { get; set; } = null!;
 
     public int? Quantity { get; set; }
+    public string Size { get; set; } = null!;
    
     public string SubCategoryName { get; set; } = null!;
     public string CategoryName { get; set; }

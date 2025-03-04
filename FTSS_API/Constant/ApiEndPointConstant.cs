@@ -99,6 +99,7 @@ public static class ApiEndPointConstant
     {
         public const string CartEndPoint = ApiEndpoint + "/cart";
         public const string AddCartItem = CartEndPoint + "/item";
+        public const string AddSetupPackageToCart = CartEndPoint + "/setup-package";
         public const string DeleteCartItem = CartEndPoint + "item" + "/{itemId}";
         public const string GetAllCart = CartEndPoint;
         public const string ClearCart = CartEndPoint + "/clear-all";

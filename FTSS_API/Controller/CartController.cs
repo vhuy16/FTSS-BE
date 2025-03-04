@@ -106,5 +106,26 @@ namespace FTSS_API.Controller
             var response = await _cartService.UpdateCartItem(itemId, updateCartItemRequest);
             return StatusCode(int.Parse(response.status), response);
         }
+        /// <summary>
+        /// API thêm gói cài đặt vào cart.
+        /// </summary>
+        [HttpPost(ApiEndPointConstant.Cart.AddSetupPackageToCart)]
+        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
+        [ProducesErrorResponseType(typeof(ProblemDetails))]
+        public async Task<IActionResult> AddSetupPackageToCart([FromBody] Guid setupPackageId)
+        {
+            var response = await _cartService.AddSetupPackageToCart(setupPackageId);
+            if (response.status == StatusCodes.Status404NotFound.ToString())
+            {
+                return NotFound(response);
+            }
+            if (response.status == StatusCodes.Status400BadRequest.ToString())
+            {
+                return BadRequest(response);
+            }
+            return CreatedAtAction(nameof(AddSetupPackageToCart), response);
+        }
     }
 }

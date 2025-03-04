@@ -272,6 +272,148 @@ namespace FTSS_API.Service.Implement
         //}
 
 
+public async Task<ApiResponse> AddSetupPackageToCart(Guid setupPackageId)
+{
+    // Lấy UserId từ HttpContext
+    Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
+    var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
+        predicate: u => u.Id.Equals(userId) &&
+                        u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) &&
+                        u.IsDelete != true && u.Role == RoleEnum.Customer.GetDescriptionFromEnum());
+
+    if (user == null)
+    {
+        return new ApiResponse()
+        {
+            status = StatusCodes.Status401Unauthorized.ToString(),
+            message = "Unauthorized: Token is missing or expired.",
+            data = null
+        };
+    }
+
+    var cart = await _unitOfWork.GetRepository<Cart>().SingleOrDefaultAsync(predicate: c => c.UserId.Equals(userId));
+
+    if (cart == null)
+    {
+        return new ApiResponse()
+        {
+            status = StatusCodes.Status404NotFound.ToString(),
+            message = "Cart not found",
+            data = null
+        };
+    }
+
+    // Lấy danh sách sản phẩm từ setupPackageId
+    var packageProducts = await _unitOfWork.GetRepository<SetupPackageDetail>()
+        .GetListAsync(predicate: spd => spd.SetupPackageId.Equals(setupPackageId));
+
+    if (packageProducts == null || !packageProducts.Any())
+    {
+        return new ApiResponse()
+        {
+            status = StatusCodes.Status404NotFound.ToString(),
+            message = "Setup package not found or contains no products",
+            data = null
+        };
+    }
+
+    List<AddCartItemResponse> cartItemResponses = new List<AddCartItemResponse>();
+
+    foreach (var packageItem in packageProducts)
+    {
+        var product = await _unitOfWork.GetRepository<Product>().SingleOrDefaultAsync(
+            predicate: p => p.Id.Equals(packageItem.ProductId) &&
+                            p.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()));
+
+        if (product == null)
+        {
+            return new ApiResponse()
+            {
+                status = StatusCodes.Status404NotFound.ToString(),
+                message = $"Product {packageItem.ProductId} does not exist or is unavailable",
+                data = null
+            };
+        }
+
+        if (packageItem.Quantity <= 0)
+        {
+            return new ApiResponse()
+            {
+                status = StatusCodes.Status400BadRequest.ToString(),
+                message = "Invalid product quantity in setup package",
+                data = null
+            };
+        }
+
+        var existingCartItem =  await _unitOfWork.GetRepository<CartItem>().SingleOrDefaultAsync(
+            predicate: ci => ci.CartId.Equals(cart.Id) && ci.ProductId.Equals(product.Id) &&
+                             ci.Status == CartItemEnum.Odd.ToString() && ci.IsDelete != true);
+
+        if (existingCartItem != null)
+        {
+            // Nếu sản phẩm đã tồn tại trong giỏ hàng với trạng thái Odd, cộng thêm số lượng
+            int? newQuantity = existingCartItem.Quantity + packageItem.Quantity;
+
+            if (newQuantity > product.Quantity)
+            {
+                return new ApiResponse()
+                {
+                    status = StatusCodes.Status400BadRequest.ToString(),
+                    message = $"Not enough stock for product {product.ProductName}",
+                    data = null
+                };
+            }
+
+            existingCartItem.Quantity = (int)newQuantity;
+            existingCartItem.ModifyDate = TimeUtils.GetCurrentSEATime();
+            _unitOfWork.GetRepository<CartItem>().UpdateAsync(existingCartItem);
+        }
+        else
+        {
+            // Nếu sản phẩm chưa có trong giỏ hàng, thêm mới
+            if (packageItem.Quantity > product.Quantity)
+            {
+                return new ApiResponse()
+                {
+                    status = StatusCodes.Status400BadRequest.ToString(),
+                    message = $"Not enough stock for product {product.ProductName}",
+                    data = null
+                };
+            }
+
+            var cartItem = new CartItem()
+            {
+                Id = Guid.NewGuid(),
+                CartId = cart.Id,
+                ProductId = product.Id,
+                Quantity = (int)packageItem.Quantity,
+                Status = CartItemEnum.Setup.ToString(),
+                CreateDate = TimeUtils.GetCurrentSEATime(),
+                ModifyDate = TimeUtils.GetCurrentSEATime()
+            };
+
+            await _unitOfWork.GetRepository<CartItem>().InsertAsync(cartItem);
+        }
+
+        cartItemResponses.Add(new AddCartItemResponse()
+        {
+            CartItemId = existingCartItem?.Id ?? Guid.NewGuid(),
+            ProductId = product.Id,
+            ProductName = product.ProductName,
+            Price = product.Price * packageItem.Quantity,
+            Quantity = (int)packageItem.Quantity,
+        });
+    }
+
+    bool isSuccessfully = await _unitOfWork.CommitAsync() > 0;
+
+    return new ApiResponse()
+    {
+        status = isSuccessfully ? StatusCodes.Status200OK.ToString() : StatusCodes.Status500InternalServerError.ToString(),
+        message = isSuccessfully ? "Setup package added to cart successfully" : "Failed to add setup package",
+        data = cartItemResponses
+    };
+}
 
         public async Task<ApiResponse> ClearCart()
         {
