@@ -130,9 +130,33 @@ namespace FTSS_API.Controller
             return Ok(response);
         }
         /// <summary>
-        /// API cập nhập Setup cho customer.
+        /// API cập nhật SetupPackage cho customer.
         /// </summary>
-        
+        [HttpPut(ApiEndPointConstant.SetupPackage.UpdateSetupPackage)]
+        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
+        [ProducesErrorResponseType(typeof(ProblemDetails))]
+        public async Task<IActionResult> UpdateSetupPackage(
+            [FromRoute] Guid setupPackageId, 
+            [FromBody] UpdateSetupPackageRequest request, 
+            [FromServices] Supabase.Client client)
+        {
+            var response = await _setupPackageService.UpdateSetupPackage(setupPackageId, request, client);
+            return StatusCode(int.Parse(response.status), response);
+        }
+
+        /// <summary>
+        /// API sao chép SetupPackage.
+        /// </summary>
+        [HttpPost(ApiEndPointConstant.SetupPackage.CopySetupPackage)]
+        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status201Created)]
+        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
+        [ProducesErrorResponseType(typeof(ProblemDetails))]
+        public async Task<IActionResult> CopySetupPackage([FromRoute] Guid setupPackageId)
+        {
+            var response = await _setupPackageService.CopySetupPackage(setupPackageId);
+            return StatusCode(int.Parse(response.status), response);
+        }
             
         /// <summary>
         /// API lấy thông tin chi tiết setup theo ID cho mọi role.
