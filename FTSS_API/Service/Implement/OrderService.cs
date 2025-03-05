@@ -740,7 +740,8 @@ public class OrderService : BaseService<OrderService>, IOrderService
             // Truy vấn để lấy thông tin đơn hàng
             var order = await _unitOfWork.Context.Set<Order>()
                 .Include(o => o.User) // Bao gồm thông tin người dùng
-                .Include(o => o.Voucher) // Bao gồm thông tin voucher
+                .Include(o => o.Voucher)
+                .Include(p => p.Payments)// Bao gồm thông tin voucher
                 .Include(o => o.OrderDetails) // Bao gồm chi tiết đơn hàng
                     .ThenInclude(od => od.Product) // Bao gồm thông tin sản phẩm
                         .ThenInclude(p => p.Images) // Bao gồm hình ảnh sản phẩm
@@ -766,7 +767,12 @@ public class OrderService : BaseService<OrderService>, IOrderService
                 Address = order.Address,
                 CreateDate = order.CreateDate,
                 ModifyDate = order.ModifyDate,
-                Discount = order.Voucher?.Discount ?? 0, // Lấy giảm giá từ voucher nếu có
+                Discount = order.Voucher?.Discount ?? 0,
+                Payment = new GetOrderResponse.PaymentResponse
+                {
+                    PaymentMethod = order.Payments.FirstOrDefault()?.PaymentMethod,
+                    PaymentStatus = order.Payments.FirstOrDefault()?.PaymentStatus,
+                },
                 userResponse = new GetOrderResponse.UserResponse
                 {
                     Name = order.User?.UserName,
@@ -778,7 +784,7 @@ public class OrderService : BaseService<OrderService>, IOrderService
                     ProductName = od.Product.ProductName,
                     Price = od.Price,
                     Quantity = od.Quantity,
-                    LinkImage = od.Product.Images.FirstOrDefault()?.LinkImage ?? "NoImageAvailable" // Lấy ảnh đầu tiên hoặc giá trị mặc định
+                    LinkImage = od.Product.Images.FirstOrDefault()?.LinkImage ?? "NoImageAvailable" 
                 }).ToList()
             };
 

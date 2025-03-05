@@ -237,7 +237,7 @@ namespace FTSS_API.Service.Implement
             // Lấy thông tin SubCategory theo ID
             var subCategory = await _unitOfWork.GetRepository<SubCategory>()
                 .SingleOrDefaultAsync(
-                    selector: s => new
+                    selector: s => new  
                     {
                         Id = s.Id,
                         SubCategoryName = s.SubCategoryName,

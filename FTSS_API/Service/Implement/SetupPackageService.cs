@@ -233,7 +233,7 @@ namespace FTSS_API.Service.Implement
                 var setupPackagesQuery = await _unitOfWork.GetRepository<SetupPackage>().GetListAsync(
                     predicate: sp => sp.User != null &&
                                      sp.User.Role == RoleEnum.Manager.GetDescriptionFromEnum(),
-                                     // sp.IsDelete == false,
+                    // sp.IsDelete == false,
                     orderBy: sp => isAscending == true
                         ? sp.OrderBy(sp => sp.CreateDate)
                         : sp.OrderByDescending(sp => sp.CreateDate),
@@ -545,13 +545,12 @@ namespace FTSS_API.Service.Implement
 
                 var productIds = productids.Select(p => p.ProductId).ToList();
                 var allProducts = await _unitOfWork.GetRepository<Product>().GetListAsync(
-
-                        predicate: p => productIds.Contains(p.Id),
-                        include: p => p.Include(p => p.SubCategory)
-                                       .ThenInclude(sc => sc.Category)
-                                       .Include(p => p.Images)
-                                       .Include(p => p.SetupPackageDetails) 
-                    );
+                    predicate: p => productIds.Contains(p.Id),
+                    include: p => p.Include(p => p.SubCategory)
+                        .ThenInclude(sc => sc.Category)
+                        .Include(p => p.Images)
+                        .Include(p => p.SetupPackageDetails)
+                );
                 // Kiểm tra các ProductId có tồn tại trong DB hay không
                 var missingProducts = productids.Where(p => !allProducts.Any(prod => prod.Id == p.ProductId)).ToList();
                 if (missingProducts.Any())
@@ -559,7 +558,8 @@ namespace FTSS_API.Service.Implement
                     return new ApiResponse
                     {
                         status = StatusCodes.Status400BadRequest.ToString(),
-                        message = $"Some products do not exist: {string.Join(", ", missingProducts.Select(p => p.ProductId))}.",
+                        message =
+                            $"Some products do not exist: {string.Join(", ", missingProducts.Select(p => p.ProductId))}.",
                         data = null
                     };
                 }
@@ -668,13 +668,12 @@ namespace FTSS_API.Service.Implement
                 await _unitOfWork.CommitAsync();
 
                 setupPackage = await _unitOfWork.GetRepository<SetupPackage>().SingleOrDefaultAsync(
-
-                                predicate: sp => sp.Id == setupPackage.Id,
-                                include: sp => sp.Include(sp => sp.SetupPackageDetails)
-                                                 .ThenInclude(spd => spd.Product)
-                                                     .ThenInclude(p => p.SubCategory)
-                                                         .ThenInclude(sc => sc.Category)
-                            );
+                    predicate: sp => sp.Id == setupPackage.Id,
+                    include: sp => sp.Include(sp => sp.SetupPackageDetails)
+                        .ThenInclude(spd => spd.Product)
+                        .ThenInclude(p => p.SubCategory)
+                        .ThenInclude(sc => sc.Category)
+                );
                 if (setupPackage == null)
                 {
                     return new ApiResponse
@@ -706,7 +705,7 @@ namespace FTSS_API.Service.Implement
                         var product = allProducts.FirstOrDefault(p => p.Id == d.ProductId);
                         if (product == null)
                         {
-                            return null;  // Nếu không tìm thấy sản phẩm, bỏ qua
+                            return null; // Nếu không tìm thấy sản phẩm, bỏ qua
                         }
 
                         return new ProductResponse
@@ -719,9 +718,9 @@ namespace FTSS_API.Service.Implement
                             Status = product.Status,
                             IsDelete = product.IsDelete,
 
-                            CategoryName = product.SubCategory?.Category?.CategoryName,  // Kiểm tra null
-                            images = product.Images?.OrderBy(img => img.CreateDate).FirstOrDefault()?.LinkImage  // Kiểm tra null
-
+                            CategoryName = product.SubCategory?.Category?.CategoryName, // Kiểm tra null
+                            images = product.Images?.OrderBy(img => img.CreateDate).FirstOrDefault()
+                                ?.LinkImage // Kiểm tra null
                         };
                     }).Where(p => p != null).ToList()
                 };
@@ -778,7 +777,7 @@ namespace FTSS_API.Service.Implement
                     };
                 }
 
-             
+
                 var newSetupPackage = new SetupPackage
                 {
                     Id = Guid.NewGuid(),
@@ -824,77 +823,110 @@ namespace FTSS_API.Service.Implement
                 };
             }
         }
-public async Task<ApiResponse> UpdateSetupPackage(Guid setupPackageId, UpdateSetupPackageRequest request, Client client)
-{
-    try
-    {
-        Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
-        var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
-            predicate: u => u.Id.Equals(userId) &&
-                            u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) &&
-                            u.IsDelete == false &&
-                            u.Role == RoleEnum.Customer.GetDescriptionFromEnum());
 
-        if (user == null)
+        public async Task<ApiResponse> UpdateSetupPackage(Guid setupPackageId, UpdateSetupPackageRequest request,
+            Client client)
         {
-            return new ApiResponse { status = StatusCodes.Status401Unauthorized.ToString(), message = "Unauthorized: Token is missing or expired.", data = null };
-        }
-
-        var setupPackage = await _unitOfWork.GetRepository<SetupPackage>().SingleOrDefaultAsync(
-            predicate: sp => sp.Id == setupPackageId && sp.Userid == userId && sp.IsDelete == false,
-            include: sp => sp.Include(sp => sp.SetupPackageDetails));
-
-        if (setupPackage == null)
-        {
-            return new ApiResponse { status = StatusCodes.Status404NotFound.ToString(), message = "Setup package not found.", data = null };
-        }
-
-        setupPackage.SetupName = request.SetupName;
-        setupPackage.Description = request.Description;
-        setupPackage.ModifyDate = TimeUtils.GetCurrentSEATime();
-
-        if (request.ImageFile != null)
-        {
-            var imageUrl = (await _supabaseImageService.SendImagesAsync(new List<IFormFile> { request.ImageFile }, client)).FirstOrDefault();
-            if (!string.IsNullOrEmpty(imageUrl))
+            try
             {
-                setupPackage.Image = imageUrl;
+                Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
+                var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
+                    predicate: u => u.Id.Equals(userId) &&
+                                    u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) &&
+                                    u.IsDelete == false &&
+                                    u.Role == RoleEnum.Customer.GetDescriptionFromEnum());
+
+                if (user == null)
+                {
+                    return new ApiResponse
+                    {
+                        status = StatusCodes.Status401Unauthorized.ToString(),
+                        message = "Unauthorized: Token is missing or expired.", data = null
+                    };
+                }
+
+                var setupPackage = await _unitOfWork.GetRepository<SetupPackage>().SingleOrDefaultAsync(
+                    predicate: sp => sp.Id == setupPackageId && sp.Userid == userId && sp.IsDelete == false,
+                    include: sp => sp.Include(sp => sp.SetupPackageDetails));
+
+                if (setupPackage == null)
+                {
+                    return new ApiResponse
+                    {
+                        status = StatusCodes.Status404NotFound.ToString(), message = "Setup package not found.",
+                        data = null
+                    };
+                }
+
+                setupPackage.SetupName = request.SetupName;
+                setupPackage.Description = request.Description;
+                setupPackage.ModifyDate = TimeUtils.GetCurrentSEATime();
+                setupPackage.Status = request.Status;
+                if (request.ImageFile != null)
+                {
+                    var imageUrl =
+                        (await _supabaseImageService.SendImagesAsync(new List<IFormFile> { request.ImageFile }, client))
+                        .FirstOrDefault();
+                    if (!string.IsNullOrEmpty(imageUrl))
+                    {
+                        setupPackage.Image = imageUrl;
+                    }
+                }
+
+                // Cập nhật danh sách sản phẩm
+                var newProductIds = request.ProductList.Select(p => p.ProductId).ToList();
+                var newProducts = await _unitOfWork.GetRepository<Product>()
+                    .GetListAsync(predicate: p => newProductIds.Contains(p.Id));
+                var newSetupPackageDetails = request.ProductList.Select(p => new SetupPackageDetail
+                {
+                    Id = Guid.NewGuid(),
+                    ProductId = p.ProductId,
+                    SetupPackageId = setupPackage.Id,
+                    Quantity = p.Quantity,
+                    Price = newProducts.First(prod => prod.Id == p.ProductId).Price * p.Quantity
+                }).ToList();
+                var setupPackageDetailsToDelete = await _unitOfWork.GetRepository<SetupPackageDetail>()
+                    .GetListAsync(predicate: spd => spd.SetupPackageId == setupPackage.Id);
+
+// Xóa danh sách đã lấy ra
+                _unitOfWork.GetRepository<SetupPackageDetail>().DeleteRangeAsync(setupPackageDetailsToDelete);
+
+                await _unitOfWork.GetRepository<SetupPackageDetail>().InsertRangeAsync(newSetupPackageDetails);
+                await _unitOfWork.CommitAsync();
+
+                return new ApiResponse
+                {
+                    status = StatusCodes.Status200OK.ToString(),
+                    message = "Setup package updated successfully.",
+                    data = null
+                };
+            }
+            catch (Exception ex)
+            {
+                return new ApiResponse
+                {
+                    status = StatusCodes.Status500InternalServerError.ToString(),
+                    message = "An error occurred while updating setup package.", data = ex.Message
+                };
             }
         }
 
-        // Cập nhật danh sách sản phẩm
-        var newProductIds = request.ProductList.Select(p => p.ProductId).ToList();
-        var newProducts = await _unitOfWork.GetRepository<Product>().GetListAsync(predicate:p => newProductIds.Contains(p.Id));
-        var newSetupPackageDetails = request.ProductList.Select(p => new SetupPackageDetail
+        public async Task<bool> enableSetupPackage(Guid setupPackageId)
         {
-            Id = Guid.NewGuid(),
-            ProductId = p.ProductId,
-            SetupPackageId = setupPackage.Id,
-            Quantity = p.Quantity,
-            Price = newProducts.First(prod => prod.Id == p.ProductId).Price * p.Quantity
-        }).ToList();
-        var setupPackageDetailsToDelete = await _unitOfWork.GetRepository<SetupPackageDetail>()
-            .GetListAsync(predicate: spd => spd.SetupPackageId == setupPackage.Id);
+            var setupPackage = await _unitOfWork.GetRepository<SetupPackage>().SingleOrDefaultAsync(predicate: sp => sp.Id == setupPackageId);
+            if (setupPackage.IsDelete == true)
+            {
+                setupPackage.IsDelete = false;
 
-// Xóa danh sách đã lấy ra
-         _unitOfWork.GetRepository<SetupPackageDetail>().DeleteRangeAsync(setupPackageDetailsToDelete);
-       
-        await _unitOfWork.GetRepository<SetupPackageDetail>().InsertRangeAsync(newSetupPackageDetails);
-        await _unitOfWork.CommitAsync();
-
-        return new ApiResponse
-        {
-            status = StatusCodes.Status200OK.ToString(),
-            message = "Setup package updated successfully.",
-            data = null
-        };
-    }
-    catch (Exception ex)
-    {
-        return new ApiResponse { status = StatusCodes.Status500InternalServerError.ToString(), message = "An error occurred while updating setup package.", data = ex.Message };
-    }
-}
-
+                _unitOfWork.GetRepository<SetupPackage>().UpdateAsync(setupPackage);
+                await _unitOfWork.CommitAsync();
+                return true;
+            }
+            else
+            {
+                return false;
+            }
+        }
         // public Task<ApiResponse> UpdateSetupPackage(Guid setupPackageId, List<ProductSetupItem> productids,
         //     AddSetupPackageRequest request, Client client)
         // {
