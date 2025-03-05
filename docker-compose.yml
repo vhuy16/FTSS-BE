@@ -1,0 +1,61 @@
+﻿version: '3.8'
+
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: sqlserver
+    environment:
+      - ACCEPT_EULA=Y 
+      - SA_PASSWORD=123@admin 
+      - MSSQL_PID=Express  
+    ports:
+      - "1433:1433"  
+    volumes:
+      - sqlserver_data:/var/opt/mssql  
+    networks:
+      - app-network
+
+  webapi1:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: webapi1
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__DefaultConnection=Server=sqlserver;Database=ftss;User Id=sa;Password=YourStrong!Passw0rd;
+    depends_on:
+      - sqlserver
+    networks:
+      - app-network
+
+  webapi2:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: webapi2
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__DefaultConnection=Server=sqlserver;Database=ftss;User Id=sa;Password=YourStrong!Passw0rd;
+    depends_on:
+      - sqlserver
+    networks:
+      - app-network
+
+  nginx:
+    image: nginx:latest
+    container_name: nginx
+    ports:
+      - "8080:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+    depends_on:
+      - webapi1
+      - webapi2
+    networks:
+      - app-network
+
+volumes:
+  sqlserver_data:  # Định nghĩa volume để lưu trữ dữ liệu SQL Server
+
+networks:
+  app-network:  # Định nghĩa mạng nội bộ cho các dịch vụ
