@@ -545,12 +545,26 @@ namespace FTSS_API.Service.Implement
 
                 var productIds = productids.Select(p => p.ProductId).ToList();
                 var allProducts = await _unitOfWork.GetRepository<Product>().GetListAsync(
-                    predicate: p => productIds.Contains(p.Id),
-                    include: p => p.Include(p => p.SubCategory)
-                        .ThenInclude(sc => sc.Category)
-                        .Include(p => p.Images)
-                        .Include(p => p.SetupPackageDetails)
-                );
+
+                        predicate: p => productIds.Contains(p.Id),
+                        include: p => p.Include(p => p.SubCategory)
+                                       .ThenInclude(sc => sc.Category)
+                                       .Include(p => p.Images)
+                                       .Include(p => p.SetupPackageDetails) 
+                    );
+                // Kiểm tra các ProductId có tồn tại trong DB hay không
+                var missingProducts = productids.Where(p => !allProducts.Any(prod => prod.Id == p.ProductId)).ToList();
+                if (missingProducts.Any())
+                {
+                    return new ApiResponse
+                    {
+                        status = StatusCodes.Status400BadRequest.ToString(),
+                        message = $"Some products do not exist: {string.Join(", ", missingProducts.Select(p => p.ProductId))}.",
+                        data = null
+                    };
+                }
+
+
                 var insufficientStockProducts = allProducts
                     .Where(p => productids.First(pi => pi.ProductId == p.Id).Quantity > p.Quantity)
                     .Select(p => p.ProductName)
@@ -654,12 +668,24 @@ namespace FTSS_API.Service.Implement
                 await _unitOfWork.CommitAsync();
 
                 setupPackage = await _unitOfWork.GetRepository<SetupPackage>().SingleOrDefaultAsync(
-                    predicate: sp => sp.Id == setupPackage.Id,
-                    include: sp => sp.Include(sp => sp.SetupPackageDetails)
-                        .ThenInclude(spd => spd.Product)
-                        .ThenInclude(p => p.SubCategory)
-                        .ThenInclude(sc => sc.Category)
-                );
+
+                                predicate: sp => sp.Id == setupPackage.Id,
+                                include: sp => sp.Include(sp => sp.SetupPackageDetails)
+                                                 .ThenInclude(spd => spd.Product)
+                                                     .ThenInclude(p => p.SubCategory)
+                                                         .ThenInclude(sc => sc.Category)
+                            );
+                if (setupPackage == null)
+                {
+                    return new ApiResponse
+                    {
+                        status = StatusCodes.Status500InternalServerError.ToString(),
+                        message = "Setup package retrieval failed after creation.",
+                        data = null
+                    };
+                }
+
+
                 // 🔹 **Chuẩn bị response `SetupPackageResponse`**
                 var response = new SetupPackageResponse
                 {
@@ -677,20 +703,27 @@ namespace FTSS_API.Service.Implement
                     IsDelete = setupPackage.IsDelete,
                     Products = setupPackageDetails.Select(d =>
                     {
-                        var product = allProducts.First(p => p.Id == d.ProductId);
+                        var product = allProducts.FirstOrDefault(p => p.Id == d.ProductId);
+                        if (product == null)
+                        {
+                            return null;  // Nếu không tìm thấy sản phẩm, bỏ qua
+                        }
+
                         return new ProductResponse
                         {
                             Id = d.ProductId,
                             ProductName = product.ProductName,
                             Price = product.Price,
                             Quantity = d.Quantity,
-                            InventoryQuantity = d.Product.Quantity,
+                            InventoryQuantity = product.Quantity,
                             Status = product.Status,
                             IsDelete = product.IsDelete,
-                            CategoryName = product.SubCategory.Category.CategoryName, // Bỏ kiểm tra null
-                            images = product.Images.OrderBy(img => img.CreateDate).First().LinkImage // Bỏ kiểm tra null
+
+                            CategoryName = product.SubCategory?.Category?.CategoryName,  // Kiểm tra null
+                            images = product.Images?.OrderBy(img => img.CreateDate).FirstOrDefault()?.LinkImage  // Kiểm tra null
+
                         };
-                    }).ToList()
+                    }).Where(p => p != null).ToList()
                 };
 
 
