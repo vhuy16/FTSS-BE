@@ -108,6 +108,20 @@ namespace FTSS_API.Controller;
              return StatusCode(StatusCodes.Status500InternalServerError, "An error occurred while processing the webhook.");
          }
      }
+
+     [HttpPost("cancleUrl")]
+     public async Task<IActionResult> handleCanclePayment()
+     {
+         string  status = Request.Query["status"].ToString();
+         string id = Request.Query["id"].ToString();
+         string orderCode = Request.Query["orderCode"];
+         if (status == "CANCELLED")
+         {
+             var response = await _payOsService.HandleFailedPayment(Guid.Parse(orderCode));
+             return Redirect("https://ftss.id.vn/api/v1/cancleUrl");
+         }
+         return Redirect("https://ftss.id.vn/api/v1/cancleUrl");
+     }
      
      [HttpPost("confirm-webhook")]
      public async Task<IActionResult> ConfirmWebhook()
