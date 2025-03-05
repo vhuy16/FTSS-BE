@@ -605,6 +605,7 @@ public class ProductService : BaseService<ProductService>, IProductService
 
         // Mark as deleted
         existingProduct.IsDelete = true;
+        existingProduct.Status = ProductStatusEnum.Unavailable.GetDescriptionFromEnum();
         _unitOfWork.GetRepository<Product>().UpdateAsync(existingProduct);
         bool isSuccessful = await _unitOfWork.CommitAsync() > 0;
 

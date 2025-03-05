@@ -119,6 +119,7 @@ public static class ApiEndPointConstant
     {
         public const string SetupPackageEndPoint = ApiEndpoint + "/setuppackage";
         public const string AddSetupPackage = SetupPackageEndPoint;
+        public const string CopySetupPackage = SetupPackageEndPoint + "/copySetupPackage";
         public const string RemoveSetupPackage = SetupPackageEndPoint + "/{id}";
         public const string GetListSetupPackage = SetupPackageEndPoint;
         public const string GetListSetupPackageAllUser = SetupPackageEndPoint + "/all-users";
