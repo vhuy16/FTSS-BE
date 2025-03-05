@@ -1,4 +1,4 @@
-﻿    using AutoMapper;
+﻿using AutoMapper;
 using FTSS_API.Payload;
 using FTSS_API.Payload.Request.Product;
 using FTSS_API.Payload.Request.SetupPackage;
@@ -18,7 +18,10 @@ namespace FTSS_API.Service.Implement
     public class SetupPackageService : BaseService<SetupPackageService>, ISetupPackageService
     {
         private readonly SupabaseUltils _supabaseImageService;
-        public SetupPackageService(IUnitOfWork<MyDbContext> unitOfWork, ILogger<SetupPackageService> logger, IMapper mapper, IHttpContextAccessor httpContextAccessor, SupabaseUltils supabaseImageService) : base(unitOfWork, logger, mapper, httpContextAccessor)
+
+        public SetupPackageService(IUnitOfWork<MyDbContext> unitOfWork, ILogger<SetupPackageService> logger,
+            IMapper mapper, IHttpContextAccessor httpContextAccessor, SupabaseUltils supabaseImageService) : base(
+            unitOfWork, logger, mapper, httpContextAccessor)
         {
             _supabaseImageService = supabaseImageService;
         }
@@ -52,12 +55,12 @@ namespace FTSS_API.Service.Implement
                         ? sp.OrderBy(sp => sp.CreateDate)
                         : sp.OrderByDescending(sp => sp.CreateDate),
                     include: sp => sp.Include(sp => sp.SetupPackageDetails)
-                                     .ThenInclude(spd => spd.Product)
-                                     .ThenInclude(p => p.SubCategory)
-                                     .ThenInclude(sc => sc.Category)
-                                     .Include(sp => sp.SetupPackageDetails)
-                                     .ThenInclude(spd => spd.Product)
-                                     .ThenInclude(p => p.Images)
+                        .ThenInclude(spd => spd.Product)
+                        .ThenInclude(p => p.SubCategory)
+                        .ThenInclude(sc => sc.Category)
+                        .Include(sp => sp.SetupPackageDetails)
+                        .ThenInclude(spd => spd.Product)
+                        .ThenInclude(p => p.Images)
                 );
 
                 // Áp dụng phân trang sau khi lấy danh sách
@@ -149,13 +152,13 @@ namespace FTSS_API.Service.Implement
                         ? sp.OrderBy(sp => sp.CreateDate)
                         : sp.OrderByDescending(sp => sp.CreateDate),
                     include: sp => sp.Include(sp => sp.User) // Bao gồm thông tin User
-                                     .Include(sp => sp.SetupPackageDetails)
-                                     .ThenInclude(spd => spd.Product)
-                                     .ThenInclude(p => p.SubCategory)
-                                     .ThenInclude(sc => sc.Category)
-                                     .Include(sp => sp.SetupPackageDetails)
-                                     .ThenInclude(spd => spd.Product)
-                                     .ThenInclude(p => p.Images)
+                        .Include(sp => sp.SetupPackageDetails)
+                        .ThenInclude(spd => spd.Product)
+                        .ThenInclude(p => p.SubCategory)
+                        .ThenInclude(sc => sc.Category)
+                        .Include(sp => sp.SetupPackageDetails)
+                        .ThenInclude(spd => spd.Product)
+                        .ThenInclude(p => p.Images)
                 );
 
                 // Áp dụng phân trang
@@ -221,6 +224,7 @@ namespace FTSS_API.Service.Implement
                 };
             }
         }
+
         public async Task<ApiResponse> GetListSetupPackageAllShop(int pageNumber, int pageSize, bool? isAscending)
         {
             try
@@ -228,18 +232,18 @@ namespace FTSS_API.Service.Implement
                 // Lấy danh sách SetupPackage của User có Role là Manager
                 var setupPackagesQuery = await _unitOfWork.GetRepository<SetupPackage>().GetListAsync(
                     predicate: sp => sp.User != null &&
-                                     sp.User.Role == RoleEnum.Manager.GetDescriptionFromEnum() &&
-                                     sp.IsDelete == false,
+                                     sp.User.Role == RoleEnum.Manager.GetDescriptionFromEnum(),
+                                     // sp.IsDelete == false,
                     orderBy: sp => isAscending == true
                         ? sp.OrderBy(sp => sp.CreateDate)
                         : sp.OrderByDescending(sp => sp.CreateDate),
                     include: sp => sp.Include(sp => sp.SetupPackageDetails)
-                                     .ThenInclude(spd => spd.Product)
-                                     .ThenInclude(p => p.SubCategory)
-                                     .ThenInclude(sc => sc.Category)
-                                     .Include(sp => sp.SetupPackageDetails)
-                                     .ThenInclude(spd => spd.Product)
-                                     .ThenInclude(p => p.Images)
+                        .ThenInclude(spd => spd.Product)
+                        .ThenInclude(p => p.SubCategory)
+                        .ThenInclude(sc => sc.Category)
+                        .Include(sp => sp.SetupPackageDetails)
+                        .ThenInclude(spd => spd.Product)
+                        .ThenInclude(p => p.Images)
                 );
 
                 // Tổng số bản ghi
@@ -348,12 +352,12 @@ namespace FTSS_API.Service.Implement
                     predicate: sp => sp.Id == id && sp.IsDelete == false,
                     include: source => source
                         .Include(sp => sp.SetupPackageDetails)
-                            .ThenInclude(spd => spd.Product)
-                            .ThenInclude(p => p.SubCategory)
-                            .ThenInclude(sc => sc.Category)
+                        .ThenInclude(spd => spd.Product)
+                        .ThenInclude(p => p.SubCategory)
+                        .ThenInclude(sc => sc.Category)
                         .Include(sp => sp.SetupPackageDetails)
-                            .ThenInclude(spd => spd.Product)
-                            .ThenInclude(p => p.Images)
+                        .ThenInclude(spd => spd.Product)
+                        .ThenInclude(p => p.Images)
                 );
 
                 // Kiểm tra nếu không tìm thấy
@@ -384,6 +388,7 @@ namespace FTSS_API.Service.Implement
                 };
             }
         }
+
         public async Task<ApiResponse> RemoveSetupPackage(Guid id)
         {
             try
@@ -392,8 +397,10 @@ namespace FTSS_API.Service.Implement
                 Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
                 var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
                     predicate: u => u.Id.Equals(userId) &&
-                                    u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) && u.IsDelete == false &&
-                                    (u.Role == RoleEnum.Manager.GetDescriptionFromEnum() || u.Role == RoleEnum.Customer.GetDescriptionFromEnum()));
+                                    u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) &&
+                                    u.IsDelete == false &&
+                                    (u.Role == RoleEnum.Manager.GetDescriptionFromEnum() ||
+                                     u.Role == RoleEnum.Customer.GetDescriptionFromEnum()));
 
                 if (user == null)
                 {
@@ -404,6 +411,7 @@ namespace FTSS_API.Service.Implement
                         data = null
                     };
                 }
+
                 var setupPackage = await _unitOfWork.Context.Set<SetupPackage>()
                     .FirstOrDefaultAsync(sp => sp.Id == id && sp.IsDelete == false);
 
@@ -439,7 +447,8 @@ namespace FTSS_API.Service.Implement
             }
         }
 
-        public async Task<ApiResponse> AddSetupPackage(List<ProductSetupItem> productids, AddSetupPackageRequest request, Client client)
+        public async Task<ApiResponse> AddSetupPackage(List<ProductSetupItem> productids,
+            AddSetupPackageRequest request, Client client)
         {
             try
             {
@@ -453,63 +462,99 @@ namespace FTSS_API.Service.Implement
 
                 if (user == null)
                 {
-                    return new ApiResponse { status = StatusCodes.Status401Unauthorized.ToString(), message = "Unauthorized: Token is missing or expired.", data = null };
+                    return new ApiResponse
+                    {
+                        status = StatusCodes.Status401Unauthorized.ToString(),
+                        message = "Unauthorized: Token is missing or expired.", data = null
+                    };
                 }
 
-                if (string.IsNullOrWhiteSpace(request.SetupName) || request.SetupName.Length > 10 || !char.IsUpper(request.SetupName.Trim()[0]))
+                if (string.IsNullOrWhiteSpace(request.SetupName) || request.SetupName.Length > 10 ||
+                    !char.IsUpper(request.SetupName.Trim()[0]))
                 {
-                    return new ApiResponse { status = StatusCodes.Status400BadRequest.ToString(), message = "SetupName cannot be empty, must be uppercase, and must be less than 10 characters.", data = null };
+                    return new ApiResponse
+                    {
+                        status = StatusCodes.Status400BadRequest.ToString(),
+                        message = "SetupName cannot be empty, must be uppercase, and must be less than 10 characters.",
+                        data = null
+                    };
                 }
 
                 if (string.IsNullOrWhiteSpace(request.Description))
                 {
-                    return new ApiResponse { status = StatusCodes.Status400BadRequest.ToString(), message = "Description cannot be empty.", data = null };
+                    return new ApiResponse
+                    {
+                        status = StatusCodes.Status400BadRequest.ToString(), message = "Description cannot be empty.",
+                        data = null
+                    };
                 }
+
                 if (productids == null || !productids.Any())
                 {
-                    return new ApiResponse { status = StatusCodes.Status400BadRequest.ToString(), message = "Product list cannot be empty.", data = null };
+                    return new ApiResponse
+                    {
+                        status = StatusCodes.Status400BadRequest.ToString(), message = "Product list cannot be empty.",
+                        data = null
+                    };
                 }
 
                 if (productids.Any(p => p.Quantity == null || p.Quantity <= 0))
                 {
-                    return new ApiResponse { status = StatusCodes.Status400BadRequest.ToString(), message = "Each product must have a positive integer quantity.", data = null };
+                    return new ApiResponse
+                    {
+                        status = StatusCodes.Status400BadRequest.ToString(),
+                        message = "Each product must have a positive integer quantity.", data = null
+                    };
                 }
 
                 var isSetupNameExists = await _unitOfWork.GetRepository<SetupPackage>()
                     .SingleOrDefaultAsync(predicate: p => p.SetupName.Equals(request.SetupName));
                 if (isSetupNameExists != null)
                 {
-                    return new ApiResponse { status = StatusCodes.Status400BadRequest.ToString(), message = "Setup name already exists.", data = null };
+                    return new ApiResponse
+                    {
+                        status = StatusCodes.Status400BadRequest.ToString(), message = "Setup name already exists.",
+                        data = null
+                    };
                 }
 
                 bool isManager = user.Role == RoleEnum.Manager.GetDescriptionFromEnum();
                 if (isManager && request.ImageFile == null)
                 {
-                    return new ApiResponse { status = StatusCodes.Status400BadRequest.ToString(), message = "Image is required for Manager.", data = null };
+                    return new ApiResponse
+                    {
+                        status = StatusCodes.Status400BadRequest.ToString(), message = "Image is required for Manager.",
+                        data = null
+                    };
                 }
 
                 string? imageUrl = null;
                 if (request.ImageFile != null)
                 {
-                    imageUrl = (await _supabaseImageService.SendImagesAsync(new List<IFormFile> { request.ImageFile }, client)).FirstOrDefault();
+                    imageUrl = (await _supabaseImageService.SendImagesAsync(new List<IFormFile> { request.ImageFile },
+                        client)).FirstOrDefault();
                     if (string.IsNullOrEmpty(imageUrl))
                     {
-                        return new ApiResponse { status = StatusCodes.Status500InternalServerError.ToString(), message = "Failed to upload image.", data = null };
+                        return new ApiResponse
+                        {
+                            status = StatusCodes.Status500InternalServerError.ToString(),
+                            message = "Failed to upload image.", data = null
+                        };
                     }
                 }
 
                 var productIds = productids.Select(p => p.ProductId).ToList();
                 var allProducts = await _unitOfWork.GetRepository<Product>().GetListAsync(
-                        predicate: p => productIds.Contains(p.Id),
-                        include: p => p.Include(p => p.SubCategory)
-                                       .ThenInclude(sc => sc.Category)
-                                       .Include(p => p.Images)
-                                       .Include(p => p.SetupPackageDetails) 
-                    );
+                    predicate: p => productIds.Contains(p.Id),
+                    include: p => p.Include(p => p.SubCategory)
+                        .ThenInclude(sc => sc.Category)
+                        .Include(p => p.Images)
+                        .Include(p => p.SetupPackageDetails)
+                );
                 var insufficientStockProducts = allProducts
-                        .Where(p => productids.First(pi => pi.ProductId == p.Id).Quantity > p.Quantity)
-                        .Select(p => p.ProductName)
-                        .ToList();
+                    .Where(p => productids.First(pi => pi.ProductId == p.Id).Quantity > p.Quantity)
+                    .Select(p => p.ProductName)
+                    .ToList();
 
                 if (insufficientStockProducts.Any())
                 {
@@ -534,6 +579,7 @@ namespace FTSS_API.Service.Implement
                         data = null
                     };
                 }
+
                 // Lọc danh sách sản phẩm có CategoryName = "Bể"
                 var categoryBeProducts = allProducts.Where(p => p.SubCategory.Category.CategoryName == "Bể").ToList();
 
@@ -557,20 +603,27 @@ namespace FTSS_API.Service.Implement
                         return new ApiResponse
                         {
                             status = StatusCodes.Status400BadRequest.ToString(),
-                            message = $"Product '{product.ProductName}' in category 'Bể' can only have a quantity of 1.",
+                            message =
+                                $"Product '{product.ProductName}' in category 'Bể' can only have a quantity of 1.",
                             data = null
                         };
                     }
                 }
 
-                var invalidProducts = allProducts.Where(p => p.Status == ProductStatusEnum.Unavailable.GetDescriptionFromEnum() || p.IsDelete == true).ToList();
+                var invalidProducts = allProducts.Where(p =>
+                    p.Status == ProductStatusEnum.Unavailable.GetDescriptionFromEnum() || p.IsDelete == true).ToList();
                 if (invalidProducts.Any())
                 {
                     var invalidProductNames = string.Join(", ", invalidProducts.Select(p => p.ProductName));
-                    return new ApiResponse { status = StatusCodes.Status400BadRequest.ToString(), message = $"Invalid products detected: {invalidProductNames}.", data = null };
+                    return new ApiResponse
+                    {
+                        status = StatusCodes.Status400BadRequest.ToString(),
+                        message = $"Invalid products detected: {invalidProductNames}.", data = null
+                    };
                 }
 
-                decimal totalPrice = productids.Sum(p => allProducts.First(prod => prod.Id == p.ProductId).Price * (p.Quantity ?? 1));
+                decimal totalPrice = productids.Sum(p =>
+                    allProducts.First(prod => prod.Id == p.ProductId).Price * (p.Quantity ?? 1));
 
                 var setupPackage = new SetupPackage
                 {
@@ -601,12 +654,12 @@ namespace FTSS_API.Service.Implement
                 await _unitOfWork.CommitAsync();
 
                 setupPackage = await _unitOfWork.GetRepository<SetupPackage>().SingleOrDefaultAsync(
-                                predicate: sp => sp.Id == setupPackage.Id,
-                                include: sp => sp.Include(sp => sp.SetupPackageDetails)
-                                                 .ThenInclude(spd => spd.Product)
-                                                     .ThenInclude(p => p.SubCategory)
-                                                         .ThenInclude(sc => sc.Category)
-                            );
+                    predicate: sp => sp.Id == setupPackage.Id,
+                    include: sp => sp.Include(sp => sp.SetupPackageDetails)
+                        .ThenInclude(spd => spd.Product)
+                        .ThenInclude(p => p.SubCategory)
+                        .ThenInclude(sc => sc.Category)
+                );
                 // 🔹 **Chuẩn bị response `SetupPackageResponse`**
                 var response = new SetupPackageResponse
                 {
@@ -617,9 +670,9 @@ namespace FTSS_API.Service.Implement
                     CreateDate = setupPackage.CreateDate,
                     ModifyDate = setupPackage.ModifyDate,
                     Size = setupPackage.SetupPackageDetails
-                                .Where(spd => spd.Product.SubCategory.Category.CategoryName == "Bể")
-                                .Select(spd => spd.Product.Size)
-                                .FirstOrDefault(),
+                        .Where(spd => spd.Product.SubCategory.Category.CategoryName == "Bể")
+                        .Select(spd => spd.Product.Size)
+                        .FirstOrDefault(),
                     images = setupPackage.Image,
                     IsDelete = setupPackage.IsDelete,
                     Products = setupPackageDetails.Select(d =>
@@ -634,8 +687,8 @@ namespace FTSS_API.Service.Implement
                             InventoryQuantity = d.Product.Quantity,
                             Status = product.Status,
                             IsDelete = product.IsDelete,
-                            CategoryName = product.SubCategory.Category.CategoryName,  // Bỏ kiểm tra null
-                            images = product.Images.OrderBy(img => img.CreateDate).First().LinkImage  // Bỏ kiểm tra null
+                            CategoryName = product.SubCategory.Category.CategoryName, // Bỏ kiểm tra null
+                            images = product.Images.OrderBy(img => img.CreateDate).First().LinkImage // Bỏ kiểm tra null
                         };
                     }).ToList()
                 };
@@ -650,13 +703,169 @@ namespace FTSS_API.Service.Implement
             }
             catch (Exception ex)
             {
-                return new ApiResponse { status = StatusCodes.Status500InternalServerError.ToString(), message = "An error occurred while adding setup package.", data = ex.Message };
+                return new ApiResponse
+                {
+                    status = StatusCodes.Status500InternalServerError.ToString(),
+                    message = "An error occurred while adding setup package.", data = ex.Message
+                };
             }
         }
 
-        public Task<ApiResponse> UpdateSetupPackage(Guid setupPackageId, List<ProductSetupItem> productids, AddSetupPackageRequest request, Client client)
+        public async Task<ApiResponse> CopySetupPackage(Guid setupPackageId)
         {
-            throw new NotImplementedException();
+            try
+            {
+                Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
+                var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
+                    predicate: u => u.Id.Equals(userId) &&
+                                    u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) &&
+                                    u.IsDelete == false &&
+                                    u.Role == RoleEnum.Customer.GetDescriptionFromEnum());
+
+                if (user == null)
+                {
+                    return new ApiResponse
+                    {
+                        status = StatusCodes.Status401Unauthorized.ToString(),
+                        message = "Unauthorized: Token is missing or expired.", data = null
+                    };
+                }
+
+                var existingSetup = await _unitOfWork.GetRepository<SetupPackage>().SingleOrDefaultAsync(
+                    predicate: sp => sp.Id == setupPackageId && sp.IsDelete == false,
+                    include: sp => sp.Include(sp => sp.SetupPackageDetails)
+                        .ThenInclude(spd => spd.Product));
+
+                if (existingSetup == null)
+                {
+                    return new ApiResponse
+                    {
+                        status = StatusCodes.Status404NotFound.ToString(), message = "Setup package not found.",
+                        data = null
+                    };
+                }
+
+             
+                var newSetupPackage = new SetupPackage
+                {
+                    Id = Guid.NewGuid(),
+                    SetupName = $"{existingSetup.SetupName}_Copy",
+                    Description = existingSetup.Description,
+                    Price = existingSetup.Price,
+                    CreateDate = TimeUtils.GetCurrentSEATime(),
+                    ModifyDate = TimeUtils.GetCurrentSEATime(),
+                    IsDelete = false,
+                    Userid = userId, // Chuyển quyền sở hữu cho user hiện tại
+                    Image = existingSetup.Image
+                };
+
+                await _unitOfWork.GetRepository<SetupPackage>().InsertAsync(newSetupPackage);
+                await _unitOfWork.CommitAsync();
+
+                // Sao chép chi tiết SetupPackageDetails
+                var newSetupPackageDetails = existingSetup.SetupPackageDetails.Select(spd => new SetupPackageDetail
+                {
+                    Id = Guid.NewGuid(),
+                    ProductId = spd.ProductId,
+                    SetupPackageId = newSetupPackage.Id,
+                    Quantity = spd.Quantity,
+                    Price = spd.Price
+                }).ToList();
+
+                await _unitOfWork.GetRepository<SetupPackageDetail>().InsertRangeAsync(newSetupPackageDetails);
+                await _unitOfWork.CommitAsync();
+
+                return new ApiResponse
+                {
+                    status = StatusCodes.Status201Created.ToString(),
+                    message = "Setup package copied successfully.",
+                    data = new { newSetupPackageId = newSetupPackage.Id }
+                };
+            }
+            catch (Exception ex)
+            {
+                return new ApiResponse
+                {
+                    status = StatusCodes.Status500InternalServerError.ToString(),
+                    message = "An error occurred while copying setup package.", data = ex.Message
+                };
+            }
         }
+public async Task<ApiResponse> UpdateSetupPackage(Guid setupPackageId, UpdateSetupPackageRequest request, Client client)
+{
+    try
+    {
+        Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
+        var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
+            predicate: u => u.Id.Equals(userId) &&
+                            u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) &&
+                            u.IsDelete == false &&
+                            u.Role == RoleEnum.Customer.GetDescriptionFromEnum());
+
+        if (user == null)
+        {
+            return new ApiResponse { status = StatusCodes.Status401Unauthorized.ToString(), message = "Unauthorized: Token is missing or expired.", data = null };
+        }
+
+        var setupPackage = await _unitOfWork.GetRepository<SetupPackage>().SingleOrDefaultAsync(
+            predicate: sp => sp.Id == setupPackageId && sp.Userid == userId && sp.IsDelete == false,
+            include: sp => sp.Include(sp => sp.SetupPackageDetails));
+
+        if (setupPackage == null)
+        {
+            return new ApiResponse { status = StatusCodes.Status404NotFound.ToString(), message = "Setup package not found.", data = null };
+        }
+
+        setupPackage.SetupName = request.SetupName;
+        setupPackage.Description = request.Description;
+        setupPackage.ModifyDate = TimeUtils.GetCurrentSEATime();
+
+        if (request.ImageFile != null)
+        {
+            var imageUrl = (await _supabaseImageService.SendImagesAsync(new List<IFormFile> { request.ImageFile }, client)).FirstOrDefault();
+            if (!string.IsNullOrEmpty(imageUrl))
+            {
+                setupPackage.Image = imageUrl;
+            }
+        }
+
+        // Cập nhật danh sách sản phẩm
+        var newProductIds = request.ProductList.Select(p => p.ProductId).ToList();
+        var newProducts = await _unitOfWork.GetRepository<Product>().GetListAsync(predicate:p => newProductIds.Contains(p.Id));
+        var newSetupPackageDetails = request.ProductList.Select(p => new SetupPackageDetail
+        {
+            Id = Guid.NewGuid(),
+            ProductId = p.ProductId,
+            SetupPackageId = setupPackage.Id,
+            Quantity = p.Quantity,
+            Price = newProducts.First(prod => prod.Id == p.ProductId).Price * p.Quantity
+        }).ToList();
+        var setupPackageDetailsToDelete = await _unitOfWork.GetRepository<SetupPackageDetail>()
+            .GetListAsync(predicate: spd => spd.SetupPackageId == setupPackage.Id);
+
+// Xóa danh sách đã lấy ra
+         _unitOfWork.GetRepository<SetupPackageDetail>().DeleteRangeAsync(setupPackageDetailsToDelete);
+       
+        await _unitOfWork.GetRepository<SetupPackageDetail>().InsertRangeAsync(newSetupPackageDetails);
+        await _unitOfWork.CommitAsync();
+
+        return new ApiResponse
+        {
+            status = StatusCodes.Status200OK.ToString(),
+            message = "Setup package updated successfully.",
+            data = null
+        };
+    }
+    catch (Exception ex)
+    {
+        return new ApiResponse { status = StatusCodes.Status500InternalServerError.ToString(), message = "An error occurred while updating setup package.", data = ex.Message };
+    }
+}
+
+        // public Task<ApiResponse> UpdateSetupPackage(Guid setupPackageId, List<ProductSetupItem> productids,
+        //     AddSetupPackageRequest request, Client client)
+        // {
+        //     throw new NotImplementedException();
+        // }
     }
 }
