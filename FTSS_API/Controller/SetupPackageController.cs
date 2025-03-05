@@ -132,31 +132,8 @@ namespace FTSS_API.Controller
         /// <summary>
         /// API cập nhập Setup cho customer.
         /// </summary>
-        [HttpPut(ApiEndPointConstant.SetupPackage.UpdateSetupPackage)]
-        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
-        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
-        [ProducesErrorResponseType(typeof(ProblemDetails))]
-        public async Task<IActionResult> UpdateSetupPackage(Guid setupPackageId, [FromForm] AddSetupPackageRequest request, [FromServices] Supabase.Client client)
-        {
-            List<ProductSetupItem> productids;
-            try
-            {
-                productids = JsonConvert.DeserializeObject<List<ProductSetupItem>>(request.ProductItemsJson);
-                if (productids == null || productids.Count == 0)
-                {
-                    return BadRequest(new ApiResponse { status = "400", message = "Danh sách sản phẩm không được để trống" });
-                }
-            }
-            catch (JsonException)
-            {
-                return BadRequest(new ApiResponse { status = "400", message = "Định dạng danh sách sản phẩm không hợp lệ" });
-            }
-
-            var response = await _setupPackageService.UpdateSetupPackage(setupPackageId, productids, request, client);
-
-            // 🔹 Tránh lỗi vòng lặp bằng cách sử dụng PreserveReferencesHandling
-            return StatusCode(int.Parse(response.status), response);
-        }
+        
+            
         /// <summary>
         /// API lấy thông tin chi tiết setup theo ID cho mọi role.
         /// </summary>
