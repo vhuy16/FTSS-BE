@@ -177,16 +177,15 @@ namespace FTSS_API.Controller
         }
         
         /// <summary>
-        /// API cập nhật SetupPackage cho customer.
+        /// API kích hoạt SetupPackage cho customer.
         /// </summary>
-        [HttpPut(ApiEndPointConstant.SetupPackage.EnablSetupPackage)]
+        [HttpPut(ApiEndPointConstant.SetupPackage.EnableSetupPackage)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
         [ProducesErrorResponseType(typeof(ProblemDetails))]
-        public async Task<IActionResult> EnablSetupPackage(
-            [FromRoute] Guid setupPackageId, 
-            [FromBody] UpdateSetupPackageRequest request, 
-            [FromServices] Supabase.Client client)
+        public async Task<IActionResult> enableSetupPackage(
+            [FromRoute] Guid setupPackageId 
+           )
         {
             var response = await _setupPackageService.enableSetupPackage(setupPackageId);
             return Ok(response);
