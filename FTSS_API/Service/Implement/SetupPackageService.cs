@@ -11,6 +11,7 @@ using FTSS_Model.Enum;
 using FTSS_Repository.Interface;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Newtonsoft.Json;
 using Supabase;
 
 namespace FTSS_API.Service.Implement
@@ -824,7 +825,10 @@ namespace FTSS_API.Service.Implement
             }
         }
 
-        public async Task<ApiResponse> UpdateSetupPackage(Guid setupPackageId, UpdateSetupPackageRequest request,
+        public async Task<ApiResponse> UpdateSetupPackage(
+            List<ProductSetupItem> productIds,
+            Guid setupPackageId,
+            AddSetupPackageRequest request,
             Client client)
         {
             try
@@ -841,7 +845,8 @@ namespace FTSS_API.Service.Implement
                     return new ApiResponse
                     {
                         status = StatusCodes.Status401Unauthorized.ToString(),
-                        message = "Unauthorized: Token is missing or expired.", data = null
+                        message = "Unauthorized: Token is missing or expired.",
+                        data = null
                     };
                 }
 
@@ -853,15 +858,16 @@ namespace FTSS_API.Service.Implement
                 {
                     return new ApiResponse
                     {
-                        status = StatusCodes.Status404NotFound.ToString(), message = "Setup package not found.",
+                        status = StatusCodes.Status404NotFound.ToString(),
+                        message = "Setup package not found.",
                         data = null
                     };
                 }
 
-                setupPackage.SetupName = request.SetupName;
-                setupPackage.Description = request.Description;
+                setupPackage.SetupName = request.SetupName ?? setupPackage.SetupName;
+                setupPackage.Description = request.Description ?? setupPackage.Description;
                 setupPackage.ModifyDate = TimeUtils.GetCurrentSEATime();
-                setupPackage.Status = request.Status;
+
                 if (request.ImageFile != null)
                 {
                     var imageUrl =
@@ -873,25 +879,40 @@ namespace FTSS_API.Service.Implement
                     }
                 }
 
-                // Cập nhật danh sách sản phẩm
-                var newProductIds = request.ProductList.Select(p => p.ProductId).ToList();
-                var newProducts = await _unitOfWork.GetRepository<Product>()
-                    .GetListAsync(predicate: p => newProductIds.Contains(p.Id));
-                var newSetupPackageDetails = request.ProductList.Select(p => new SetupPackageDetail
+                if (!string.IsNullOrEmpty(request.ProductItemsJson))
                 {
-                    Id = Guid.NewGuid(),
-                    ProductId = p.ProductId,
-                    SetupPackageId = setupPackage.Id,
-                    Quantity = p.Quantity,
-                    Price = newProducts.First(prod => prod.Id == p.ProductId).Price * p.Quantity
-                }).ToList();
-                var setupPackageDetailsToDelete = await _unitOfWork.GetRepository<SetupPackageDetail>()
-                    .GetListAsync(predicate: spd => spd.SetupPackageId == setupPackage.Id);
+                    var newProductList =
+                        JsonConvert.DeserializeObject<List<ProductSetupItem>>(request.ProductItemsJson);
+                    if (newProductList != null && newProductList.Any())
+                    {
+                        var newProductIds = newProductList.Select(p => p.ProductId).ToList();
+                        var newProducts = await _unitOfWork.GetRepository<Product>().GetListAsync(
+                            predicate: p => newProductIds.Contains(p.Id));
 
-// Xóa danh sách đã lấy ra
-                _unitOfWork.GetRepository<SetupPackageDetail>().DeleteRangeAsync(setupPackageDetailsToDelete);
+                        var newSetupPackageDetails = newProductList
+                            .Where(p => newProducts.Any(prod => prod.Id == p.ProductId))
+                            .Select(p => new SetupPackageDetail
+                            {
+                                Id = Guid.NewGuid(),
+                                ProductId = p.ProductId,
+                                SetupPackageId = setupPackage.Id,
+                                Quantity = p.Quantity ?? 1,
+                                Price = newProducts.First(prod => prod.Id == p.ProductId).Price * (p.Quantity ?? 1)
+                            }).ToList();
 
-                await _unitOfWork.GetRepository<SetupPackageDetail>().InsertRangeAsync(newSetupPackageDetails);
+                        var setupPackageDetailsToDelete = await _unitOfWork.GetRepository<SetupPackageDetail>()
+                            .GetListAsync(predicate: spd => spd.SetupPackageId == setupPackage.Id);
+
+                        if (setupPackageDetailsToDelete.Any())
+                        {
+                             _unitOfWork.GetRepository<SetupPackageDetail>()
+                                .DeleteRangeAsync(setupPackageDetailsToDelete);
+                        }
+
+                        await _unitOfWork.GetRepository<SetupPackageDetail>().InsertRangeAsync(newSetupPackageDetails);
+                    }
+                }
+
                 await _unitOfWork.CommitAsync();
 
                 return new ApiResponse
@@ -906,14 +927,16 @@ namespace FTSS_API.Service.Implement
                 return new ApiResponse
                 {
                     status = StatusCodes.Status500InternalServerError.ToString(),
-                    message = "An error occurred while updating setup package.", data = ex.Message
+                    message = "An error occurred while updating setup package.",
+                    data = ex.Message
                 };
             }
         }
 
         public async Task<bool> enableSetupPackage(Guid setupPackageId)
         {
-            var setupPackage = await _unitOfWork.GetRepository<SetupPackage>().SingleOrDefaultAsync(predicate: sp => sp.Id == setupPackageId);
+            var setupPackage = await _unitOfWork.GetRepository<SetupPackage>()
+                .SingleOrDefaultAsync(predicate: sp => sp.Id == setupPackageId);
             if (setupPackage.IsDelete == true)
             {
                 setupPackage.IsDelete = false;
