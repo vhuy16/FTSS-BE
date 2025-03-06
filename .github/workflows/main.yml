@@ -22,8 +22,7 @@ jobs:
 
     # 3. Build dự án .NET và tạo tài liệu Swagger XML
     - name: Build project
-      run: dotnet publish FTSS-BE/FTSS.sln -c Release -o ./publish /p:DocumentationFile=./publish/FTSS_API.xml
-
+      run: dotnet publish -c Release -o ./publish /p:DocumentationFile=./publish/FTSS_API.xml
 
     # 4. Triển khai mã nguồn qua FTP
     - name: Deploy via FTP
