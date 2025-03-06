@@ -9,6 +9,7 @@ using FTSS_Model.Paginate;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json;
+using Supabase;
 
 namespace FTSS_API.Controller
 {
@@ -137,14 +138,42 @@ namespace FTSS_API.Controller
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
         [ProducesErrorResponseType(typeof(ProblemDetails))]
         public async Task<IActionResult> UpdateSetupPackage(
-            [FromRoute] Guid setupPackageId, 
-            [FromForm] UpdateSetupPackageRequest request, 
+            [FromForm] AddSetupPackageRequest request,
+            [FromRoute] Guid setupPackageId,
+           
             [FromServices] Supabase.Client client)
         {
-            var response = await _setupPackageService.UpdateSetupPackage(setupPackageId, request, client);
-            return StatusCode(int.Parse(response.status), response);
-        }
+            List<ProductSetupItem> productIds;
+            try
+            {
+                productIds = JsonConvert.DeserializeObject<List<ProductSetupItem>>(request.ProductItemsJson);
+                if (productIds == null || productIds.Count == 0)
+                {
+                    return BadRequest(new ApiResponse { status = "400", message = "Danh sách sản phẩm không được để trống" });
+                }
+            }
+            catch (JsonException)
+            {
+                return BadRequest(new ApiResponse { status = "400", message = "Định dạng danh sách sản phẩm không hợp lệ" });
+            }
 
+            var response = await _setupPackageService.UpdateSetupPackage(productIds, setupPackageId, request, client);
+
+            if (response.status == StatusCodes.Status200OK.ToString())
+            {
+                return Ok(response);
+            }
+            if (response.status == StatusCodes.Status401Unauthorized.ToString())
+            {
+                return Unauthorized(response);
+            }
+            if (response.status == StatusCodes.Status404NotFound.ToString())
+            {
+                return NotFound(response);
+            }
+            return StatusCode(StatusCodes.Status500InternalServerError, response);
+        }
+    
         /// <summary>
         /// API sao chép SetupPackage.
         /// </summary>
