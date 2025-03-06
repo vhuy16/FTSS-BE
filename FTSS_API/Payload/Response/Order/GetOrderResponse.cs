@@ -19,6 +19,9 @@
         public class OrderDetailCreateResponse
         {
             public string? ProductName { get; set; }
+            
+            public string? CategoryName { get; set; }
+            public string? SubCategoryName { get; set; }
             public decimal? Price { get; set; }
             public int? Quantity { get; set; }
             public string LinkImage { get; set; } = null!;
