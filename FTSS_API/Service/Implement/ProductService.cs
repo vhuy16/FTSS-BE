@@ -642,9 +642,32 @@ public class ProductService : BaseService<ProductService>, IProductService
         };
     }
 
-    public Task<ApiResponse> EnableProduct(Guid productId)
+    public async Task<ApiResponse> EnableProduct(Guid productId)
     {
-        throw new NotImplementedException();
+       var prodcut = await _unitOfWork.GetRepository<Product>().SingleOrDefaultAsync(predicate: p => p.Id.Equals(productId));
+       
+         
+      
+
+           if (prodcut.IsDelete == true || prodcut.Status == ProductStatusEnum.Unavailable.GetDescriptionFromEnum())
+           {
+               prodcut.Status = ProductStatusEnum.Available.GetDescriptionFromEnum();
+               prodcut.IsDelete = false;
+               _unitOfWork.GetRepository<Product>().UpdateAsync(prodcut);
+               await _unitOfWork.CommitAsync();
+               return new ApiResponse()
+               {
+                   status = StatusCodes.Status200OK.ToString(),
+                   message = "successfully enabled product.",
+                   data = null
+               };
+           }   
+           return new ApiResponse
+           {
+               status = StatusCodes.Status404NotFound.ToString(),
+               message = MessageConstant.ProductMessage.ProductNotExist, data = null
+
+           };
     }
 
     public Task<ApiResponse> UpImageForDescription(IFormFile formFile)
