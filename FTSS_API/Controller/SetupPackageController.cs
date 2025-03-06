@@ -140,13 +140,13 @@ namespace FTSS_API.Controller
         public async Task<IActionResult> UpdateSetupPackage(
             [FromForm] AddSetupPackageRequest request,
             [FromRoute] Guid setupPackageId,
-            [FromQuery] string productItemsJson,
+           
             [FromServices] Supabase.Client client)
         {
             List<ProductSetupItem> productIds;
             try
             {
-                productIds = JsonConvert.DeserializeObject<List<ProductSetupItem>>(productItemsJson);
+                productIds = JsonConvert.DeserializeObject<List<ProductSetupItem>>(request.ProductItemsJson);
                 if (productIds == null || productIds.Count == 0)
                 {
                     return BadRequest(new ApiResponse { status = "400", message = "Danh sách sản phẩm không được để trống" });
