@@ -2,7 +2,7 @@
 
 public class UpdateSetupPackageRequest
 {
-    public Guid SetupPackageId { get; set; }  // ID của SetupPackage cần cập nhật
+   
     public string SetupName { get; set; }  // Tên mới của SetupPackage
     public string Description { get; set; }  // Mô tả mới
     

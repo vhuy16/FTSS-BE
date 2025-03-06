@@ -138,7 +138,7 @@ namespace FTSS_API.Controller
         [ProducesErrorResponseType(typeof(ProblemDetails))]
         public async Task<IActionResult> UpdateSetupPackage(
             [FromRoute] Guid setupPackageId, 
-            [FromBody] UpdateSetupPackageRequest request, 
+            [FromForm] UpdateSetupPackageRequest request, 
             [FromServices] Supabase.Client client)
         {
             var response = await _setupPackageService.UpdateSetupPackage(setupPackageId, request, client);
