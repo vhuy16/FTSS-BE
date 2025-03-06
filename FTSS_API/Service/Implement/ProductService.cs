@@ -337,70 +337,57 @@ public class ProductService : BaseService<ProductService>, IProductService
     }
 
 
-    public async Task<ApiResponse> GetListProductBySubCategoryId(Guid subCateId, int page, int size)
+    public async Task<ApiResponse> GetAllProductsGroupedByCategory(int page, int size)
     {
-        
-        var subCateCheck = await _unitOfWork.GetRepository<SubCategory>().SingleOrDefaultAsync(
-            predicate: c => c.Id.Equals(subCateId)
-        );
-
-        if (subCateCheck == null)
-        {
-            return new ApiResponse
-            {
-                status = StatusCodes.Status200OK.ToString(),
-                message = "Subcategory không tồn tại",
-                data = null
-            };
-        }
-
-// Retrieve a paginated list of products by category ID
+        // Lấy toàn bộ danh sách sản phẩm có trạng thái "Available"
         var products = await _unitOfWork.GetRepository<Product>().GetPagingListAsync(
-            selector: s => new GetProductResponse
+            selector: s => new 
             {
-                Id = s.Id,
-                SubCategoryName = s.SubCategory.SubCategoryName,
                 CategoryName = s.SubCategory.Category.CategoryName,
-                Description = s.Description,
-                Images = s.Images.Select(i => i.LinkImage).ToList(),
-                ProductName = s.ProductName,
-                Quantity = s.Quantity,
-                Size = s.Size,
-                Price = s.Price,
-
-                Status = s.Status
+                Product = new GetProductResponse
+                {
+                    Id = s.Id,
+                    SubCategoryName = s.SubCategory.SubCategoryName,
+                    CategoryName = s.SubCategory.Category.CategoryName,
+                    Description = s.Description,
+                    Images = s.Images.Select(i => i.LinkImage).ToList(),
+                    ProductName = s.ProductName,
+                    Quantity = s.Quantity,
+                    Size = s.Size,
+                    Price = s.Price,
+                    Status = s.Status
+                }
             },
-            predicate: p =>
-                p.Status.Equals(ProductStatusEnum.Available.GetDescriptionFromEnum()) &&
-                p.SubCategoryId.Equals(subCateId),
+            predicate: p => p.Status.Equals(ProductStatusEnum.Available.GetDescriptionFromEnum()),
             page: page,
             size: size
         );
 
+        // Nhóm sản phẩm theo CategoryName
+        var groupedProducts = products.Items
+            .GroupBy(p => p.CategoryName)
+            .Select(g => new 
+            {
+                CategoryName = g.Key,
+                Products = g.Select(p => p.Product).ToList()
+            })
+            .ToList();
+
         int totalItems = products.Total;
         int totalPages = (int)Math.Ceiling((double)totalItems / size);
-        if (products == null || products.Items.Count == 0)
-        {
-            return new ApiResponse
-            {
-                status = StatusCodes.Status200OK.ToString(),
-                message = "Products retrieved successfully.",
-                data = new Paginate<Product>()
-                {
-                    Page = page,
-                    Size = size,
-                    Total = totalItems,
-                    TotalPages = totalPages,
-                    Items = new List<Product>()
-                }
-            };
-        }
 
         return new ApiResponse
         {
             status = StatusCodes.Status200OK.ToString(),
             message = "Products retrieved successfully.",
-            data = products
+            data = new 
+            {
+                Page = page,
+                Size = size,
+                Total = totalItems,
+                TotalPages = totalPages,
+                Categories = groupedProducts
+            }
         };
     }
 

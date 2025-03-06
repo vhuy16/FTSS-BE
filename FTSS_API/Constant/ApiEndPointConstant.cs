@@ -71,7 +71,7 @@ public static class ApiEndPointConstant
         public const string GetListProducts = ProductEndpoint;
         public const string GetAllProducts = ProductEndpoint + "/get-all-product";
         public const string GetProductById = ProductEndpoint + "/{id}";
-        public const string GetListProductsBySubCategoryId = ProductEndpoint +"/{id}" + "/subcategory";
+        public const string GetListProductsBySubCategory = ProductEndpoint + "/subcategory";
         public const string UpdateProduct = ProductEndpoint + "/{id}";
         public const string EnableProduct = ProductEndpoint + "/enable-product" + "/{id}"  ;
         public const string DeleteProduct = ProductEndpoint + "/{id}";
@@ -125,6 +125,7 @@ public static class ApiEndPointConstant
         public const string GetListSetupPackageAllUser = SetupPackageEndPoint + "/all-users";
         public const string GetListSetupPackageAllShop = SetupPackageEndPoint + "/all-shop";
         public const string UpdateSetupPackage  = SetupPackageEndPoint + "/{setupPackageId}";
+        public const string EnablSetupPackage  = SetupPackageEndPoint + "/{id}";
         public const string GetSetUpById = SetupPackageEndPoint + "/{id}";
     }
     public static class MaintenanceSchedule
