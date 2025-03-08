@@ -140,23 +140,24 @@ namespace FTSS_API.Controller
         public async Task<IActionResult> UpdateSetupPackage(
             [FromForm] AddSetupPackageRequest request,
             [FromRoute] Guid setupPackageId,
-           
             [FromServices] Supabase.Client client)
         {
-            List<ProductSetupItem> productIds;
-            try
+            List<ProductSetupItem> productIds = new List<ProductSetupItem>();
+
+            // Kiểm tra nếu request.ProductItemsJson không rỗng thì mới parse JSON
+            if (!string.IsNullOrWhiteSpace(request.ProductItemsJson))
             {
-                productIds = JsonConvert.DeserializeObject<List<ProductSetupItem>>(request.ProductItemsJson);
-                if (productIds == null || productIds.Count == 0)
+                try
                 {
-                    return BadRequest(new ApiResponse { status = "400", message = "Danh sách sản phẩm không được để trống" });
+                    productIds = JsonConvert.DeserializeObject<List<ProductSetupItem>>(request.ProductItemsJson) ?? new List<ProductSetupItem>();
+                }
+                catch (JsonException)
+                {
+                    return BadRequest(new ApiResponse { status = "400", message = "Định dạng danh sách sản phẩm không hợp lệ" });
                 }
             }
-            catch (JsonException)
-            {
-                return BadRequest(new ApiResponse { status = "400", message = "Định dạng danh sách sản phẩm không hợp lệ" });
-            }
 
+            // Nếu không có sản phẩm nào sau khi parse, vẫn cho phép tiếp tục xử lý
             var response = await _setupPackageService.UpdateSetupPackage(productIds, setupPackageId, request, client);
 
             if (response.status == StatusCodes.Status200OK.ToString())
@@ -173,7 +174,7 @@ namespace FTSS_API.Controller
             }
             return StatusCode(StatusCodes.Status500InternalServerError, response);
         }
-    
+
         /// <summary>
         /// API sao chép SetupPackage.
         /// </summary>

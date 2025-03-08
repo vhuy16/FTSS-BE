@@ -252,11 +252,47 @@ public class UserService : BaseService<UserService>, IUserService
         };
     }
 
-    public Task<ApiResponse> DeleteUser(Guid id)
+    public async Task<ApiResponse> DeleteUser(Guid id)
     {
-        throw new NotImplementedException();
-    }
+        var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
+            predicate: u => u.Id == id && u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()));
 
+        if (user == null)
+        {
+            return new ApiResponse
+            {
+                status = StatusCodes.Status404NotFound.ToString(),
+                message = MessageConstant.UserMessage.UserNotExist,
+                data = null
+            };
+        }
+
+        // Đánh dấu người dùng là đã xóa thay vì xóa cứng
+        user.IsDelete = true;
+        user.ModifyDate = TimeUtils.GetCurrentSEATime();
+    
+        _unitOfWork.GetRepository<User>().UpdateAsync(user);
+        bool isSuccessful = await _unitOfWork.CommitAsync() > 0;
+
+        if (isSuccessful)
+        {
+            return new ApiResponse
+            {
+                status = StatusCodes.Status200OK.ToString(),
+                message = "User deleted successfully.",
+                data = null
+            };
+        }
+        else
+        {
+            return new ApiResponse
+            {
+                status = StatusCodes.Status500InternalServerError.ToString(),
+                message = "Failed to delete user.",
+                data = null
+            };
+        }
+    }
     public async Task<ApiResponse> GetAllUser(int page, int size)
     {
         var users = await _unitOfWork.GetRepository<User>().GetPagingListAsync(
@@ -270,6 +306,7 @@ public class UserService : BaseService<UserService>, IUserService
                 Gender = u.Gender,
                 Role = u.Role,
                 Address = u.Address,
+                IsDeleted = u.IsDelete
             },
             predicate: u => u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()),
             page: page,
@@ -319,6 +356,7 @@ public class UserService : BaseService<UserService>, IUserService
                 Gender = u.Gender,
                 Role = u.Role,
                 Address = u.Address,
+                IsDeleted = u.IsDelete
             },
             predicate: u => u.Id.Equals(userId.Value) && u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()));
 
@@ -353,6 +391,7 @@ public class UserService : BaseService<UserService>, IUserService
                 Gender = u.Gender,
                 Role = u.Role,
                 Address = u.Address,
+                IsDeleted = u.IsDelete
             },
             predicate: u => u.Id.Equals(id) && u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()));
 
