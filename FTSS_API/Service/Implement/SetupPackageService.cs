@@ -887,13 +887,13 @@ namespace FTSS_API.Service.Implement
                     if (newProductList != null && newProductList.Any())
                     {
                         var newProductIds = newProductList.Select(p => p.ProductId).ToList();
+
+                        // Lấy danh sách chi tiết gói cài đặt hiện tại (không tracking để tránh lỗi)
                         var existingSetupPackageDetails = await _unitOfWork.GetRepository<SetupPackageDetail>()
                             .GetListAsync(predicate: spd => spd.SetupPackageId == setupPackage.Id);
 
-                        var existingProductIds = existingSetupPackageDetails.Select(spd => spd.ProductId).ToList();
-
-                        var newProducts = await _unitOfWork.GetRepository<Product>().GetListAsync(
-                            predicate: p => newProductIds.Contains(p.Id));
+                        var newProducts = await _unitOfWork.GetRepository<Product>()
+                            .GetListAsync(predicate: p => newProductIds.Contains(p.Id));
 
                         // Nhóm sản phẩm theo ProductId và tính tổng Quantity
                         var groupedProducts = newProductList
@@ -904,16 +904,6 @@ namespace FTSS_API.Service.Implement
                                 TotalQuantity = g.Sum(p => p.Quantity ?? 1) // Nếu Quantity null thì mặc định là 1
                             })
                             .ToList();
-
-                        var setupPackageDetailsToDelete = existingSetupPackageDetails
-                            .Where(spd => !newProductIds.Contains(spd.ProductId))
-                            .ToList();
-
-                        if (setupPackageDetailsToDelete.Any())
-                        {
-                            _unitOfWork.GetRepository<SetupPackageDetail>()
-                                .DeleteRangeAsync(setupPackageDetailsToDelete);
-                        }
 
                         var newSetupPackageDetails = new List<SetupPackageDetail>();
 
@@ -927,13 +917,16 @@ namespace FTSS_API.Service.Implement
                             {
                                 if (existingDetail != null)
                                 {
-                                    // Nếu sản phẩm đã có, cập nhật số lượng
+                                    // ✅ Cộng dồn số lượng sản phẩm nếu đã tồn tại
                                     existingDetail.Quantity += gp.TotalQuantity;
                                     existingDetail.Price = product.Price * existingDetail.Quantity;
+
+                                    // ✅ Update lại vào database
+                                    _unitOfWork.GetRepository<SetupPackageDetail>().UpdateAsync(existingDetail);
                                 }
                                 else
                                 {
-                                    // Nếu sản phẩm chưa có, thêm mới
+                                    // ✅ Nếu chưa có, thêm mới
                                     newSetupPackageDetails.Add(new SetupPackageDetail
                                     {
                                         Id = Guid.NewGuid(),
@@ -946,16 +939,17 @@ namespace FTSS_API.Service.Implement
                             }
                         }
 
+                        // ✅ Thêm mới các sản phẩm chưa có
                         if (newSetupPackageDetails.Any())
                         {
                             await _unitOfWork.GetRepository<SetupPackageDetail>()
                                 .InsertRangeAsync(newSetupPackageDetails);
                         }
+
+                        await _unitOfWork.CommitAsync();
                     }
                 }
 
-                _unitOfWork.GetRepository<SetupPackage>().UpdateAsync(setupPackage);
-                await _unitOfWork.CommitAsync();
 
                 return new ApiResponse
                 {
