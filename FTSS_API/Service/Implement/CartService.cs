@@ -559,11 +559,13 @@ public async Task<ApiResponse> AddSetupPackageToCart(Guid setupPackageId)
 
                 response.Add(new GetAllCartItemResponse
                 {
+                    Status = cartItem.Status.ToString(),
                     CartItemId = cartItem.Id,
                     ProductId = cartItem.ProductId,
                     ProductName = cartItem.Product.ProductName,
                     Quantity = cartItem.Quantity,
                     UnitPrice = cartItem.Product.Price,
+                    
                     Price = cartItem.Product.Price * cartItem.Quantity,
                     LinkImage = image?.LinkImage // Sử dụng LinkImage nếu tồn tại, nếu không để null
                 });

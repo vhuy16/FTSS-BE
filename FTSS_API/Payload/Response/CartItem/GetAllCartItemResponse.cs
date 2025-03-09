@@ -9,5 +9,6 @@
         public decimal? UnitPrice { get; set; }
         public decimal? Price { get; set; }
         public string LinkImage { get; set; } = null!;
+        public string Status { get; set; } 
     }
 }
