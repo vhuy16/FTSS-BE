@@ -37,12 +37,7 @@ jobs:
           sudo apt-get install -y lftp
           lftp -e "open ${{ secrets.FTP_HOST }}; user ${{ secrets.FTP_USERNAME }} ${{ secrets.FTP_PASSWORD }}; ls; exit" || echo "FTP connection test completed"
 
-      # 6. Tải lên file nén bằng LFTP (công cụ FTP mạnh mẽ hơn với tính năng tự động thử lại)
-      - name: Upload archive using LFTP
-        run: |
-          sudo apt-get install -y lftp
-          lftp -e "set net:max-retries 5; set net:reconnect-interval-base 5; set net:reconnect-interval-multiplier 1; open ${{ secrets.FTP_HOST }}; user ${{ secrets.FTP_USERNAME }} ${{ secrets.FTP_PASSWORD }}; cd /ftss.id.vn/; put -O . publish.tar.gz; exit"
-        
+    
       # 7. Giải nén từ xa trên server (nếu server hỗ trợ SSH)
       # Nếu không có quyền truy cập SSH, bạn có thể cần tải lên từng file riêng lẻ thay vì sử dụng phương pháp nén
       - name: Deploy via FTP (backup method if LFTP fails)
