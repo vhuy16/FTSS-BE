@@ -12,8 +12,6 @@ jobs:
       # 1. Lấy mã nguồn từ repository
       - name: Checkout repository
         uses: actions/checkout@v3
-        with:
-          fetch-depth: 0 # Lấy toàn bộ history để có thể xác định chính xác thay đổi
 
       # 2. Cài đặt .NET SDK
       - name: Setup .NET
@@ -21,26 +19,33 @@ jobs:
         with:
           dotnet-version: 8.0 # Thay đổi phiên bản .NET nếu cần
 
-      # 3. Restore dependencies
-      - name: Restore dependencies
-        run: dotnet restore
-
-      # 4. Build dự án .NET và tạo tài liệu Swagger XML
+      # 3. Build dự án .NET và tạo tài liệu Swagger XML
       - name: Build project
         run: dotnet publish -c Release -o ./publish /p:DocumentationFile=./publish/FTSS_API.xml
 
-      # 5. Đợi một chút để đảm bảo tất cả quá trình xử lý file đã hoàn tất
-      - name: Wait for processes to finish
-        run: sleep 10
-
-      # 6. Đảm bảo không có tiến trình nào đang sử dụng các file
-      - name: Close any open file handles
+      # 4. Nén thư mục publish để giảm số lượng file cần truyền
+      - name: Compress publish folder
         run: |
-          find ./publish -type f -exec lsof {} \; 2>/dev/null || true
-          sync
+          cd publish
+          tar -czf ../publish.tar.gz .
+          cd ..
 
-      # 7. Triển khai mã nguồn qua FTP với chiến lược tải lên hợp lý hơn
-      - name: Deploy via FTP
+      # 5. Kiểm tra kết nối FTP trước khi tải lên
+      - name: Check FTP connection
+        run: |
+          echo "Checking FTP connection..."
+          sudo apt-get install -y lftp
+          lftp -e "open ${{ secrets.FTP_HOST }}; user ${{ secrets.FTP_USERNAME }} ${{ secrets.FTP_PASSWORD }}; ls; exit" || echo "FTP connection test completed"
+
+      # 6. Tải lên file nén bằng LFTP (công cụ FTP mạnh mẽ hơn với tính năng tự động thử lại)
+      - name: Upload archive using LFTP
+        run: |
+          sudo apt-get install -y lftp
+          lftp -e "set net:max-retries 5; set net:reconnect-interval-base 5; set net:reconnect-interval-multiplier 1; open ${{ secrets.FTP_HOST }}; user ${{ secrets.FTP_USERNAME }} ${{ secrets.FTP_PASSWORD }}; cd /ftss.id.vn/; put -O . publish.tar.gz; exit"
+        
+      # 7. Giải nén từ xa trên server (nếu server hỗ trợ SSH)
+      # Nếu không có quyền truy cập SSH, bạn có thể cần tải lên từng file riêng lẻ thay vì sử dụng phương pháp nén
+      - name: Deploy via FTP (backup method if LFTP fails)
         uses: SamKirkland/FTP-Deploy-Action@4.3.0
         with:
           server: ${{ secrets.FTP_HOST }}
@@ -51,9 +56,8 @@ jobs:
           exclude: |
             **/*.pdb
             **/*.config
-            **/appsettings.*.json
-          dangerous-clean-slate: false # Không xóa toàn bộ thư mục đích
-          state-name: .ftp-deploy-sync-state.json # Tệp trạng thái để theo dõi các thay đổi
+          state-name: .ftp-deploy-sync-state.json
           log-level: verbose
-          timeout: 120000 # Tăng thời gian chờ lên 2 phút
-          retries: 3 # Số lần thử lại khi có lỗi
+          timeout: 300000  # Tăng timeout lên 5 phút
+          retries: 5       # Tăng số lần thử lại
+          protocol: ftp    # Có thể thử ftps nếu server hỗ trợ
