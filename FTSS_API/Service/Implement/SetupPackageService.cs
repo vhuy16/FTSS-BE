@@ -31,7 +31,6 @@ namespace FTSS_API.Service.Implement
         {
             try
             {
-                
                 Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
                 var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
                     predicate: u => u.Id.Equals(userId) &&
@@ -313,82 +312,82 @@ namespace FTSS_API.Service.Implement
             }
         }
 
-      public async Task<ApiResponse> GetSetUpById(Guid id)
-{
-    try
-    {
-        var setupPackage = await _unitOfWork.GetRepository<SetupPackage>().SingleOrDefaultAsync(
-            selector: sp => new SetupPackageResponse
+        public async Task<ApiResponse> GetSetUpById(Guid id)
+        {
+            try
             {
-                SetupPackageId = sp.Id,
-                SetupName = sp.SetupName,
-                Description = sp.Description,
-                TotalPrice = sp.Price,
-                CreateDate = sp.CreateDate,
-                ModifyDate = sp.ModifyDate,
-                Size = sp.SetupPackageDetails
-                    .Where(spd => spd.Product.SubCategory.Category.CategoryName == "Bể")
-                    .Select(spd => spd.Product.Size)
-                    .FirstOrDefault(),
-                images = sp.Image,
-                IsDelete = sp.IsDelete,
-                Products = sp.SetupPackageDetails
-                    .Select(spd => new ProductResponse
+                var setupPackage = await _unitOfWork.GetRepository<SetupPackage>().SingleOrDefaultAsync(
+                    selector: sp => new SetupPackageResponse
                     {
-                        Id = spd.Product.Id,
-                        ProductName = spd.Product.ProductName,
-                        Quantity = spd.Quantity, // Giữ nguyên số lượng của từng sản phẩm
-                        InventoryQuantity = spd.Product.Quantity,
-                        Price = spd.Product.Price,
-                        Status = spd.Product.Status,
-                        IsDelete = spd.Product.IsDelete,
-                        CategoryName = spd.Product.SubCategory.Category.CategoryName,
-                        images = spd.Product.Images
-                            .Where(img => img.IsDelete == false)
-                            .OrderBy(img => img.CreateDate)
-                            .Select(img => img.LinkImage)
-                            .FirstOrDefault()
-                    }).ToList()
-            },
-            predicate: sp => sp.Id == id && sp.IsDelete == false,
-            include: source => source
-                .Include(sp => sp.SetupPackageDetails)
-                .ThenInclude(spd => spd.Product)
-                .ThenInclude(p => p.SubCategory)
-                .ThenInclude(sc => sc.Category)
-                .Include(sp => sp.SetupPackageDetails)
-                .ThenInclude(spd => spd.Product)
-                .ThenInclude(p => p.Images)
-        );
+                        SetupPackageId = sp.Id,
+                        SetupName = sp.SetupName,
+                        Description = sp.Description,
+                        TotalPrice = sp.Price,
+                        CreateDate = sp.CreateDate,
+                        ModifyDate = sp.ModifyDate,
+                        Size = sp.SetupPackageDetails
+                            .Where(spd => spd.Product.SubCategory.Category.CategoryName == "Bể")
+                            .Select(spd => spd.Product.Size)
+                            .FirstOrDefault(),
+                        images = sp.Image,
+                        IsDelete = sp.IsDelete,
+                        Products = sp.SetupPackageDetails
+                            .Select(spd => new ProductResponse
+                            {
+                                Id = spd.Product.Id,
+                                ProductName = spd.Product.ProductName,
+                                Quantity = spd.Quantity, // Giữ nguyên số lượng của từng sản phẩm
+                                InventoryQuantity = spd.Product.Quantity,
+                                Price = spd.Product.Price,
+                                Status = spd.Product.Status,
+                                IsDelete = spd.Product.IsDelete,
+                                CategoryName = spd.Product.SubCategory.Category.CategoryName,
+                                images = spd.Product.Images
+                                    .Where(img => img.IsDelete == false)
+                                    .OrderBy(img => img.CreateDate)
+                                    .Select(img => img.LinkImage)
+                                    .FirstOrDefault()
+                            }).ToList()
+                    },
+                    predicate: sp => sp.Id == id && sp.IsDelete == false,
+                    include: source => source
+                        .Include(sp => sp.SetupPackageDetails)
+                        .ThenInclude(spd => spd.Product)
+                        .ThenInclude(p => p.SubCategory)
+                        .ThenInclude(sc => sc.Category)
+                        .Include(sp => sp.SetupPackageDetails)
+                        .ThenInclude(spd => spd.Product)
+                        .ThenInclude(p => p.Images)
+                );
 
-        // Kiểm tra nếu không tìm thấy
-        if (setupPackage == null)
-        {
-            return new ApiResponse
+                // Kiểm tra nếu không tìm thấy
+                if (setupPackage == null)
+                {
+                    return new ApiResponse
+                    {
+                        status = StatusCodes.Status404NotFound.ToString(),
+                        message = "Setup package not found.",
+                        data = null
+                    };
+                }
+
+                return new ApiResponse
+                {
+                    status = StatusCodes.Status200OK.ToString(),
+                    message = "Setup package details retrieved successfully.",
+                    data = setupPackage
+                };
+            }
+            catch (Exception ex)
             {
-                status = StatusCodes.Status404NotFound.ToString(),
-                message = "Setup package not found.",
-                data = null
-            };
+                return new ApiResponse
+                {
+                    status = StatusCodes.Status500InternalServerError.ToString(),
+                    message = "An error occurred while retrieving setup package details.",
+                    data = ex.Message
+                };
+            }
         }
-
-        return new ApiResponse
-        {
-            status = StatusCodes.Status200OK.ToString(),
-            message = "Setup package details retrieved successfully.",
-            data = setupPackage
-        };
-    }
-    catch (Exception ex)
-    {
-        return new ApiResponse
-        {
-            status = StatusCodes.Status500InternalServerError.ToString(),
-            message = "An error occurred while retrieving setup package details.",
-            data = ex.Message
-        };
-    }
-}
 
 
         public async Task<ApiResponse> RemoveSetupPackage(Guid id)
@@ -888,10 +887,11 @@ namespace FTSS_API.Service.Implement
                     {
                         var newProductIds = newProductList.Select(p => p.ProductId).ToList();
 
-                        // Lấy danh sách chi tiết gói cài đặt hiện tại (không tracking để tránh lỗi)
+                        // Lấy danh sách chi tiết gói cài đặt hiện tại (không tracking)
                         var existingSetupPackageDetails = await _unitOfWork.GetRepository<SetupPackageDetail>()
                             .GetListAsync(predicate: spd => spd.SetupPackageId == setupPackage.Id);
 
+                        // Lấy danh sách sản phẩm mới từ DB
                         var newProducts = await _unitOfWork.GetRepository<Product>()
                             .GetListAsync(predicate: p => newProductIds.Contains(p.Id));
 
@@ -907,6 +907,17 @@ namespace FTSS_API.Service.Implement
 
                         var newSetupPackageDetails = new List<SetupPackageDetail>();
 
+                        // Xóa các sản phẩm không còn trong danh sách mới
+                        var toRemove = existingSetupPackageDetails
+                            .Where(spd => !groupedProducts.Select(gp => gp.ProductId).Contains(spd.ProductId))
+                            .ToList();
+
+                        if (toRemove.Any())
+                        {
+                            _unitOfWork.GetRepository<SetupPackageDetail>().DeleteRangeAsync(toRemove);
+                        }
+
+                        // Cập nhật hoặc thêm mới sản phẩm
                         foreach (var gp in groupedProducts)
                         {
                             var existingDetail =
@@ -917,11 +928,10 @@ namespace FTSS_API.Service.Implement
                             {
                                 if (existingDetail != null)
                                 {
-                                    // ✅ Cộng dồn số lượng sản phẩm nếu đã tồn tại
-                                    existingDetail.Quantity += gp.TotalQuantity;
+                                    // ✅ Cập nhật lại số lượng thay vì cộng dồn
+                                    existingDetail.Quantity = gp.TotalQuantity;
                                     existingDetail.Price = product.Price * existingDetail.Quantity;
 
-                                    // ✅ Update lại vào database
                                     _unitOfWork.GetRepository<SetupPackageDetail>().UpdateAsync(existingDetail);
                                 }
                                 else
