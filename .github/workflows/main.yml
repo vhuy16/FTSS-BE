@@ -8,32 +8,52 @@ on:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
-
     steps:
-    # 1. Lấy mã nguồn từ repository
-    - name: Checkout repository
-      uses: actions/checkout@v3
+      # 1. Lấy mã nguồn từ repository
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0 # Lấy toàn bộ history để có thể xác định chính xác thay đổi
 
-    # 2. Cài đặt .NET SDK
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v3
-      with:
-        dotnet-version: 8.0 # Thay đổi phiên bản .NET nếu cần
+      # 2. Cài đặt .NET SDK
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: 8.0 # Thay đổi phiên bản .NET nếu cần
 
-    # 3. Build dự án .NET và tạo tài liệu Swagger XML
-    - name: Build project
-      run: dotnet publish -c Release -o ./publish /p:DocumentationFile=./publish/FTSS_API.xml
+      # 3. Restore dependencies
+      - name: Restore dependencies
+        run: dotnet restore
 
-    # 4. Triển khai mã nguồn qua FTP
-    - name: Deploy via FTP
-      uses: SamKirkland/FTP-Deploy-Action@4.3.0
-      with:
-         server: ${{ secrets.FTP_HOST }} # Địa chỉ FTP
-         username: ${{ secrets.FTP_USERNAME }} # Tên người dùng FTP
-         password: ${{ secrets.FTP_PASSWORD }} # Mật khẩu FTP
-         local-dir: ./publish/
-         server-dir: /ftss.id.vn/ # Thư mục đích trên server
-         exclude: |
-          **/*.pdb   # Loại trừ file PDB (debug)
-          **/*.config # Nếu không muốn upload config file
-         log-level: verbose
+      # 4. Build dự án .NET và tạo tài liệu Swagger XML
+      - name: Build project
+        run: dotnet publish -c Release -o ./publish /p:DocumentationFile=./publish/FTSS_API.xml
+
+      # 5. Đợi một chút để đảm bảo tất cả quá trình xử lý file đã hoàn tất
+      - name: Wait for processes to finish
+        run: sleep 10
+
+      # 6. Đảm bảo không có tiến trình nào đang sử dụng các file
+      - name: Close any open file handles
+        run: |
+          find ./publish -type f -exec lsof {} \; 2>/dev/null || true
+          sync
+
+      # 7. Triển khai mã nguồn qua FTP với chiến lược tải lên hợp lý hơn
+      - name: Deploy via FTP
+        uses: SamKirkland/FTP-Deploy-Action@4.3.0
+        with:
+          server: ${{ secrets.FTP_HOST }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          local-dir: ./publish/
+          server-dir: /ftss.id.vn/
+          exclude: |
+            **/*.pdb
+            **/*.config
+            **/appsettings.*.json
+          dangerous-clean-slate: false # Không xóa toàn bộ thư mục đích
+          state-name: .ftp-deploy-sync-state.json # Tệp trạng thái để theo dõi các thay đổi
+          log-level: verbose
+          timeout: 120000 # Tăng thời gian chờ lên 2 phút
+          retries: 3 # Số lần thử lại khi có lỗi
