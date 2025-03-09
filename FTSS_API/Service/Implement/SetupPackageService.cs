@@ -31,7 +31,7 @@ namespace FTSS_API.Service.Implement
         {
             try
             {
-                // Lấy UserId từ HttpContext
+                
                 Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
                 var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
                     predicate: u => u.Id.Equals(userId) &&
