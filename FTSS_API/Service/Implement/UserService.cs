@@ -111,23 +111,23 @@ public class UserService : BaseService<UserService>, IUserService
             };
 
             string otp = OtpUltil.GenerateOtp();
-            // var otpRecord = new Otp
-            // {
-            //     Id = Guid.NewGuid(),  // Sử dụng Guid.NewGuid() để tạo một GUID duy nhất
-            //     UserId = newUser.Id,
-            //     OtpCode = otp,
-            //     CreateDate = TimeUtils.GetCurrentSEATime(),
-            //     ExpiresAt = TimeUtils.GetCurrentSEATime().AddMinutes(10),
-            //     IsValid = true
-            // };
-            //
-            // await _unitOfWork.GetRepository<Otp>().InsertAsync(otpRecord);
+            var otpRecord = new Otp
+            {
+                Id = Guid.NewGuid(),  // Sử dụng Guid.NewGuid() để tạo một GUID duy nhất
+                UserId = newUser.Id,
+                OtpCode = otp,
+                CreateDate = TimeUtils.GetCurrentSEATime(),
+                ExpiresAt = TimeUtils.GetCurrentSEATime().AddMinutes(10),
+                IsValid = true
+            };
+            
+            await _unitOfWork.GetRepository<Otp>().InsertAsync(otpRecord);
             await _unitOfWork.CommitAsync();
-            // Send OTP email
-            var redisDb = _redis.GetDatabase();
-            if (redisDb == null) throw new RedisServerException("Không thể kết nối tới Redis");
-            var key = "emailOtp:" + createNewAccountRequest.Email;
-            await redisDb.StringSetAsync(key, otp, TimeSpan.FromMinutes(5));
+            // // Send OTP email
+            // var redisDb = _redis.GetDatabase();
+            // if (redisDb == null) throw new RedisServerException("Không thể kết nối tới Redis");
+            // var key = "emailOtp:" + createNewAccountRequest.Email;
+            // await redisDb.StringSetAsync(key, otp, TimeSpan.FromMinutes(5));
             await _emailService.SendVerificationEmailAsync(newUser.Email, otp);
 
             // Optionally, handle OTP expiration as discussed
