@@ -229,7 +229,7 @@ public class PayOsService : BaseService<PayOsService>, IPayOSService
             }
         }
 
-        order.Status = OrderStatus.PENDING_DELIVERY.GetDescriptionFromEnum();
+        
         order.ModifyDate = DateTime.UtcNow;
         _unitOfWork.GetRepository<Order>().UpdateAsync(order);
 
