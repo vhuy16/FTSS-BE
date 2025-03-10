@@ -19,7 +19,7 @@ public interface IUserService
     Task<string> CreateTokenByEmail(string email);
 
     Task<bool> GetAccountByEmail(string email);
-    Task<ApiResponse> VerifyOtp(string email, string otp);
+    Task<bool> VerifyOtp(Guid UserId, string otpCheck);
     Task<ApiResponse> ResendOtp(string email);
     Task<ApiResponse> CreateNewUserAccountByGoogle(GoogleAuthResponse response);
     Task<ApiResponse> ForgotPassword(ForgotPasswordRequest request);

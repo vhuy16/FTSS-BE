@@ -126,7 +126,7 @@ public class UserController : BaseController<UserController>
     [ProducesErrorResponseType(typeof(ProblemDetails))]
     public async Task<IActionResult> VerifyOtp([FromBody] VerifyOtpRequest verifyOtpRequest)
     {
-        var isOtpValid = await _userService.VerifyOtp(verifyOtpRequest.email, verifyOtpRequest.otpCheck);
+        var isOtpValid = await _userService.VerifyOtp(verifyOtpRequest.UserId, verifyOtpRequest.otpCheck);
         return Ok(isOtpValid);
     }
 
