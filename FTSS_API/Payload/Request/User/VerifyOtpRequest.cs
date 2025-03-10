@@ -2,6 +2,6 @@
 
 public class VerifyOtpRequest
 {
-    public string email { get; set; }
+    public Guid UserId { get; set; }
     public string otpCheck {  get; set; }
 }
