@@ -9,4 +9,5 @@ public interface IPaymentService
     Task<ApiResponse> GetPaymentById(Guid paymentId);
     Task<ApiResponse> GetPaymentByOrderId(Guid orderId);
     Task<ApiResponse> GetPayments(int page, int size);
+    Task<ApiResponse> UpdatePaymentStatus(Guid paymentId, string newStatus);
 }

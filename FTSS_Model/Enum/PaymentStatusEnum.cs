@@ -6,7 +6,8 @@ public enum PaymentStatusEnum
     Completed,       // Payment has been successfully completed.
     Failed,         // Payment attempt failed.
     Canceled,        // Payment was canceled by the user or system.
-    Refunded,         // Payment was refunded to the customer.
+    Refunded,   
+    Refunding,// Payment was refunded to the customer.
     Processing,      // Payment is currently being processed.
     Declined     // Payment was declined by the payment provider.
 }
