@@ -533,6 +533,73 @@ public class OrderService : BaseService<OrderService>, IOrderService
             };
         }
     }
+public async Task<ApiResponse> UpdateOrder(Guid orderId, UpdateOrderRequest updateOrderRequest)
+{
+    try
+    {
+        var order = await _unitOfWork.GetRepository<Order>().SingleOrDefaultAsync(
+            predicate: o => o.Id == orderId,
+            include: query => query.Include(o => o.User).Include(o => o.OrderDetails)
+        );
+        var payment = await _unitOfWork.GetRepository<Payment>().SingleOrDefaultAsync(
+            predicate: p => p.OrderId == orderId);
+        if (order == null)
+        {
+            return new ApiResponse()
+            {
+                status = StatusCodes.Status404NotFound.ToString(),
+                message = "Order not found.",
+                data = null
+            };
+        }
+
+       
+
+        if (updateOrderRequest.Status != null)
+        {
+            if (updateOrderRequest.Status == OrderStatus.CANCELLED.ToString())
+            {
+                if(order.Status == OrderStatus.PAID.ToString())
+                order.Status = updateOrderRequest.Status;
+                payment.Status = PaymentStatusEnum.Refunding.ToString();
+            }
+          
+        }
+        
+          
+
+          
+        _unitOfWork.GetRepository<Payment>().UpdateAsync(payment );
+        _unitOfWork.GetRepository<Order>().UpdateAsync(order);
+        bool isUpdated = await _unitOfWork.CommitAsync() > 0;
+
+        if (!isUpdated)
+        {
+            return new ApiResponse()
+            {
+                status = StatusCodes.Status400BadRequest.ToString(),
+                message = "Failed to update order.",
+                data = null
+            };
+        }
+
+        return new ApiResponse()
+        {
+            status = StatusCodes.Status200OK.ToString(),
+            message = "Order updated successfully.",
+            data = order
+        };
+    }
+    catch (Exception ex)
+    {
+        return new ApiResponse()
+        {
+            status = StatusCodes.Status500InternalServerError.ToString(),
+            message = $"An unexpected error occurred while updating the order: {ex.Message}",
+            data = null
+        };
+    }
+}
 
     public async Task<ApiResponse> GetListOrder(int page, int size, bool? isAscending)
     {

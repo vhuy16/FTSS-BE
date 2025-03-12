@@ -11,4 +11,5 @@ public interface IOrderService
     Task<ApiResponse> GetOrderById(Guid id);
     // Task<ApiResponse> UpdateOrder(Guid id, OrderStatus? orderStatus, ShipEnum? shipStatus);
     Task<ApiResponse> CancelOrder(Guid id);
+    Task<ApiResponse> UpdateOrder(Guid orderId, UpdateOrderRequest updateOrderRequest);
 }

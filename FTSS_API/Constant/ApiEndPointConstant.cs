@@ -45,6 +45,7 @@ public static class ApiEndPointConstant
         public const string GetPaymentById = PaymentEndPoint + "/{paymentId}";
         public const string GetPaymentByOrderId = PaymentEndPoint + "/order/{orderId}";
         public const string GetPayments = PaymentEndPoint;
+        public const string UpdatePaymentStatus = "api/payments/update-status";
     }
     public static class Category
     {

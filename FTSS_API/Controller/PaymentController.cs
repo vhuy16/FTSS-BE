@@ -47,6 +47,22 @@ public class PaymentController : BaseController<PaymentController>
         }
     }
     /// <summary>
+    /// API cập nhật trạng thái thanh toán.
+    /// </summary>
+    [HttpPut(ApiEndPointConstant.Payment.UpdatePaymentStatus)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UpdatePaymentStatus([FromBody]  String Status, [FromForm]  Guid PaymentId)
+    {
+      
+
+        var result = await _paymentService.UpdatePaymentStatus(PaymentId, Status);
+
+        return result.status == StatusCodes.Status200OK.ToString() ? Ok(result) : BadRequest(result);
+    }
+
+    /// <summary>
     /// API lấy Payment theo id
     /// </summary>
     [HttpGet(ApiEndPointConstant.Payment.GetPaymentById)]

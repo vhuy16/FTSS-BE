@@ -445,6 +445,7 @@ public class UserService : BaseService<UserService>, IUserService
         user.Address = string.IsNullOrEmpty(updateUserRequest.Address) ? user.Address : updateUserRequest.Address;
         user.Role = string.IsNullOrEmpty(updateUserRequest.Role) ? user.Role : updateUserRequest.Role;
         user.Status = string.IsNullOrEmpty(updateUserRequest.Status) ? user.Status : updateUserRequest.Status;
+        user.IsDelete = updateUserRequest.IsDelete ?? user.IsDelete;
         _unitOfWork.GetRepository<User>().UpdateAsync(user);
 
         bool isSuccessful = await _unitOfWork.CommitAsync() > 0;
