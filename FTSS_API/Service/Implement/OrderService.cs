@@ -24,6 +24,7 @@ namespace FTSS_API.Service.Implement;
 public class OrderService : BaseService<OrderService>, IOrderService
 {
     private readonly Lazy<IPaymentService> _paymentService;
+
     public OrderService(IUnitOfWork<MyDbContext> unitOfWork, ILogger<OrderService> logger, IMapper mapper,
         Lazy<IPaymentService> paymentService,
         IHttpContextAccessor httpContextAccessor) : base(unitOfWork, logger, mapper, httpContextAccessor)
@@ -263,13 +264,13 @@ public class OrderService : BaseService<OrderService>, IOrderService
             };
         }
 
-        
+
         try
         {
             var cart = await _unitOfWork.GetRepository<Cart>()
                 .SingleOrDefaultAsync(predicate: p => p.UserId.Equals(userId),
                     include: query => query.Include(c => c.User));
-        
+
             if (cart == null)
             {
                 return new ApiResponse()
@@ -279,12 +280,12 @@ public class OrderService : BaseService<OrderService>, IOrderService
                     data = null
                 };
             }
-        
+
             var cartItems = await _unitOfWork.GetRepository<CartItem>().GetListAsync(predicate: p =>
-                   p.CartId.Equals(cart.Id)
-                    && createOrderRequest.CartItem.Contains(p.Id)
-                    && p.IsDelete.Equals(false));
-        
+                p.CartId.Equals(cart.Id)
+                && createOrderRequest.CartItem.Contains(p.Id)
+                && p.IsDelete.Equals(false));
+
             if (cartItems == null || !cartItems.Any())
             {
                 return new ApiResponse()
@@ -294,12 +295,13 @@ public class OrderService : BaseService<OrderService>, IOrderService
                     data = null
                 };
             }
-            
+
             decimal totalprice = 0;
             List<Guid> productIds = cartItems.Select(x => x.ProductId).ToList();
-            var products = await _unitOfWork.GetRepository<Product>().GetListAsync(predicate: p => productIds.Contains(p.Id) );
+            var products = await _unitOfWork.GetRepository<Product>()
+                .GetListAsync(predicate: p => productIds.Contains(p.Id));
             var productsDict = products.ToDictionary(x => x.Id, x => x);
-             
+
             Order order = new Order
             {
                 Id = Guid.NewGuid(),
@@ -310,20 +312,20 @@ public class OrderService : BaseService<OrderService>, IOrderService
                 Address = createOrderRequest.Address,
                 Shipcost = createOrderRequest.ShipCost,
 
-              //  OrderDetails = orderDetails // remove this to add later
+                //  OrderDetails = orderDetails // remove this to add later
             };
-        
-        
+
+
             // Voucher Implementation
             Voucher? voucher = null;
             if (createOrderRequest.VoucherId != null)
-            { 
+            {
                 voucher = await _unitOfWork.GetRepository<Voucher>().SingleOrDefaultAsync(predicate: v =>
                     v.Id == createOrderRequest.VoucherId &&
                     v.Status.Equals(VoucherEnum.Active.GetDescriptionFromEnum()) &&
                     v.IsDelete.Equals(false) && // Use .Equals(false)
                     v.ExpiryDate >= TimeUtils.GetCurrentSEATime());
-        
+
                 if (voucher == null)
                 {
                     return new ApiResponse
@@ -333,26 +335,29 @@ public class OrderService : BaseService<OrderService>, IOrderService
                         data = null
                     };
                 }
-                 if (voucher.Quantity <= 0) {
+
+                if (voucher.Quantity <= 0)
+                {
                     return new ApiResponse
                     {
-                         status = StatusCodes.Status400BadRequest.ToString(),
-                         message = "This voucher has been fully used",
-                         data = null
-                     };
-                 }
+                        status = StatusCodes.Status400BadRequest.ToString(),
+                        message = "This voucher has been fully used",
+                        data = null
+                    };
+                }
             }
-        
-        
+
+
             //Calculate order details
-             List<OrderDetail> orderDetails = new List<OrderDetail>();
+            List<OrderDetail> orderDetails = new List<OrderDetail>();
             foreach (var cartItem in cartItems)
             {
                 if (productsDict.ContainsKey(cartItem.ProductId))
                 {
-                    
                     var product = productsDict[cartItem.ProductId];
-                    if (product.Quantity < cartItem.Quantity) throw new Exception($"Sản phẩm '{product.ProductName}' chỉ còn {product.Quantity} trong kho, không đủ để đặt hàng.");
+                    if (product.Quantity < cartItem.Quantity)
+                        throw new Exception(
+                            $"Sản phẩm '{product.ProductName}' chỉ còn {product.Quantity} trong kho, không đủ để đặt hàng.");
                     totalprice += cartItem.Quantity * product.Price;
                     var newOrderDetail = new OrderDetail
                     {
@@ -367,7 +372,8 @@ public class OrderService : BaseService<OrderService>, IOrderService
                 else
                 {
                     // Handle error if product not found. Maybe log it and skip or return bad request
-                    _logger.LogError($"Product not found for cart item ID: {cartItem.Id} Product Id : {cartItem.ProductId}");
+                    _logger.LogError(
+                        $"Product not found for cart item ID: {cartItem.Id} Product Id : {cartItem.ProductId}");
                     return new ApiResponse()
                     {
                         status = StatusCodes.Status400BadRequest.ToString(),
@@ -376,19 +382,19 @@ public class OrderService : BaseService<OrderService>, IOrderService
                     };
                 }
             }
-        
-             if (createOrderRequest.VoucherId != null && voucher != null)
+
+            if (createOrderRequest.VoucherId != null && voucher != null)
             {
-                 if (totalprice < voucher.MaximumOrderValue)
+                if (totalprice < voucher.MaximumOrderValue)
                 {
-                     return new ApiResponse
+                    return new ApiResponse
                     {
-                         status = StatusCodes.Status400BadRequest.ToString(),
-                         message = "Your order value is less than the minimum for this voucher.",
-                         data = null
-                     };
-                  }
-        
+                        status = StatusCodes.Status400BadRequest.ToString(),
+                        message = "Your order value is less than the minimum for this voucher.",
+                        data = null
+                    };
+                }
+
                 // Apply the discount logic
                 decimal discountAmount = 0;
                 if (voucher.DiscountType.Equals(VoucherTypeEnum.Percentage.GetDescriptionFromEnum()))
@@ -399,19 +405,20 @@ public class OrderService : BaseService<OrderService>, IOrderService
                 {
                     discountAmount = voucher.Discount;
                 }
+
                 totalprice -= discountAmount;
-                  voucher.Quantity -=1;
+                voucher.Quantity -= 1;
                 _unitOfWork.GetRepository<Voucher>().UpdateAsync(voucher);
-        
             }
+
             order.OrderDetails = orderDetails;
             order.TotalPrice = totalprice + createOrderRequest.ShipCost;
             // Insert the Order into the database
             await _unitOfWork.GetRepository<Order>().InsertAsync(order);
-        
+
             // insert orderDetails
             await _unitOfWork.GetRepository<OrderDetail>().InsertRangeAsync(orderDetails);
-            
+
             bool isSuccessOrder = await _unitOfWork.CommitAsync() > 0;
             if (!isSuccessOrder)
             {
@@ -422,6 +429,7 @@ public class OrderService : BaseService<OrderService>, IOrderService
                     data = null
                 };
             }
+
             var createPaymentRequest = new CreatePaymentRequest
             {
                 OrderId = order.Id,
@@ -439,13 +447,13 @@ public class OrderService : BaseService<OrderService>, IOrderService
             //    _unitOfWork.GetRepository<CartItem>().DeleteAsync(cartItem);
             //}
 
-        
+
             //await _unitOfWork.CommitAsync(); // Commit after deletion
-        
+
 
             // Prepare response
             var orderDetailsResponse = new List<CreateOrderResponse.OrderDetailCreateResponse>();
-            foreach (var od in  order.OrderDetails)
+            foreach (var od in order.OrderDetails)
             {
                 var product = await _unitOfWork.GetRepository<Product>().SingleOrDefaultAsync(
                     predicate: p => p.Id.Equals(od.ProductId));
@@ -460,13 +468,13 @@ public class OrderService : BaseService<OrderService>, IOrderService
                 }
             }
 
-        
+
             order = await _unitOfWork.GetRepository<Order>()
                 .SingleOrDefaultAsync(predicate: p => p.Id.Equals(order.Id),
                     include: query => query.Include(o => o.User));
-        
+
             // Check if order or user is still null
-            
+
 
             if (order == null || order.User == null)
             {
@@ -490,11 +498,9 @@ public class OrderService : BaseService<OrderService>, IOrderService
                     Name = order.User.UserName,
                     Email = order.User.Email,
                     PhoneNumber = order.User.PhoneNumber
-                }, 
+                },
                 CheckoutUrl = payment?.PaymentURL,
                 Description = payment?.Description
-                
-                
             };
 
             return new ApiResponse()
@@ -524,21 +530,93 @@ public class OrderService : BaseService<OrderService>, IOrderService
                 status = StatusCodes.Status500InternalServerError.ToString(),
                 message = $"An unexpected error occurred while creating the order: {ex.Message}",
                 data = null
-            }; }
+            };
+        }
     }
+public async Task<ApiResponse> UpdateOrder(Guid orderId, UpdateOrderRequest updateOrderRequest)
+{
+    try
+    {
+        var order = await _unitOfWork.GetRepository<Order>().SingleOrDefaultAsync(
+            predicate: o => o.Id == orderId,
+            include: query => query.Include(o => o.User).Include(o => o.OrderDetails)
+        );
+        var payment = await _unitOfWork.GetRepository<Payment>().SingleOrDefaultAsync(
+            predicate: p => p.OrderId == orderId);
+        if (order == null)
+        {
+            return new ApiResponse()
+            {
+                status = StatusCodes.Status404NotFound.ToString(),
+                message = "Order not found.",
+                data = null
+            };
+        }
+
+       
+
+        if (updateOrderRequest.Status != null)
+        {
+            if (updateOrderRequest.Status == OrderStatus.CANCELLED.ToString())
+            {
+                if(order.Status == OrderStatus.PAID.ToString())
+                order.Status = updateOrderRequest.Status;
+                payment.Status = PaymentStatusEnum.Refunding.ToString();
+            }
+          
+        }
+        
+          
+
+          
+        _unitOfWork.GetRepository<Payment>().UpdateAsync(payment );
+        _unitOfWork.GetRepository<Order>().UpdateAsync(order);
+        bool isUpdated = await _unitOfWork.CommitAsync() > 0;
+
+        if (!isUpdated)
+        {
+            return new ApiResponse()
+            {
+                status = StatusCodes.Status400BadRequest.ToString(),
+                message = "Failed to update order.",
+                data = null
+            };
+        }
+
+        return new ApiResponse()
+        {
+            status = StatusCodes.Status200OK.ToString(),
+            message = "Order updated successfully.",
+            data = order
+        };
+    }
+    catch (Exception ex)
+    {
+        return new ApiResponse()
+        {
+            status = StatusCodes.Status500InternalServerError.ToString(),
+            message = $"An unexpected error occurred while updating the order: {ex.Message}",
+            data = null
+        };
+    }
+}
 
     public async Task<ApiResponse> GetListOrder(int page, int size, bool? isAscending)
     {
         try
         {
-            // Truy vấn với Include
+            // Truy vấn với Include để lấy đầy đủ thông tin
             var query = _unitOfWork.Context.Set<Order>()
                 .Include(o => o.User)
                 .Include(o => o.Voucher)
                 .Include(o => o.Payments)
                 .Include(o => o.OrderDetails)
-                    .ThenInclude(od => od.Product)
-                        .ThenInclude(p => p.Images) // Bao gồm ảnh sản phẩm
+                .ThenInclude(od => od.Product)
+                .ThenInclude(p => p.SubCategory) // Bao gồm SubCategory
+                .ThenInclude(sc => sc.Category) // Bao gồm Category từ SubCategory
+                .Include(o => o.OrderDetails)
+                .ThenInclude(od => od.Product)
+                .ThenInclude(p => p.Images) // Bao gồm hình ảnh sản phẩm
                 .AsQueryable();
 
             // Sắp xếp nếu cần
@@ -582,19 +660,22 @@ public class OrderService : BaseService<OrderService>, IOrderService
                     PaymentMethod = order.Payments.FirstOrDefault()?.PaymentMethod,
                     PaymentStatus = order.Payments.FirstOrDefault()?.PaymentStatus,
                 },
-                // Lấy giảm giá từ voucher (nếu có)
+                // Lấy thông tin người dùng
                 userResponse = new GetOrderResponse.UserResponse
                 {
                     Name = order.User?.UserName,
                     Email = order.User?.Email,
                     PhoneNumber = order.User?.PhoneNumber
                 },
+                // Lấy thông tin chi tiết đơn hàng
                 OrderDetails = order.OrderDetails.Select(od => new GetOrderResponse.OrderDetailCreateResponse
                 {
                     ProductName = od.Product.ProductName,
                     Price = od.Price,
                     Quantity = od.Quantity,
-                    LinkImage = od.Product.Images.FirstOrDefault()?.LinkImage ?? "NoImageAvailable" // Lấy ảnh đầu tiên hoặc giá trị mặc định
+                    LinkImage = od.Product.Images.FirstOrDefault()?.LinkImage ?? "NoImageAvailable",
+                    SubCategoryName = od.Product.SubCategory?.SubCategoryName ?? "NoSubCategory",
+                    CategoryName = od.Product.SubCategory?.Category?.CategoryName ?? "NoCategory"
                 }).ToList(),
             }).ToList();
 
@@ -630,7 +711,8 @@ public class OrderService : BaseService<OrderService>, IOrderService
         {
             Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
             var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
-                predicate: u => u.Id.Equals(userId) && u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()));
+                predicate: u =>
+                    u.Id.Equals(userId) && u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()));
 
             if (user == null)
             {
@@ -641,22 +723,27 @@ public class OrderService : BaseService<OrderService>, IOrderService
                     data = null
                 };
             }
+
             var query = _unitOfWork.Context.Set<Order>()
                 .Where(o => o.UserId == userId && (string.IsNullOrEmpty(status) || o.Status.Equals(status)))
                 .Include(o => o.User)
                 .Include(o => o.Voucher)
                 .Include(o => o.Payments)
                 .Include(o => o.OrderDetails)
-                    .ThenInclude(od => od.Product)
-                        .ThenInclude(p => p.Images) // Bao gồm hình ảnh sản phẩm
+                .ThenInclude(od => od.Product)
+                .ThenInclude(p => p.SubCategory) // Bao gồm SubCategory từ Product
+                .ThenInclude(sc => sc.Category) // Bao gồm Category từ SubCategory
+                .Include(o => o.OrderDetails)
+                .ThenInclude(od => od.Product)
+                .ThenInclude(p => p.Images) // Bao gồm hình ảnh sản phẩm
                 .AsQueryable();
 
             // Sắp xếp nếu cần
             if (isAscending.HasValue)
             {
                 query = isAscending.Value
-                    ? query.OrderBy(o => o.CreateDate) // Sắp xếp tăng dần
-                    : query.OrderByDescending(o => o.CreateDate); // Sắp xếp giảm dần
+                    ? query.OrderBy(o => o.CreateDate)
+                    : query.OrderByDescending(o => o.CreateDate);
             }
 
             // Phân trang
@@ -691,7 +778,7 @@ public class OrderService : BaseService<OrderService>, IOrderService
                 {
                     PaymentMethod = order.Payments.FirstOrDefault()?.PaymentMethod,
                     PaymentStatus = order.Payments.FirstOrDefault()?.PaymentStatus,
-                },// Lấy giảm giá từ voucher (nếu có)
+                },
                 userResponse = new GetOrderResponse.UserResponse
                 {
                     Name = order.User?.UserName,
@@ -703,7 +790,9 @@ public class OrderService : BaseService<OrderService>, IOrderService
                     ProductName = od.Product.ProductName,
                     Price = od.Price,
                     Quantity = od.Quantity,
-                    LinkImage = od.Product.Images.FirstOrDefault()?.LinkImage ?? "NoImageAvailable" // Lấy ảnh đầu tiên hoặc giá trị mặc định
+                    LinkImage = od.Product.Images.FirstOrDefault()?.LinkImage ?? "NoImageAvailable",
+                    SubCategoryName = od.Product.SubCategory?.SubCategoryName ?? "NoSubCategory",
+                    CategoryName = od.Product.SubCategory?.Category?.CategoryName ?? "NoCategory"
                 }).ToList()
             }).ToList();
 
@@ -741,10 +830,16 @@ public class OrderService : BaseService<OrderService>, IOrderService
             var order = await _unitOfWork.Context.Set<Order>()
                 .Include(o => o.User) // Bao gồm thông tin người dùng
                 .Include(o => o.Voucher) // Bao gồm thông tin voucher
+                .Include(o => o.Payments) // Bao gồm thông tin thanh toán
                 .Include(o => o.OrderDetails) // Bao gồm chi tiết đơn hàng
-                    .ThenInclude(od => od.Product) // Bao gồm thông tin sản phẩm
-                        .ThenInclude(p => p.Images) // Bao gồm hình ảnh sản phẩm
-                .FirstOrDefaultAsync(o => o.Id == id); // Lọc theo ID
+                .ThenInclude(od => od.Product) // Bao gồm thông tin sản phẩm
+                .ThenInclude(p => p.SubCategory) // Bao gồm SubCategory từ Product
+                .ThenInclude(sc => sc.Category) // Bao gồm Category từ SubCategory
+                .Include(o => o.OrderDetails)
+                .ThenInclude(od => od.Product)
+                .ThenInclude(p => p.Images) // Bao gồm hình ảnh của sản phẩm
+                .FirstOrDefaultAsync(o => o.Id == id);
+
 
             if (order == null)
             {
@@ -766,7 +861,12 @@ public class OrderService : BaseService<OrderService>, IOrderService
                 Address = order.Address,
                 CreateDate = order.CreateDate,
                 ModifyDate = order.ModifyDate,
-                Discount = order.Voucher?.Discount ?? 0, // Lấy giảm giá từ voucher nếu có
+                Discount = order.Voucher?.Discount ?? 0,
+                Payment = new GetOrderResponse.PaymentResponse
+                {
+                    PaymentMethod = order.Payments.FirstOrDefault()?.PaymentMethod,
+                    PaymentStatus = order.Payments.FirstOrDefault()?.PaymentStatus,
+                },
                 userResponse = new GetOrderResponse.UserResponse
                 {
                     Name = order.User?.UserName,
@@ -776,9 +876,11 @@ public class OrderService : BaseService<OrderService>, IOrderService
                 OrderDetails = order.OrderDetails.Select(od => new GetOrderResponse.OrderDetailCreateResponse
                 {
                     ProductName = od.Product.ProductName,
+                    CategoryName = od.Product.SubCategory.Category.CategoryName,
+                    SubCategoryName = od.Product.SubCategory.SubCategoryName,
                     Price = od.Price,
                     Quantity = od.Quantity,
-                    LinkImage = od.Product.Images.FirstOrDefault()?.LinkImage ?? "NoImageAvailable" // Lấy ảnh đầu tiên hoặc giá trị mặc định
+                    LinkImage = od.Product.Images.FirstOrDefault()?.LinkImage ?? "NoImageAvailable"
                 }).ToList()
             };
 
@@ -799,7 +901,6 @@ public class OrderService : BaseService<OrderService>, IOrderService
                 data = null
             };
         }
-
     }
 
 

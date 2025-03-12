@@ -143,15 +143,15 @@ public class ProductController : BaseController<ProductController>
     /// </summary>
     /// <param name="id">ID danh mục cần lấy sản phẩm.</param>
     /// <returns>Danh sách sản phẩm trong danh mục.</returns>
-    [HttpGet(ApiEndPointConstant.Product.GetListProductsBySubCategoryId)]
+    [HttpGet(ApiEndPointConstant.Product.GetListProductsBySubCategory)]
     [ProducesResponseType(typeof(IPaginate<GetProductResponse>), StatusCodes.Status200OK)]
     [ProducesErrorResponseType(typeof(ProblemDetails))]
-    public async Task<IActionResult> GetListProductBySubCategoryId([FromRoute] Guid id, [FromQuery] int? page, [FromQuery] int? size)
+    public async Task<IActionResult> GetListProductBySubCategoryId( [FromQuery] int? page, [FromQuery] int? size)
     {
         int pageNumber = page ?? 1;
         int pageSize = size ?? 10;
 
-        var response = await _productService.GetListProductBySubCategoryId(id, pageNumber, pageSize);
+        var response = await _productService.GetAllProductsGroupedByCategory(pageNumber, pageSize);
 
         if (response == null)
         {

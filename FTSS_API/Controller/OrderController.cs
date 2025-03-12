@@ -62,6 +62,30 @@ public class OrderController : BaseController<OrderController>
         return Ok(response);
     }
     /// <summary>
+    /// API cập nhật đơn hàng
+    /// </summary>
+    [HttpPut(ApiEndPointConstant.Order.UpdateOrder)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
+    [ProducesErrorResponseType(typeof(ProblemDetails))]
+    public async Task<IActionResult> UpdateOrder([FromRoute] Guid id, [FromBody] UpdateOrderRequest updateOrderRequest)
+    {
+        if (updateOrderRequest == null)
+        {
+            return BadRequest(new ApiResponse
+            {
+                data = string.Empty,
+                message = "Invalid request data",
+                status = StatusCodes.Status400BadRequest.ToString(),
+            });
+        }
+
+        var response = await _orderService.UpdateOrder(id, updateOrderRequest);
+        return StatusCode(int.Parse(response.status), response);
+    }
+
+    /// <summary>
     /// API lấy danh sách đơn hàng cho user.
     /// </summary>
     [HttpGet(ApiEndPointConstant.Order.GetALLOrder)]

@@ -111,23 +111,23 @@ public class UserService : BaseService<UserService>, IUserService
             };
 
             string otp = OtpUltil.GenerateOtp();
-            // var otpRecord = new Otp
-            // {
-            //     Id = Guid.NewGuid(),  // Sử dụng Guid.NewGuid() để tạo một GUID duy nhất
-            //     UserId = newUser.Id,
-            //     OtpCode = otp,
-            //     CreateDate = TimeUtils.GetCurrentSEATime(),
-            //     ExpiresAt = TimeUtils.GetCurrentSEATime().AddMinutes(10),
-            //     IsValid = true
-            // };
-            //
-            // await _unitOfWork.GetRepository<Otp>().InsertAsync(otpRecord);
+            var otpRecord = new Otp
+            {
+                Id = Guid.NewGuid(),  // Sử dụng Guid.NewGuid() để tạo một GUID duy nhất
+                UserId = newUser.Id,
+                OtpCode = otp,
+                CreateDate = TimeUtils.GetCurrentSEATime(),
+                ExpiresAt = TimeUtils.GetCurrentSEATime().AddMinutes(10),
+                IsValid = true
+            };
+            
+            await _unitOfWork.GetRepository<Otp>().InsertAsync(otpRecord);
             await _unitOfWork.CommitAsync();
-            // Send OTP email
-            var redisDb = _redis.GetDatabase();
-            if (redisDb == null) throw new RedisServerException("Không thể kết nối tới Redis");
-            var key = "emailOtp:" + createNewAccountRequest.Email;
-            await redisDb.StringSetAsync(key, otp, TimeSpan.FromMinutes(5));
+            // // Send OTP email
+            // var redisDb = _redis.GetDatabase();
+            // if (redisDb == null) throw new RedisServerException("Không thể kết nối tới Redis");
+            // var key = "emailOtp:" + createNewAccountRequest.Email;
+            // await redisDb.StringSetAsync(key, otp, TimeSpan.FromMinutes(5));
             await _emailService.SendVerificationEmailAsync(newUser.Email, otp);
 
             // Optionally, handle OTP expiration as discussed
@@ -252,11 +252,47 @@ public class UserService : BaseService<UserService>, IUserService
         };
     }
 
-    public Task<ApiResponse> DeleteUser(Guid id)
+    public async Task<ApiResponse> DeleteUser(Guid id)
     {
-        throw new NotImplementedException();
-    }
+        var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
+            predicate: u => u.Id == id && u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()));
 
+        if (user == null)
+        {
+            return new ApiResponse
+            {
+                status = StatusCodes.Status404NotFound.ToString(),
+                message = MessageConstant.UserMessage.UserNotExist,
+                data = null
+            };
+        }
+
+        // Đánh dấu người dùng là đã xóa thay vì xóa cứng
+        user.IsDelete = true;
+        user.ModifyDate = TimeUtils.GetCurrentSEATime();
+    
+        _unitOfWork.GetRepository<User>().UpdateAsync(user);
+        bool isSuccessful = await _unitOfWork.CommitAsync() > 0;
+
+        if (isSuccessful)
+        {
+            return new ApiResponse
+            {
+                status = StatusCodes.Status200OK.ToString(),
+                message = "User deleted successfully.",
+                data = null
+            };
+        }
+        else
+        {
+            return new ApiResponse
+            {
+                status = StatusCodes.Status500InternalServerError.ToString(),
+                message = "Failed to delete user.",
+                data = null
+            };
+        }
+    }
     public async Task<ApiResponse> GetAllUser(int page, int size)
     {
         var users = await _unitOfWork.GetRepository<User>().GetPagingListAsync(
@@ -270,6 +306,7 @@ public class UserService : BaseService<UserService>, IUserService
                 Gender = u.Gender,
                 Role = u.Role,
                 Address = u.Address,
+                IsDeleted = u.IsDelete
             },
             predicate: u => u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()),
             page: page,
@@ -319,6 +356,7 @@ public class UserService : BaseService<UserService>, IUserService
                 Gender = u.Gender,
                 Role = u.Role,
                 Address = u.Address,
+                IsDeleted = u.IsDelete
             },
             predicate: u => u.Id.Equals(userId.Value) && u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()));
 
@@ -353,6 +391,7 @@ public class UserService : BaseService<UserService>, IUserService
                 Gender = u.Gender,
                 Role = u.Role,
                 Address = u.Address,
+                IsDeleted = u.IsDelete
             },
             predicate: u => u.Id.Equals(id) && u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()));
 
@@ -406,6 +445,7 @@ public class UserService : BaseService<UserService>, IUserService
         user.Address = string.IsNullOrEmpty(updateUserRequest.Address) ? user.Address : updateUserRequest.Address;
         user.Role = string.IsNullOrEmpty(updateUserRequest.Role) ? user.Role : updateUserRequest.Role;
         user.Status = string.IsNullOrEmpty(updateUserRequest.Status) ? user.Status : updateUserRequest.Status;
+        user.IsDelete = updateUserRequest.IsDelete ?? user.IsDelete;
         _unitOfWork.GetRepository<User>().UpdateAsync(user);
 
         bool isSuccessful = await _unitOfWork.CommitAsync() > 0;
@@ -457,93 +497,93 @@ public class UserService : BaseService<UserService>, IUserService
     }
 
     #region verifyOtp
-    //
-    // public async Task<bool> VerifyOtp(Guid UserId, string otpCheck)
+    
+    public async Task<bool> VerifyOtp(Guid UserId, string otpCheck)
+    {
+        var otp = await _unitOfWork.GetRepository<Otp>()
+            .SingleOrDefaultAsync(predicate: p => p.OtpCode.Equals(otpCheck) && p.UserId.Equals(UserId));
+        if (otp != null && TimeUtils.GetCurrentSEATime() < otp.ExpiresAt && otp.IsValid == true)
+        {
+            var user = await _unitOfWork.GetRepository<User>()
+                .SingleOrDefaultAsync(predicate: u => u.Id.Equals(UserId));
+            if (user != null)
+            {
+                user.Status = UserStatusEnum.Available.GetDescriptionFromEnum();
+                _unitOfWork.GetRepository<User>().UpdateAsync(user);
+                _unitOfWork.GetRepository<Otp>().DeleteAsync(otp); // Delete the OTP record
+    
+    
+                await _unitOfWork.CommitAsync();
+                return true;
+            }
+        }
+    
+        return false;
+    }
+    
+    // public async Task<ApiResponse> VerifyOtp(string email, string otp)
     // {
-    //     var otp = await _unitOfWork.GetRepository<Otp>()
-    //         .SingleOrDefaultAsync(predicate: p => p.OtpCode.Equals(otpCheck) && p.UserId.Equals(UserId));
-    //     if (otp != null && TimeUtils.GetCurrentSEATime() < otp.ExpiresAt && otp.IsValid == true)
+    //     var redisDb = _redis.GetDatabase();
+    //     if (redisDb == null) throw new RedisServerException("Không thể kết nối tới Redis");
+    //
+    //     var key = "emailOtp:" + email;
+    //     var storedOtp = await redisDb.StringGetAsync(key);
+    //     if (storedOtp.IsNullOrEmpty)
     //     {
-    //         var user = await _unitOfWork.GetRepository<User>()
-    //             .SingleOrDefaultAsync(predicate: u => u.Id.Equals(UserId));
-    //         if (user != null)
+    //         return new ApiResponse()
     //         {
-    //             user.Status = UserStatusEnum.Available.GetDescriptionFromEnum();
-    //             _unitOfWork.GetRepository<User>().UpdateAsync(user);
-    //             _unitOfWork.GetRepository<Otp>().DeleteAsync(otp); // Delete the OTP record
-    //
-    //
-    //             await _unitOfWork.CommitAsync();
-    //             return true;
-    //         }
+    //             status = StatusCodes.Status400BadRequest.ToString(),
+    //             message = "OTP đã hết hạn hoặc không tồn tại",
+    //             data = null
+    //         };
     //     }
     //
-    //     return false;
-    // }
+    //     if (!storedOtp.Equals(otp))
+    //     {
+    //         return new ApiResponse()
+    //         {
+    //             status = StatusCodes.Status400BadRequest.ToString(),
+    //             message = "OTP không chính xác",
+    //             data = null
+    //         };
+    //     }
     //
-    public async Task<ApiResponse> VerifyOtp(string email, string otp)
-    {
-        var redisDb = _redis.GetDatabase();
-        if (redisDb == null) throw new RedisServerException("Không thể kết nối tới Redis");
-
-        var key = "emailOtp:" + email;
-        var storedOtp = await redisDb.StringGetAsync(key);
-        if (storedOtp.IsNullOrEmpty)
-        {
-            return new ApiResponse()
-            {
-                status = StatusCodes.Status400BadRequest.ToString(),
-                message = "OTP đã hết hạn hoặc không tồn tại",
-                data = null
-            };
-        }
-
-        if (!storedOtp.Equals(otp))
-        {
-            return new ApiResponse()
-            {
-                status = StatusCodes.Status400BadRequest.ToString(),
-                message = "OTP không chính xác",
-                data = null
-            };
-        }
-
-        var user = await _unitOfWork.GetRepository<User>()
-            .SingleOrDefaultAsync(predicate: a => a.Email.Equals(email));
-        if (user == null)
-        {
-            return new ApiResponse()
-            {
-                status = StatusCodes.Status404NotFound.ToString(),
-                message = "Tài khoản không tồn tại",
-                data = null
-            };
-        }
-
-        user.Status = UserStatusEnum.Available.GetDescriptionFromEnum();
-        Cart newCart = new Cart
-        {
-            Id = Guid.NewGuid(),
-            UserId = user.Id,
-            CreateDate = TimeUtils.GetCurrentSEATime(),
-            ModifyDate = TimeUtils.GetCurrentSEATime(),
-            Status = CartEnum.Available.GetDescriptionFromEnum(),
-            IsDelete = false
-        };
-
-        await _unitOfWork.GetRepository<Cart>().InsertAsync(newCart);
-        _unitOfWork.GetRepository<User>().UpdateAsync(user);
-        await _unitOfWork.CommitAsync();
-
-        await redisDb.KeyDeleteAsync(key);
-
-        return new ApiResponse()
-        {
-            status = StatusCodes.Status200OK.ToString(),
-            message = "Tài khoản đã được xác thực thành công",
-            data = true
-        };
-    }
+    //     var user = await _unitOfWork.GetRepository<User>()
+    //         .SingleOrDefaultAsync(predicate: a => a.Email.Equals(email));
+    //     if (user == null)
+    //     {
+    //         return new ApiResponse()
+    //         {
+    //             status = StatusCodes.Status404NotFound.ToString(),
+    //             message = "Tài khoản không tồn tại",
+    //             data = null
+    //         };
+    //     }
+    //
+    //     user.Status = UserStatusEnum.Available.GetDescriptionFromEnum();
+    //     Cart newCart = new Cart
+    //     {
+    //         Id = Guid.NewGuid(),
+    //         UserId = user.Id,
+    //         CreateDate = TimeUtils.GetCurrentSEATime(),
+    //         ModifyDate = TimeUtils.GetCurrentSEATime(),
+    //         Status = CartEnum.Available.GetDescriptionFromEnum(),
+    //         IsDelete = false
+    //     };
+    //
+    //     await _unitOfWork.GetRepository<Cart>().InsertAsync(newCart);
+    //     _unitOfWork.GetRepository<User>().UpdateAsync(user);
+    //     await _unitOfWork.CommitAsync();
+    //
+    //     await redisDb.KeyDeleteAsync(key);
+    //
+    //     return new ApiResponse()
+    //     {
+    //         status = StatusCodes.Status200OK.ToString(),
+    //         message = "Tài khoản đã được xác thực thành công",
+    //         data = true
+    //     };
+    // }
     #endregion
     public async Task<ApiResponse> CreateNewUserAccountByGoogle(GoogleAuthResponse request)
     {

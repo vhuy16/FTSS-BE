@@ -2,6 +2,7 @@
 using FTSS_API.Payload;
 using FTSS_API.Payload.Request.SetupPackage;
 using Microsoft.AspNetCore.Mvc;
+using Supabase;
 
 namespace FTSS_API.Service.Interface
 {
@@ -13,6 +14,14 @@ namespace FTSS_API.Service.Interface
         Task<ApiResponse> GetListSetupPackageAllShop(int pageNumber, int pageSize, bool? isAscending);
         Task<ApiResponse> GetSetUpById(Guid id);
         Task<ApiResponse> RemoveSetupPackage(Guid id);
-        Task<ApiResponse> UpdateSetupPackage(Guid setupPackageId, List<ProductSetupItem> productids, AddSetupPackageRequest request, Supabase.Client client);
+        Task<ApiResponse> CopySetupPackage(Guid setupPackageId);
+
+        Task<ApiResponse> UpdateSetupPackage(
+            List<ProductSetupItem> productIds,
+            Guid setupPackageId,
+            AddSetupPackageRequest request,
+            Client client);
+        // Task<ApiResponse> UpdateSetupPackage(Guid setupPackageId, List<ProductSetupItem> productids, AddSetupPackageRequest request, Supabase.Client client);
+        Task<bool> enableSetupPackage(Guid setupPackageId);
     }
 }

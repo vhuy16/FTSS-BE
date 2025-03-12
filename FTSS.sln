@@ -1,10 +1,13 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FTSS_API", "FTSS_API\FTSS_API.csproj", "{74AC2CE7-D8EC-479F-A81F-5C9C0D89CCEA}"
+# Visual Studio Version 17
+VisualStudioVersion = 17.11.35327.3
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FTSS_API", "FTSS_API\FTSS_API.csproj", "{74AC2CE7-D8EC-479F-A81F-5C9C0D89CCEA}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FTSS_Model", "FTSS_Model\FTSS_Model.csproj", "{BC9F74E5-AD62-4FB9-A40E-45F42C9CAE76}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FTSS_Model", "FTSS_Model\FTSS_Model.csproj", "{BC9F74E5-AD62-4FB9-A40E-45F42C9CAE76}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FTSS_Repository", "FTSS_Repository\FTSS_Repository.csproj", "{986B526C-E6E6-4A9B-B535-8A979229424E}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FTSS_Repository", "FTSS_Repository\FTSS_Repository.csproj", "{986B526C-E6E6-4A9B-B535-8A979229424E}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -24,5 +27,8 @@ Global
 		{986B526C-E6E6-4A9B-B535-8A979229424E}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{986B526C-E6E6-4A9B-B535-8A979229424E}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{986B526C-E6E6-4A9B-B535-8A979229424E}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
 	EndGlobalSection
 EndGlobal

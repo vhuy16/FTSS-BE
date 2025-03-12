@@ -154,6 +154,31 @@ public class PaymentService : BaseService<PaymentService>, IPaymentService
     };
 }
 
+public async Task<ApiResponse> UpdatePaymentStatus(Guid PaymentId, string newStatus)
+{
+    var payment = await _unitOfWork.GetRepository<Payment>().SingleOrDefaultAsync(predicate: o => o.Id == PaymentId);
+    if (payment == null)
+    {
+        return new ApiResponse
+        {
+            status = StatusCodes.Status404NotFound.ToString(),
+            message = "Order not found",
+            data = null
+        };
+    }
+
+    payment.Status = newStatus;
+    _unitOfWork.GetRepository<Payment>().UpdateAsync(payment);
+    await _unitOfWork.CommitAsync();
+
+    return new ApiResponse
+    {
+        status = StatusCodes.Status200OK.ToString(),
+        message = "Order status updated successfully",
+        data = payment
+    };
+}
+
 public async Task<ApiResponse> GetPaymentById(Guid paymentId)
 {
     var payment = await _unitOfWork.GetRepository<Payment>().SingleOrDefaultAsync(

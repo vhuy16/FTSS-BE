@@ -1,4 +1,5 @@
-﻿using System.Security.Cryptography;
+﻿using System.Net;
+using System.Security.Cryptography;
 using System.Text;
 using AutoMapper;
 using FTSS_API.Payload;
@@ -169,10 +170,10 @@ public class PayOsService : BaseService<PayOsService>, IPayOSService
             {
                 await HandleSuccessfulPayment(existingPayment);
             }
-            else
-            {
-                await HandleFailedPayment(existingPayment);
-            }
+            // else
+            // {
+            //     await HandleFailedPayment(existingPayment);
+            // }
 
             await _unitOfWork.CommitAsync();
             _logger.LogInformation("Successfully processed webhook for orderCode: {OrderCode}",
@@ -228,18 +229,47 @@ public class PayOsService : BaseService<PayOsService>, IPayOSService
             }
         }
 
-        order.Status = OrderStatus.PENDING_DELIVERY.GetDescriptionFromEnum();
+        
         order.ModifyDate = DateTime.UtcNow;
         _unitOfWork.GetRepository<Order>().UpdateAsync(order);
 
         _unitOfWork.GetRepository<Payment>().UpdateAsync(payment);
     }
 
-    private async Task HandleFailedPayment(Payment payment)
+    public async Task<ApiResponse> HandleFailedPayment(Guid orderCode)
     {
+        var payment = await _unitOfWork.GetRepository<Payment>()
+            .SingleOrDefaultAsync(predicate: p => p.Id.Equals(orderCode));
+        if (payment == null)
+        {
+            return new ApiResponse()
+            {
+                data = null,
+                message = "Payment could not be found",
+                status = StatusCodes.Status404NotFound.ToString()
+            };
+        }
+        var order = await _unitOfWork.GetRepository<Order>().SingleOrDefaultAsync(predicate: o => o.Id == payment.OrderId);
+        if (order == null)
+        {
+            return new ApiResponse()
+            {
+                data = null,
+                message = "Order could not be found",
+                status = StatusCodes.Status404NotFound.ToString()
+            };
+        }
         payment.PaymentStatus = PaymentStatusEnum.Canceled.ToString();
         payment.PaymentDate = DateTime.UtcNow;
+        order.Status = OrderStatus.CANCELLED.GetDescriptionFromEnum();
         _unitOfWork.GetRepository<Payment>().UpdateAsync(payment);
+        await _unitOfWork.CommitAsync();
+        return new ApiResponse()
+        {
+            data = payment,
+            message = "Payment could not be completed",
+            status = StatusCodes.Status200OK.ToString()
+        };
     }
 
     private bool ValidateWebhookSignature(string requestBody, string signatureFromPayOs)

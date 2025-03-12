@@ -9,6 +9,7 @@ using FTSS_Model.Paginate;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json;
+using Supabase;
 
 namespace FTSS_API.Controller
 {
@@ -130,33 +131,63 @@ namespace FTSS_API.Controller
             return Ok(response);
         }
         /// <summary>
-        /// API cập nhập Setup cho customer.
+        /// API cập nhật SetupPackage cho customer.
         /// </summary>
         [HttpPut(ApiEndPointConstant.SetupPackage.UpdateSetupPackage)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
         [ProducesErrorResponseType(typeof(ProblemDetails))]
-        public async Task<IActionResult> UpdateSetupPackage(Guid setupPackageId, [FromForm] AddSetupPackageRequest request, [FromServices] Supabase.Client client)
+        public async Task<IActionResult> UpdateSetupPackage(
+            [FromForm] AddSetupPackageRequest request,
+            [FromRoute] Guid setupPackageId,
+            [FromServices] Supabase.Client client)
         {
-            List<ProductSetupItem> productids;
-            try
+            List<ProductSetupItem> productIds = new List<ProductSetupItem>();
+
+            // Kiểm tra nếu request.ProductItemsJson không rỗng thì mới parse JSON
+            if (!string.IsNullOrWhiteSpace(request.ProductItemsJson))
             {
-                productids = JsonConvert.DeserializeObject<List<ProductSetupItem>>(request.ProductItemsJson);
-                if (productids == null || productids.Count == 0)
+                try
                 {
-                    return BadRequest(new ApiResponse { status = "400", message = "Danh sách sản phẩm không được để trống" });
+                    productIds = JsonConvert.DeserializeObject<List<ProductSetupItem>>(request.ProductItemsJson) ?? new List<ProductSetupItem>();
+                }
+                catch (JsonException)
+                {
+                    return BadRequest(new ApiResponse { status = "400", message = "Định dạng danh sách sản phẩm không hợp lệ" });
                 }
             }
-            catch (JsonException)
+
+            // Nếu không có sản phẩm nào sau khi parse, vẫn cho phép tiếp tục xử lý
+            var response = await _setupPackageService.UpdateSetupPackage(productIds, setupPackageId, request, client);
+
+            if (response.status == StatusCodes.Status200OK.ToString())
             {
-                return BadRequest(new ApiResponse { status = "400", message = "Định dạng danh sách sản phẩm không hợp lệ" });
+                return Ok(response);
             }
+            if (response.status == StatusCodes.Status401Unauthorized.ToString())
+            {
+                return Unauthorized(response);
+            }
+            if (response.status == StatusCodes.Status404NotFound.ToString())
+            {
+                return NotFound(response);
+            }
+            return StatusCode(StatusCodes.Status500InternalServerError, response);
+        }
 
-            var response = await _setupPackageService.UpdateSetupPackage(setupPackageId, productids, request, client);
-
-            // 🔹 Tránh lỗi vòng lặp bằng cách sử dụng PreserveReferencesHandling
+        /// <summary>
+        /// API sao chép SetupPackage.
+        /// </summary>
+        [HttpPost(ApiEndPointConstant.SetupPackage.CopySetupPackage)]
+        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status201Created)]
+        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
+        [ProducesErrorResponseType(typeof(ProblemDetails))]
+        public async Task<IActionResult> CopySetupPackage([FromRoute] Guid setupPackageId)
+        {
+            var response = await _setupPackageService.CopySetupPackage(setupPackageId);
             return StatusCode(int.Parse(response.status), response);
         }
+            
         /// <summary>
         /// API lấy thông tin chi tiết setup theo ID cho mọi role.
         /// </summary>
@@ -172,6 +203,21 @@ namespace FTSS_API.Controller
                 return Problem(MessageConstant.SetUpPackageMessage.SetUpPackageIsEmpty, statusCode: StatusCodes.Status404NotFound);
             }
 
+            return Ok(response);
+        }
+        
+        /// <summary>
+        /// API kích hoạt SetupPackage cho customer.
+        /// </summary>
+        [HttpPut(ApiEndPointConstant.SetupPackage.EnableSetupPackage)]
+        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
+        [ProducesErrorResponseType(typeof(ProblemDetails))]
+        public async Task<IActionResult> enableSetupPackage(
+            [FromRoute] Guid setupPackageId 
+           )
+        {
+            var response = await _setupPackageService.enableSetupPackage(setupPackageId);
             return Ok(response);
         }
     }

@@ -23,6 +23,8 @@ public partial class SetupPackage
 
     public string? Image { get; set; }
 
+    public string? Status { get; set; }
+
     public virtual ICollection<SetupPackageDetail> SetupPackageDetails { get; set; } = new List<SetupPackageDetail>();
 
     public virtual User? User { get; set; }

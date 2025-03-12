@@ -158,8 +158,7 @@ namespace FTSS_API.Service.Implement
         }
 
 
-
-
+ 
         public async Task<ApiResponse> GetAllCategory(int page, int size, string searchName, bool? isAscending)
         {
             var categories = await _unitOfWork.GetRepository<Category>().GetPagingListAsync(
