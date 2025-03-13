@@ -163,9 +163,11 @@ namespace FTSS_API.Service.Implement;
 
       private async Task HandleFailedPayment(Payment payment)
       {
+          var order = await _unitOfWork.GetRepository<Order>().SingleOrDefaultAsync(predicate: o => o.Id == payment.OrderId);
           payment.PaymentStatus = PaymentStatusEnum.Canceled.ToString();
-          
+          order.Status = OrderStatus.CANCELLED.ToString();
           payment.PaymentDate = DateTime.UtcNow;
           _unitOfWork.GetRepository<Payment>().UpdateAsync(payment);
+          _unitOfWork.GetRepository<Order>().UpdateAsync(order);
       }
   }

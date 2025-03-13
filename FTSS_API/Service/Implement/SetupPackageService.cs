@@ -782,7 +782,7 @@ namespace FTSS_API.Service.Implement
                 var newSetupPackage = new SetupPackage
                 {
                     Id = Guid.NewGuid(),
-                    SetupName = $"{existingSetup.SetupName}_Copy",
+                    SetupName = existingSetup.SetupName,
                     Description = existingSetup.Description,
                     Price = existingSetup.Price,
                     CreateDate = TimeUtils.GetCurrentSEATime(),

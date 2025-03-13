@@ -409,6 +409,8 @@ public class OrderService : BaseService<OrderService>, IOrderService
                 totalprice -= discountAmount;
                 voucher.Quantity -= 1;
                 _unitOfWork.GetRepository<Voucher>().UpdateAsync(voucher);
+                await _unitOfWork.CommitAsync();
+
             }
 
             order.OrderDetails = orderDetails;
@@ -419,120 +421,139 @@ public class OrderService : BaseService<OrderService>, IOrderService
             // insert orderDetails
             await _unitOfWork.GetRepository<OrderDetail>().InsertRangeAsync(orderDetails);
 
-            bool isSuccessOrder = await _unitOfWork.CommitAsync() > 0;
-            if (!isSuccessOrder)
-            {
-                return new ApiResponse()
-                {
-                    status = StatusCodes.Status400BadRequest.ToString(),
-                    message = MessageConstant.OrderMessage.CreateOrderFail,
-                    data = null
-                };
-            }
-
-            var createPaymentRequest = new CreatePaymentRequest
-            {
-                OrderId = order.Id,
-                PaymentMethod = createOrderRequest.PaymentMethod,
-            };
-            var paymentResponse = await _paymentService.Value.CreatePayment(createPaymentRequest);
-            CreatePaymentResponse payment = null;
-            if (paymentResponse != null && paymentResponse.status.Equals(StatusCodes.Status200OK.ToString()))
-            {
-                payment = paymentResponse.data as CreatePaymentResponse;
-            }
-            // Delete CartItems with status "buyed"
-            //foreach (var cartItem in cartItems)
-            //{
-            //    _unitOfWork.GetRepository<CartItem>().DeleteAsync(cartItem);
-            //}
-
-
-            //await _unitOfWork.CommitAsync(); // Commit after deletion
-
-
-            // Prepare response
-            var orderDetailsResponse = new List<CreateOrderResponse.OrderDetailCreateResponse>();
-            foreach (var od in order.OrderDetails)
-            {
-                var product = await _unitOfWork.GetRepository<Product>().SingleOrDefaultAsync(
-                    predicate: p => p.Id.Equals(od.ProductId));
-                if (product != null)
-                {
-                    orderDetailsResponse.Add(new CreateOrderResponse.OrderDetailCreateResponse
-                    {
-                        Price = od.Price,
-                        ProductName = product.ProductName,
-                        Quantity = od.Quantity
-                    });
-                }
-            }
-
-
-            order = await _unitOfWork.GetRepository<Order>()
-                .SingleOrDefaultAsync(predicate: p => p.Id.Equals(order.Id),
-                    include: query => query.Include(o => o.User));
-
-            // Check if order or user is still null
-
-
-            if (order == null || order.User == null)
-            {
-                throw new Exception("Order or User information is missing.");
-            }
-
-            if (string.IsNullOrEmpty(order.User.UserName) || string.IsNullOrEmpty(order.User.Email))
-            {
-                throw new Exception("User name or email is missing.");
-            }
-
-            CreateOrderResponse createOrderResponse = new CreateOrderResponse
-            {
-                Id = order.Id,
-                OrderDetails = orderDetailsResponse,
-                ShipCost = createOrderRequest.ShipCost,
-                TotalPrice = order.TotalPrice,
-                Address = order.Address,
-                userResponse = new CreateOrderResponse.UserResponse
-                {
-                    Name = order.User.UserName,
-                    Email = order.User.Email,
-                    PhoneNumber = order.User.PhoneNumber
-                },
-                CheckoutUrl = payment?.PaymentURL,
-                Description = payment?.Description
-            };
-
-            return new ApiResponse()
-            {
-                status = StatusCodes.Status200OK.ToString(),
-                message = MessageConstant.OrderMessage.CreateOrderSuccess,
-                data = createOrderResponse
-            };
-        }
-        catch (DbUpdateConcurrencyException ex)
+         bool isSuccessOrder = false;
+        int retryCount = 3;
+        while (retryCount > 0)
         {
-            return new ApiResponse()
+            try
             {
-                status = StatusCodes.Status409Conflict.ToString(),
-                message = "Database concurrency issue. Please try again.",
+                isSuccessOrder = await _unitOfWork.CommitAsync() > 0;
+                if (isSuccessOrder) break;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"CommitAsync failed, retrying... ({3 - retryCount + 1}/3) - Error: {ex.Message}");
+                retryCount--;
+                await Task.Delay(200); // Đợi 200ms trước khi thử lại
+            }
+        }
+
+        if (!isSuccessOrder)
+        {
+            return new ApiResponse
+            {
+                status = StatusCodes.Status400BadRequest.ToString(),
+                message = MessageConstant.OrderMessage.CreateOrderFail,
                 data = null
             };
         }
-        catch (BadHttpRequestException)
+
+        var createPaymentRequest = new CreatePaymentRequest
         {
-            throw;
+            OrderId = order.Id,
+            PaymentMethod = createOrderRequest.PaymentMethod,
+        };
+        var paymentResponse = await _paymentService.Value.CreatePayment(createPaymentRequest);
+        CreatePaymentResponse payment = null;
+        if (paymentResponse != null && paymentResponse.status.Equals(StatusCodes.Status200OK.ToString()))
+        {
+            payment = paymentResponse.data as CreatePaymentResponse;
         }
-        catch (Exception ex)
+
+        // Xóa CartItems có trạng thái "buyed"
+        // await _unitOfWork.GetRepository<CartItem>().DeleteAsync(cartItems);
+        // await _unitOfWork.CommitAsync(); // Commit sau khi xóa
+
+        // Lấy thông tin chi tiết đơn hàng
+        var orderDetailsResponse = new List<CreateOrderResponse.OrderDetailCreateResponse>();
+        foreach (var od in order.OrderDetails)
         {
-            return new ApiResponse()
+            var product = await _unitOfWork.GetRepository<Product>()
+                .SingleOrDefaultAsync(predicate: p => p.Id.Equals(od.ProductId));
+
+            if (product != null)
+            {
+                orderDetailsResponse.Add(new CreateOrderResponse.OrderDetailCreateResponse
+                {
+                    Price = od.Price,
+                    ProductName = product.ProductName,
+                    Quantity = od.Quantity
+                });
+            }
+        }
+
+        // Lấy lại thông tin order và user
+        order = await _unitOfWork.GetRepository<Order>()
+            .SingleOrDefaultAsync(predicate:p => p.Id.Equals(order.Id),
+                include: query => query.Include(o => o.User));
+
+        if (order == null || order.User == null)
+        {
+            _logger.LogError("Order or User information is missing.");
+            return new ApiResponse
             {
                 status = StatusCodes.Status500InternalServerError.ToString(),
-                message = $"An unexpected error occurred while creating the order: {ex.Message}",
+                message = "Order or User information is missing.",
                 data = null
             };
         }
+
+        if (string.IsNullOrEmpty(order.User.UserName) || string.IsNullOrEmpty(order.User.Email))
+        {
+            _logger.LogError("User name or email is missing.");
+            return new ApiResponse
+            {
+                status = StatusCodes.Status500InternalServerError.ToString(),
+                message = "User name or email is missing.",
+                data = null
+            };
+        }
+
+        var createOrderResponse = new CreateOrderResponse
+        {
+            Id = order.Id,
+            OrderDetails = orderDetailsResponse,
+            ShipCost = createOrderRequest.ShipCost,
+            TotalPrice = order.TotalPrice,
+            Address = order.Address,
+            userResponse = new CreateOrderResponse.UserResponse
+            {
+                Name = order.User.UserName,
+                Email = order.User.Email,
+                PhoneNumber = order.User.PhoneNumber
+            },
+            CheckoutUrl = payment?.PaymentURL,
+            Description = payment?.Description
+        };
+
+        return new ApiResponse
+        {
+            status = StatusCodes.Status200OK.ToString(),
+            message = MessageConstant.OrderMessage.CreateOrderSuccess,
+            data = createOrderResponse
+        };
     }
+    catch (DbUpdateConcurrencyException ex)
+    {
+        _logger.LogError($"Database concurrency issue: {ex.Message}");
+        return new ApiResponse
+        {
+            status = StatusCodes.Status409Conflict.ToString(),
+            message = "Database concurrency issue. Please try again.",
+            data = null
+        };
+    }
+    catch (Exception ex)
+    {
+        _logger.LogError($"An unexpected error occurred: {ex.Message}");
+        return new ApiResponse
+        {
+            status = StatusCodes.Status500InternalServerError.ToString(),
+            message = $"An unexpected error occurred while creating the order: {ex.Message}",
+            data = null
+        };
+    }
+}
 public async Task<ApiResponse> UpdateOrder(Guid orderId, UpdateOrderRequest updateOrderRequest)
 {
     try
@@ -620,12 +641,11 @@ public async Task<ApiResponse> UpdateOrder(Guid orderId, UpdateOrderRequest upda
                 .AsQueryable();
 
             // Sắp xếp nếu cần
-            if (isAscending.HasValue)
-            {
+           
                 query = isAscending.Value
                     ? query.OrderBy(o => o.CreateDate) // Sắp xếp tăng dần theo CreateDate
                     : query.OrderByDescending(o => o.CreateDate); // Sắp xếp giảm dần theo CreateDate
-            }
+          
 
             // Phân trang
             var totalItems = await query.CountAsync();
@@ -739,13 +759,11 @@ public async Task<ApiResponse> UpdateOrder(Guid orderId, UpdateOrderRequest upda
                 .AsQueryable();
 
             // Sắp xếp nếu cần
-            if (isAscending.HasValue)
-            {
+           
                 query = isAscending.Value
                     ? query.OrderBy(o => o.CreateDate)
                     : query.OrderByDescending(o => o.CreateDate);
-            }
-
+          
             // Phân trang
             var totalItems = await query.CountAsync();
             var orders = await query
