@@ -562,11 +562,10 @@ public async Task<ApiResponse> UpdateOrder(Guid orderId, UpdateOrderRequest upda
             predicate: o => o.Id == orderId,
             include: query => query.Include(o => o.User).Include(o => o.OrderDetails)
         );
-        var payment = await _unitOfWork.GetRepository<Payment>().SingleOrDefaultAsync(
-            predicate: p => p.OrderId == orderId);
+
         if (order == null)
         {
-            return new ApiResponse()
+            return new ApiResponse
             {
                 status = StatusCodes.Status404NotFound.ToString(),
                 message = "Order not found.",
@@ -574,46 +573,37 @@ public async Task<ApiResponse> UpdateOrder(Guid orderId, UpdateOrderRequest upda
             };
         }
 
-       
-
-        if (updateOrderRequest.Status != null)
+        // Cập nhật trạng thái đơn hàng nếu có
+        if (!string.IsNullOrEmpty(updateOrderRequest.Status))
         {
-            if (updateOrderRequest.Status == OrderStatus.CANCELLED.ToString())
+            if (updateOrderRequest.Status == OrderStatus.CANCELLED.ToString() && order.Status == OrderStatus.PAID.ToString())
             {
-                if(order.Status == OrderStatus.PAID.ToString())
-                order.Status = updateOrderRequest.Status;
-                payment.Status = PaymentStatusEnum.Refunding.ToString();
+                var payment = await _unitOfWork.GetRepository<Payment>().SingleOrDefaultAsync(predicate: p => p.OrderId == orderId);
+                if (payment != null)
+                {
+                    payment.Status = PaymentStatusEnum.Refunding.ToString();
+                    _unitOfWork.GetRepository<Payment>().UpdateAsync(payment);
+                }
             }
-          
-        }
-        
-          
 
-          
-        _unitOfWork.GetRepository<Payment>().UpdateAsync(payment );
+            order.Status = updateOrderRequest.Status;
+        }
+
         _unitOfWork.GetRepository<Order>().UpdateAsync(order);
+        
+        // Commit tất cả thay đổi
         bool isUpdated = await _unitOfWork.CommitAsync() > 0;
 
-        if (!isUpdated)
+        return new ApiResponse
         {
-            return new ApiResponse()
-            {
-                status = StatusCodes.Status400BadRequest.ToString(),
-                message = "Failed to update order.",
-                data = null
-            };
-        }
-
-        return new ApiResponse()
-        {
-            status = StatusCodes.Status200OK.ToString(),
-            message = "Order updated successfully.",
-            data = order
+            status = isUpdated ? StatusCodes.Status200OK.ToString() : StatusCodes.Status400BadRequest.ToString(),
+            message = isUpdated ? "Order updated successfully." : "Failed to update order.",
+            data = true
         };
     }
     catch (Exception ex)
     {
-        return new ApiResponse()
+        return new ApiResponse
         {
             status = StatusCodes.Status500InternalServerError.ToString(),
             message = $"An unexpected error occurred while updating the order: {ex.Message}",

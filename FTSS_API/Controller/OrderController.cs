@@ -75,15 +75,22 @@ public class OrderController : BaseController<OrderController>
         {
             return BadRequest(new ApiResponse
             {
-                data = string.Empty,
+                data = null,
                 message = "Invalid request data",
                 status = StatusCodes.Status400BadRequest.ToString(),
             });
         }
 
         var response = await _orderService.UpdateOrder(id, updateOrderRequest);
-        return StatusCode(int.Parse(response.status), response);
+
+        if (!int.TryParse(response.status, out int statusCode))
+        {
+            statusCode = StatusCodes.Status500InternalServerError; // Mặc định nếu parsing lỗi
+        }
+
+        return StatusCode(statusCode, response);
     }
+
 
     /// <summary>
     /// API lấy danh sách đơn hàng cho user.
