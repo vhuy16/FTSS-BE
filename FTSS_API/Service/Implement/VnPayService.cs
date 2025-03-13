@@ -154,7 +154,7 @@ namespace FTSS_API.Service.Implement;
               }
           }
 
-          order.Status = OrderStatus.PENDING_DELIVERY.GetDescriptionFromEnum();
+          order.Status = OrderStatus.PROCESSING.GetDescriptionFromEnum();
           order.ModifyDate = DateTime.UtcNow;
           _unitOfWork.GetRepository<Order>().UpdateAsync(order);
 
@@ -164,7 +164,7 @@ namespace FTSS_API.Service.Implement;
       private async Task HandleFailedPayment(Payment payment)
       {
           var order = await _unitOfWork.GetRepository<Order>().SingleOrDefaultAsync(predicate: o => o.Id == payment.OrderId);
-          payment.PaymentStatus = PaymentStatusEnum.Canceled.ToString();
+          payment.PaymentStatus = PaymentStatusEnum.Cancelled.ToString();
           order.Status = OrderStatus.CANCELLED.ToString();
           payment.PaymentDate = DateTime.UtcNow;
           _unitOfWork.GetRepository<Payment>().UpdateAsync(payment);
