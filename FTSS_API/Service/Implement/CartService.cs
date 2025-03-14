@@ -317,11 +317,26 @@ public async Task<ApiResponse> AddSetupPackageToCart(Guid setupPackageId)
         };
     }
 
+    // Lấy thông tin gói setup
+    var setupPackage = await _unitOfWork.GetRepository<SetupPackage>().SingleOrDefaultAsync(
+        predicate: sp => sp.Id.Equals(setupPackageId));
+
+    if (setupPackage == null)
+    {
+        return new ApiResponse()
+        {
+            status = StatusCodes.Status404NotFound.ToString(),
+            message = "Setup package not found",
+            data = null
+        };
+    }
+
     List<AddCartItemResponse> cartItemResponses = new List<AddCartItemResponse>();
 
     foreach (var packageItem in packageProducts)
     {
         var product = await _unitOfWork.GetRepository<Product>().SingleOrDefaultAsync(
+            include: x => x.Include(x => x.Images),
             predicate: p => p.Id.Equals(packageItem.ProductId) &&
                             p.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()));
 
@@ -345,7 +360,7 @@ public async Task<ApiResponse> AddSetupPackageToCart(Guid setupPackageId)
             };
         }
 
-        var existingCartItem =  await _unitOfWork.GetRepository<CartItem>().SingleOrDefaultAsync(
+        var existingCartItem = await _unitOfWork.GetRepository<CartItem>().SingleOrDefaultAsync(
             predicate: ci => ci.CartId.Equals(cart.Id) && ci.ProductId.Equals(product.Id) &&
                              ci.Status == CartItemEnum.Odd.ToString() && ci.IsDelete != true);
 
@@ -402,6 +417,8 @@ public async Task<ApiResponse> AddSetupPackageToCart(Guid setupPackageId)
             ProductName = product.ProductName,
             Price = product.Price * packageItem.Quantity,
             Quantity = (int)packageItem.Quantity,
+            UnitPrice = product.Price,
+            LinkImage = product.Images.FirstOrDefault()?.LinkImage
         });
     }
 
@@ -411,9 +428,15 @@ public async Task<ApiResponse> AddSetupPackageToCart(Guid setupPackageId)
     {
         status = isSuccessfully ? StatusCodes.Status200OK.ToString() : StatusCodes.Status500InternalServerError.ToString(),
         message = isSuccessfully ? "Setup package added to cart successfully" : "Failed to add setup package",
-        data = cartItemResponses
+        data = new
+        {
+            SetupId = setupPackage.Id,
+            SetupName = setupPackage.SetupName,
+            CartItems = cartItemResponses
+        }
     };
 }
+
 
         public async Task<ApiResponse> ClearCart()
         {
