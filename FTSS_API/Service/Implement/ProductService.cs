@@ -419,7 +419,7 @@ public class ProductService : BaseService<ProductService>, IProductService
         // Check SubCategoryId if provided
         if (updateProductRequest.SubcategoryId.HasValue)
         {
-            var cateCheck = await _unitOfWork.GetRepository<Category>()
+            var cateCheck = await _unitOfWork.GetRepository<SubCategory>()
                 .SingleOrDefaultAsync(predicate: c => c.Id.Equals(updateProductRequest.SubcategoryId.Value));
             if (cateCheck == null)
             {
