@@ -38,6 +38,15 @@ public static class ApiEndPointConstant
         public const string CreatePaymentUrl = "api/vnpay/create-payment-url";
         public const string ValidatePaymentResponse = "api/vnpay/validate-payment-response";
     }
+    public static class Shipment
+    {
+        public const string ShipmentEndPoint = ApiEndpoint + "/shipment";
+        public const string CreateShipment = ShipmentEndPoint;
+        public const string GetAllShipments = ShipmentEndPoint;
+        public const string GetShipmentById = ShipmentEndPoint + "/{id}";
+        public const string UpdateShipment = ShipmentEndPoint + "/{id}";
+        public const string DeleteShipment = ShipmentEndPoint + "/{id}";
+    }
     public static class Payment
     {
         public const string PaymentEndPoint = ApiEndpoint + "/payment";

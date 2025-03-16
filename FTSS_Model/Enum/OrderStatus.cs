@@ -8,5 +8,6 @@
     CANCELLED,       // Đã hủy
     REFUNDED,        // Đã hoàn tiền
     FAILED,
-    PENDING_DELIVERY
+    PENDING_DELIVERY,
+    COMPLETED,
 }

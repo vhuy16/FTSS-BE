@@ -259,7 +259,7 @@ public class PayOsService : BaseService<PayOsService>, IPayOSService
                 status = StatusCodes.Status404NotFound.ToString()
             };
         }
-        payment.PaymentStatus = PaymentStatusEnum.Canceled.ToString();
+        payment.PaymentStatus = PaymentStatusEnum.Cancelled.ToString();
         payment.PaymentDate = DateTime.UtcNow;
         order.Status = OrderStatus.CANCELLED.GetDescriptionFromEnum();
         _unitOfWork.GetRepository<Payment>().UpdateAsync(payment);
