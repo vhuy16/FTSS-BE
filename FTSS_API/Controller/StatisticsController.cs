@@ -40,5 +40,24 @@ namespace FTSS_API.Controller
                 return StatusCode(500, "Internal server error.");
             }
         }
+        /// <summary>
+        /// API lấy số lượng sản phẩm bán được trong tuần.
+        /// </summary>
+        [HttpGet("weekly-sales")]
+        [ProducesResponseType(typeof(List<DailySalesResponse>), StatusCodes.Status200OK)]
+        [ProducesErrorResponseType(typeof(ProblemDetails))]
+        public async Task<IActionResult> GetWeeklySales()
+        {
+            try
+            {
+                var response = await _statisticsService.GetWeeklySales();
+                return Ok(response);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"Error fetching weekly sales: {ex.Message}");
+                return StatusCode(500, "Internal server error.");
+            }
+        }
     }
 }
