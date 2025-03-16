@@ -5,5 +5,4 @@ namespace FTSS_API.Service.Interface;
 public interface IStatisticsService
 {
     Task<MonthlyStatisticsResponse> GetMonthlyStatistics();
-    Task<List<DailySalesResponse>> GetWeeklySales();
 }
