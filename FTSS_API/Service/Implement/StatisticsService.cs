@@ -101,4 +101,38 @@ public class StatisticsService : BaseService<StatisticsService>, IStatisticsServ
         decimal change = ((current - previous) / previous) * 100;
         return change >= 0 ? $"{change:F2}%" : $"-{Math.Abs(change):F2}%";
     }
+    public async Task<List<DailySalesResponse>> GetWeeklySales()
+    {
+        DateTime today = DateTime.UtcNow;
+
+        // Xác định ngày đầu tuần (Thứ Hai)
+        int currentDayOfWeek = (int)today.DayOfWeek;
+        DateTime startOfWeek = today.AddDays(-((currentDayOfWeek == 0 ? 7 : currentDayOfWeek) - 1)).Date;
+        DateTime endOfWeek = startOfWeek.AddDays(6).Date.AddHours(23).AddMinutes(59).AddSeconds(59);
+
+        var weeklyOrders = await _unitOfWork.GetRepository<Order>().GetListAsync(
+            include: i => i.Include(o => o.OrderDetails),
+            predicate: o => o.CreateDate >= startOfWeek && o.CreateDate <= endOfWeek
+                         && o.Status.Equals(OrderStatus.COMPLETED.GetDescriptionFromEnum()));
+
+        // Dữ liệu bán hàng theo ngày thực tế (nếu có)
+        var salesData = weeklyOrders
+            .SelectMany(o => o.OrderDetails, (order, detail) => new { order.CreateDate, detail.Quantity })
+            .GroupBy(d => d.CreateDate.Value.Date)
+            .ToDictionary(g => g.Key, g => g.Sum(x => x.Quantity));
+
+        // Tạo danh sách kết quả gồm tất cả các ngày trong tuần
+        List<DailySalesResponse> result = new List<DailySalesResponse>();
+
+        for (DateTime date = startOfWeek; date <= endOfWeek; date = date.AddDays(1))
+        {
+            result.Add(new DailySalesResponse
+            {
+                Day = date.ToString("dd/MM/yyyy"),
+                ProductQuantity = salesData.ContainsKey(date) ? salesData[date] : 0
+            });
+        }
+
+        return result;
+    }
 }
