@@ -94,4 +94,5 @@ public class PaymentController : BaseController<PaymentController>
         var result = await _paymentService.GetPayments(page, size);
         return Ok(result);
     }
+    
 }

@@ -40,5 +40,13 @@ namespace FTSS_API.Controller
                 return StatusCode(500, "Internal server error.");
             }
         }
+        [HttpGet("revenue")]
+        [ProducesResponseType(typeof(MonthlyStatisticsResponse), StatusCodes.Status200OK)]
+        [ProducesErrorResponseType(typeof(ProblemDetails))]
+        public async Task<IActionResult> GetRevenueByDateRange([FromQuery] DateTime startDay, [FromQuery] DateTime endDay)
+        {
+            var result = await _statisticsService.GetRevenueByDateRangeAsync(startDay, endDay);
+            return Ok(result);
+        }
     }
 }
