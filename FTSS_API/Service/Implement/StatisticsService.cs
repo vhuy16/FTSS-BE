@@ -75,6 +75,26 @@ public class StatisticsService : BaseService<StatisticsService>, IStatisticsServ
         };
     }
 
+    public async Task<List<RevenueResponse>> GetRevenueByDateRangeAsync(DateTime startDay, DateTime endDay)
+    {
+        var revenues = new List<RevenueResponse>();
+
+        for (var date = startDay; date <= endDay; date = date.AddDays(1))
+        {
+            var dailyOrders = await _unitOfWork.GetRepository<Order>().GetListAsync(
+                predicate: o => o.CreateDate.Value.Date == date.Date && o.Status == OrderStatus.COMPLETED.GetDescriptionFromEnum());
+
+            decimal totalRevenue = dailyOrders.Sum(o => o.TotalPrice);
+
+            revenues.Add(new RevenueResponse
+            {
+                Day = date.ToString("dd/MM/yyyy"),
+                Revenue = totalRevenue
+            });
+        }
+
+        return revenues;
+    }
     private string CalculateChangePercentage(decimal current, decimal previous)
     {
         if (previous == 0) return current > 0 ? "100%" : "0%";
