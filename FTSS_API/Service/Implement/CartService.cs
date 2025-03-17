@@ -422,12 +422,12 @@ public async Task<ApiResponse> AddSetupPackageToCart(Guid setupPackageId)
         });
     }
 
-    bool isSuccessfully = await _unitOfWork.CommitAsync() > 0;
+        await _unitOfWork.CommitAsync();
 
     return new ApiResponse()
     {
-        status = isSuccessfully ? StatusCodes.Status200OK.ToString() : StatusCodes.Status500InternalServerError.ToString(),
-        message = isSuccessfully ? "Setup package added to cart successfully" : "Failed to add setup package",
+        status =StatusCodes.Status200OK.ToString(),
+        message ="Setup package added to cart successfully",
         data = new
         {
             SetupId = setupPackage.Id,
