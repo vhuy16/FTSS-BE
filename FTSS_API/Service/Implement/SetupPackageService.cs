@@ -837,8 +837,8 @@ namespace FTSS_API.Service.Implement
                 var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
                     predicate: u => u.Id.Equals(userId) &&
                                     u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) &&
-                                    u.IsDelete == false &&
-                                    u.Role == RoleEnum.Customer.GetDescriptionFromEnum());
+                                    u.IsDelete == false 
+                                    );
 
                 if (user == null)
                 {
