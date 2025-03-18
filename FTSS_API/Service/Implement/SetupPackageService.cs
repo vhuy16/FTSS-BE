@@ -825,7 +825,7 @@ namespace FTSS_API.Service.Implement
             }
         }
 
-        public async Task<ApiResponse> UpdateSetupPackage(
+                public async Task<ApiResponse> UpdateSetupPackage(
             List<ProductSetupItem>? productIds,
             Guid setupPackageId,
             AddSetupPackageRequest request,
@@ -837,8 +837,8 @@ namespace FTSS_API.Service.Implement
                 var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
                     predicate: u => u.Id.Equals(userId) &&
                                     u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) &&
-                                    u.IsDelete == false 
-                                    );
+                                    u.IsDelete == false &&
+                                    u.Role == RoleEnum.Customer.GetDescriptionFromEnum()|| u.Role == RoleEnum.Manager.GetDescriptionFromEnum());
 
                 if (user == null)
                 {
@@ -955,11 +955,11 @@ namespace FTSS_API.Service.Implement
                             await _unitOfWork.GetRepository<SetupPackageDetail>()
                                 .InsertRangeAsync(newSetupPackageDetails);
                         }
-                       
+
+                        await _unitOfWork.CommitAsync();
                     }
                 }
-                _unitOfWork.GetRepository<SetupPackage>().UpdateAsync(setupPackage);
-                await _unitOfWork.CommitAsync();
+
 
                 return new ApiResponse
                 {
