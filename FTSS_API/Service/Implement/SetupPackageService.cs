@@ -955,11 +955,12 @@ namespace FTSS_API.Service.Implement
                             await _unitOfWork.GetRepository<SetupPackageDetail>()
                                 .InsertRangeAsync(newSetupPackageDetails);
                         }
-
+                                
                         await _unitOfWork.CommitAsync();
                     }
                 }
-
+                _unitOfWork.GetRepository<SetupPackage>().UpdateAsync(setupPackage);
+                await _unitOfWork.CommitAsync();
 
                 return new ApiResponse
                 {
