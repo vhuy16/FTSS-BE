@@ -1,0 +1,27 @@
+﻿using System;
+using System.Collections.Generic;
+
+namespace FTSS_Model.Entities;
+
+public partial class Mission
+{
+    public Guid Id { get; set; }
+
+    public string MissionName { get; set; } = null!;
+
+    public string? MissionDescription { get; set; }
+
+    public string? Status { get; set; }
+
+    public bool? IsDelete { get; set; }
+
+    public Guid? Userid { get; set; }
+
+    public DateTime? MissionSchedule { get; set; }
+
+    public Guid? BookingId { get; set; }
+
+    public virtual Booking? Booking { get; set; }
+
+    public virtual User? User { get; set; }
+}
