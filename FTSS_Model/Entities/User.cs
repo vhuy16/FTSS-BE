@@ -31,11 +31,11 @@ public partial class User
 
     public bool? IsDelete { get; set; }
 
+    public virtual ICollection<Booking> Bookings { get; set; } = new List<Booking>();
+
     public virtual ICollection<Cart> Carts { get; set; } = new List<Cart>();
 
-    public virtual ICollection<MaintenanceSchedule> MaintenanceSchedules { get; set; } = new List<MaintenanceSchedule>();
-
-    public virtual ICollection<MaintenanceTask> MaintenanceTasks { get; set; } = new List<MaintenanceTask>();
+    public virtual ICollection<Mission> Missions { get; set; } = new List<Mission>();
 
     public virtual ICollection<Order> Orders { get; set; } = new List<Order>();
 

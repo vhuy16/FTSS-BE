@@ -295,10 +295,6 @@ public partial class MyDbContext : DbContext
                 .HasColumnName("status");
             entity.Property(e => e.UserId).HasColumnName("userId");
 
-            entity.HasOne(d => d.User).WithMany(p => p.MaintenanceSchedules)
-                .HasForeignKey(d => d.UserId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK__Maintenan__userI__3E52440B");
         });
 
         modelBuilder.Entity<MaintenanceTask>(entity =>
@@ -330,9 +326,6 @@ public partial class MyDbContext : DbContext
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK__Maintenan__maint__245D67DE");
 
-            entity.HasOne(d => d.User).WithMany(p => p.MaintenanceTasks)
-                .HasForeignKey(d => d.Userid)
-                .HasConstraintName("FK_MaintenanceTask_User");
         });
 
         modelBuilder.Entity<Model3D>(entity =>
@@ -497,7 +490,6 @@ public partial class MyDbContext : DbContext
             entity.Property(e => e.IsDelete)
                 .HasDefaultValue(false)
                 .HasColumnName("isDelete");
-            entity.Property(e => e.Model3Did).HasColumnName("model3DId");
             entity.Property(e => e.ModifyDate)
                 .HasColumnType("datetime")
                 .HasColumnName("modifyDate");
@@ -516,9 +508,6 @@ public partial class MyDbContext : DbContext
                 .HasColumnName("status");
             entity.Property(e => e.SubCategoryId).HasColumnName("SubCategoryID");
 
-            entity.HasOne(d => d.Model3D).WithMany(p => p.Products)
-                .HasForeignKey(d => d.Model3Did)
-                .HasConstraintName("FK_Product_Model3D");
 
             entity.HasOne(d => d.SubCategory).WithMany(p => p.Products)
                 .HasForeignKey(d => d.SubCategoryId)

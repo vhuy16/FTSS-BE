@@ -15,6 +15,10 @@ public partial class FtssContext : DbContext
     {
     }
 
+    public virtual DbSet<Booking> Bookings { get; set; }
+
+    public virtual DbSet<BookingDetail> BookingDetails { get; set; }
+
     public virtual DbSet<Cart> Carts { get; set; }
 
     public virtual DbSet<CartItem> CartItems { get; set; }
@@ -29,11 +33,7 @@ public partial class FtssContext : DbContext
 
     public virtual DbSet<IssueProduct> IssueProducts { get; set; }
 
-    public virtual DbSet<MaintenanceSchedule> MaintenanceSchedules { get; set; }
-
-    public virtual DbSet<MaintenanceTask> MaintenanceTasks { get; set; }
-
-    public virtual DbSet<Model3D> Model3Ds { get; set; }
+    public virtual DbSet<Mission> Missions { get; set; }
 
     public virtual DbSet<Order> Orders { get; set; }
 
@@ -44,6 +44,8 @@ public partial class FtssContext : DbContext
     public virtual DbSet<Payment> Payments { get; set; }
 
     public virtual DbSet<Product> Products { get; set; }
+
+    public virtual DbSet<ServicePackage> ServicePackages { get; set; }
 
     public virtual DbSet<SetupPackage> SetupPackages { get; set; }
 
@@ -65,6 +67,65 @@ public partial class FtssContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<Booking>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PK__Maintena__3213E83F2B701192");
+
+            entity.ToTable("Booking");
+
+            entity.Property(e => e.Id)
+                .HasDefaultValueSql("(newid())")
+                .HasColumnName("id");
+            entity.Property(e => e.Address)
+                .HasMaxLength(255)
+                .HasColumnName("address");
+            entity.Property(e => e.OrderId).HasColumnName("orderId");
+            entity.Property(e => e.PhoneNumber)
+                .HasMaxLength(15)
+                .HasColumnName("phoneNumber");
+            entity.Property(e => e.ScheduleDate)
+                .HasColumnType("datetime")
+                .HasColumnName("scheduleDate");
+            entity.Property(e => e.Status)
+                .HasMaxLength(50)
+                .HasColumnName("status");
+            entity.Property(e => e.TotalPrice)
+                .HasColumnType("decimal(18, 2)")
+                .HasColumnName("totalPrice");
+            entity.Property(e => e.UserId).HasColumnName("userId");
+
+            entity.HasOne(d => d.Order).WithMany(p => p.Bookings)
+                .HasForeignKey(d => d.OrderId)
+                .HasConstraintName("FK_Booking_Order");
+
+            entity.HasOne(d => d.User).WithMany(p => p.Bookings)
+                .HasForeignKey(d => d.UserId)
+                .HasConstraintName("FK_Booking_User");
+        });
+
+        modelBuilder.Entity<BookingDetail>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PK__BookingD__3213E83F8426CEBB");
+
+            entity.ToTable("BookingDetail");
+
+            entity.Property(e => e.Id)
+                .HasDefaultValueSql("(newid())")
+                .HasColumnName("id");
+            entity.Property(e => e.BookingId).HasColumnName("bookingId");
+            entity.Property(e => e.ServicePackageId).HasColumnName("servicePackageId");
+
+            entity.HasOne(d => d.Booking).WithMany(p => p.BookingDetails)
+                .HasForeignKey(d => d.BookingId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_BookingDetail_Booking");
+
+            entity.HasOne(d => d.ServicePackage).WithMany(p => p.BookingDetails)
+                .HasForeignKey(d => d.ServicePackageId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_BookingDetail_ServicePackage");
+        });
+
         modelBuilder.Entity<Cart>(entity =>
         {
             entity.HasKey(e => e.Id).HasName("PK__Cart__3213E83F39ED5C43");
@@ -277,84 +338,39 @@ public partial class FtssContext : DbContext
                 .HasConstraintName("FK__IssueProd__produ__0F624AF8");
         });
 
-        modelBuilder.Entity<MaintenanceSchedule>(entity =>
-        {
-            entity.HasKey(e => e.Id).HasName("PK__Maintena__3213E83F2B701192");
-
-            entity.ToTable("MaintenanceSchedule");
-
-            entity.Property(e => e.Id)
-                .HasDefaultValueSql("(newid())")
-                .HasColumnName("id");
-            entity.Property(e => e.ScheduleDate)
-                .HasColumnType("datetime")
-                .HasColumnName("scheduleDate");
-            entity.Property(e => e.Status)
-                .HasMaxLength(50)
-                .HasColumnName("status");
-            entity.Property(e => e.UserId).HasColumnName("userId");
-
-            entity.HasOne(d => d.User).WithMany(p => p.MaintenanceSchedules)
-                .HasForeignKey(d => d.UserId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK__Maintenan__userI__3E52440B");
-        });
-
-        modelBuilder.Entity<MaintenanceTask>(entity =>
+        modelBuilder.Entity<Mission>(entity =>
         {
             entity.HasKey(e => e.Id).HasName("PK__Maintena__3213E83F3561400D");
 
-            entity.ToTable("MaintenanceTask");
+            entity.ToTable("Mission");
 
             entity.Property(e => e.Id)
                 .HasDefaultValueSql("(newid())")
                 .HasColumnName("id");
-            entity.Property(e => e.Address).HasMaxLength(255);
+            entity.Property(e => e.BookingId).HasColumnName("bookingId");
             entity.Property(e => e.IsDelete)
                 .HasDefaultValue(false)
                 .HasColumnName("isDelete");
-            entity.Property(e => e.MaintenanceScheduleId).HasColumnName("maintenanceScheduleId");
+            entity.Property(e => e.MissionDescription).HasColumnName("missionDescription");
+            entity.Property(e => e.MissionName)
+                .HasMaxLength(255)
+                .HasColumnName("missionName");
+            entity.Property(e => e.MissionSchedule)
+                .HasColumnType("datetime")
+                .HasColumnName("missionSchedule");
             entity.Property(e => e.Status)
                 .HasMaxLength(50)
                 .IsUnicode(false)
                 .HasColumnName("status");
-            entity.Property(e => e.TaskDescription).HasColumnName("taskDescription");
-            entity.Property(e => e.TaskName)
-                .HasMaxLength(255)
-                .HasColumnName("taskName");
             entity.Property(e => e.Userid).HasColumnName("userid");
 
-            entity.HasOne(d => d.MaintenanceSchedule).WithMany(p => p.MaintenanceTasks)
-                .HasForeignKey(d => d.MaintenanceScheduleId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK__Maintenan__maint__245D67DE");
+            entity.HasOne(d => d.Booking).WithMany(p => p.Missions)
+                .HasForeignKey(d => d.BookingId)
+                .HasConstraintName("FK_Mission_Booking");
 
-            entity.HasOne(d => d.User).WithMany(p => p.MaintenanceTasks)
+            entity.HasOne(d => d.User).WithMany(p => p.Missions)
                 .HasForeignKey(d => d.Userid)
                 .HasConstraintName("FK_MaintenanceTask_User");
-        });
-
-        modelBuilder.Entity<Model3D>(entity =>
-        {
-            entity.HasKey(e => e.Id).HasName("PK__Model3D__3213E83F5EF21205");
-
-            entity.ToTable("Model3D");
-
-            entity.Property(e => e.Id)
-                .HasDefaultValueSql("(newid())")
-                .HasColumnName("id");
-            entity.Property(e => e.CreateDate)
-                .HasColumnType("datetime")
-                .HasColumnName("createDate");
-            entity.Property(e => e.IsDelete)
-                .HasDefaultValue(false)
-                .HasColumnName("isDelete");
-            entity.Property(e => e.Link)
-                .HasMaxLength(255)
-                .HasColumnName("link");
-            entity.Property(e => e.ModifyDate)
-                .HasColumnType("datetime")
-                .HasColumnName("modifyDate");
         });
 
         modelBuilder.Entity<Order>(entity =>
@@ -367,7 +383,7 @@ public partial class FtssContext : DbContext
                 .HasDefaultValueSql("(newid())")
                 .HasColumnName("id");
             entity.Property(e => e.Address)
-                .HasMaxLength(50)
+                .HasMaxLength(200)
                 .HasColumnName("address");
             entity.Property(e => e.CreateDate)
                 .HasColumnType("datetime")
@@ -496,7 +512,6 @@ public partial class FtssContext : DbContext
             entity.Property(e => e.IsDelete)
                 .HasDefaultValue(false)
                 .HasColumnName("isDelete");
-            entity.Property(e => e.Model3Did).HasColumnName("model3DId");
             entity.Property(e => e.ModifyDate)
                 .HasColumnType("datetime")
                 .HasColumnName("modifyDate");
@@ -515,13 +530,33 @@ public partial class FtssContext : DbContext
                 .HasColumnName("status");
             entity.Property(e => e.SubCategoryId).HasColumnName("SubCategoryID");
 
-            entity.HasOne(d => d.Model3D).WithMany(p => p.Products)
-                .HasForeignKey(d => d.Model3Did)
-                .HasConstraintName("FK_Product_Model3D");
-
             entity.HasOne(d => d.SubCategory).WithMany(p => p.Products)
                 .HasForeignKey(d => d.SubCategoryId)
                 .HasConstraintName("FK_Product_SubCategory");
+        });
+
+        modelBuilder.Entity<ServicePackage>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PK__ServiceP__3213E83FA4E5AED8");
+
+            entity.ToTable("ServicePackage");
+
+            entity.Property(e => e.Id)
+                .HasDefaultValueSql("(newid())")
+                .HasColumnName("id");
+            entity.Property(e => e.Description).HasColumnName("description");
+            entity.Property(e => e.IsDelete)
+                .HasDefaultValue(false)
+                .HasColumnName("isDelete");
+            entity.Property(e => e.Price)
+                .HasColumnType("decimal(18, 2)")
+                .HasColumnName("price");
+            entity.Property(e => e.ServiceName)
+                .HasMaxLength(255)
+                .HasColumnName("serviceName");
+            entity.Property(e => e.Status)
+                .HasMaxLength(50)
+                .HasColumnName("status");
         });
 
         modelBuilder.Entity<SetupPackage>(entity =>
@@ -548,6 +583,9 @@ public partial class FtssContext : DbContext
             entity.Property(e => e.SetupName)
                 .HasMaxLength(255)
                 .HasColumnName("setupName");
+            entity.Property(e => e.Status)
+                .HasMaxLength(50)
+                .HasColumnName("status");
             entity.Property(e => e.Userid).HasColumnName("userid");
 
             entity.HasOne(d => d.User).WithMany(p => p.SetupPackages)
