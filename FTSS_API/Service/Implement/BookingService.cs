@@ -12,9 +12,9 @@ using Microsoft.EntityFrameworkCore;
 
 namespace FTSS_API.Service.Implement
 {
-    public class MaintenanceScheduleService : BaseService<MaintenanceScheduleService>, IMaintenanceScheduleService
+    public class BookingService : BaseService<BookingService>, IBookingService
     {
-        public MaintenanceScheduleService(IUnitOfWork<MyDbContext> unitOfWork, ILogger<MaintenanceScheduleService> logger, IMapper mapper, IHttpContextAccessor httpContextAccessor) : base(unitOfWork, logger, mapper, httpContextAccessor)
+        public BookingService(IUnitOfWork<MyDbContext> unitOfWork, ILogger<BookingService> logger, IMapper mapper, IHttpContextAccessor httpContextAccessor) : base(unitOfWork, logger, mapper, httpContextAccessor)
         {
         }
         public async Task<ApiResponse> AssigningTechnician(Guid technicianid, Guid userid, AssigningTechnicianRequest request)
@@ -124,7 +124,7 @@ namespace FTSS_API.Service.Implement
                     Id = Guid.NewGuid(),
                     UserId = userid,
                     ScheduleDate = request.ScheduleDate,
-                    Status = MaintenanceScheduleStatusEnum.Available.GetDescriptionFromEnum()
+                    Status = BookingStatusEnum.Available.GetDescriptionFromEnum()
                 };
 
                 await _unitOfWork.Context.Set<MaintenanceSchedule>().AddAsync(newSchedule);
@@ -137,7 +137,7 @@ namespace FTSS_API.Service.Implement
                     MaintenanceScheduleId = newSchedule.Id, // Lấy ID của MaintenanceSchedule vừa tạo
                     TaskName = request.TaskName,
                     TaskDescription = request.TaskDescription,
-                    Status = TaskStatusEnum.Processing.GetDescriptionFromEnum(),
+                    Status = MissionStatusEnum.Processing.GetDescriptionFromEnum(),
                     IsDelete = false,
                     Address = request.Address,
                     Userid = technicianid // Gán technicianid từ request vào userid của MaintenanceTask
@@ -212,7 +212,7 @@ namespace FTSS_API.Service.Implement
                 }
 
                 // Cập nhật trạng thái thành "Cancel"
-                task.Status = TaskStatusEnum.Cancel.GetDescriptionFromEnum();
+                task.Status = MissionStatusEnum.Cancel.GetDescriptionFromEnum();
                 _unitOfWork.GetRepository<MaintenanceTask>().UpdateAsync(task);
                 await _unitOfWork.CommitAsync();
 
