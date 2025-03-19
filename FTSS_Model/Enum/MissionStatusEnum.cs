@@ -1,6 +1,6 @@
 ﻿namespace FTSS_Model.Enum;
 
-public enum TaskStatusEnum
+public enum MissionStatusEnum
 {
     Done,
     Cancel,

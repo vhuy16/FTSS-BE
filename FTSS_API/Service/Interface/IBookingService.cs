@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace FTSS_API.Service.Interface
 {
-    public interface IMaintenanceScheduleService
+    public interface IBookingService
     {
         Task<ApiResponse> AssigningTechnician(Guid technicianid, Guid userid, AssigningTechnicianRequest request);
         Task<ApiResponse> CancelTask(Guid id);
