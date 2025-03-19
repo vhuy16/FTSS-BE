@@ -407,7 +407,7 @@ public async Task<ApiResponse> AddSetupPackageToCart(Guid setupPackageId)
                 ModifyDate = TimeUtils.GetCurrentSEATime()
             };
 
-            await _unitOfWork.GetRepository<CartItem>().InsertAsync(cartItem);
+            
         }
 
         cartItemResponses.Add(new AddCartItemResponse()
@@ -421,7 +421,6 @@ public async Task<ApiResponse> AddSetupPackageToCart(Guid setupPackageId)
             LinkImage = product.Images.FirstOrDefault()?.LinkImage
         });
     }
-
     bool isSuccessfully = await _unitOfWork.CommitAsync() > 0;
 
     return new ApiResponse()
