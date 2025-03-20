@@ -25,6 +25,8 @@ public partial class SetupPackage
 
     public string? Status { get; set; }
 
+    public virtual ICollection<Order> Orders { get; set; } = new List<Order>();
+
     public virtual ICollection<SetupPackageDetail> SetupPackageDetails { get; set; } = new List<SetupPackageDetail>();
 
     public virtual User? User { get; set; }

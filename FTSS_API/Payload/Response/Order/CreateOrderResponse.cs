@@ -6,6 +6,10 @@ public class CreateOrderResponse
     public decimal? TotalPrice { get; set; }
     public int? ShipCost { get; set; }
     public string? Address { get; set; }
+    public Guid? SetupPackageId { get; set; }
+    public string? PhoneNumber { get; set; }
+
+    public string? RecipientName { get; set; }
     public UserResponse userResponse { get; set; } // Fixed property declaration and removed invalid initialization
     public List<OrderDetailCreateResponse> OrderDetails { get; set; } = new List<OrderDetailCreateResponse>();
     public string? CheckoutUrl { get; set; }

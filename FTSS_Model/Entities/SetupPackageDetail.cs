@@ -9,7 +9,7 @@ public partial class SetupPackageDetail
 
     public Guid ProductId { get; set; }
 
-    public Guid SetupPackageId { get; set; }
+    public Guid? SetupPackageId { get; set; }
 
     public int? Quantity { get; set; }
 
@@ -17,5 +17,5 @@ public partial class SetupPackageDetail
 
     public virtual Product Product { get; set; } = null!;
 
-    public virtual SetupPackage SetupPackage { get; set; } = null!;
+    public virtual SetupPackage? SetupPackage { get; set; }
 }
