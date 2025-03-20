@@ -138,12 +138,12 @@ public static class ApiEndPointConstant
         public const string EnableSetupPackage  = SetupPackageEndPoint +"/enableSetupPackage"+ "/{setupPackageId}";
         public const string GetSetUpById = SetupPackageEndPoint + "/{id}";
     }
-    public static class MaintenanceSchedule
+    public static class Booking
     {
-        public const string MaintenanceScheduleEndPoint = ApiEndpoint + "/maintenanceschedule";
-        public const string AssigningTechnician = MaintenanceScheduleEndPoint;
-        public const string CancelTask = MaintenanceScheduleEndPoint + "{id}";
-        public const string GetListTask = MaintenanceScheduleEndPoint;
-        public const string GetListTaskTech = MaintenanceScheduleEndPoint + "/list-task-tech";
+        public const string BookingEndPoint = ApiEndpoint + "/booking";
+        public const string AssigningTechnician = BookingEndPoint;
+        public const string CancelTask = BookingEndPoint + "{id}";
+        public const string GetListTask = BookingEndPoint;
+        public const string GetListTaskTech = BookingEndPoint + "/list-task-tech";
     }
 }

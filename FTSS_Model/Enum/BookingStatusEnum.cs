@@ -1,6 +1,6 @@
 ﻿namespace FTSS_Model.Enum;
 
-public enum MaintenanceScheduleStatusEnum
+public enum BookingStatusEnum
 {
     Available,
     Unavailable

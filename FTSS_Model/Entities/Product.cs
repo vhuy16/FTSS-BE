@@ -17,8 +17,6 @@ public partial class Product
 
     public int? Quantity { get; set; }
 
-    public Guid? Model3Did { get; set; }
-
     public DateTime? CreateDate { get; set; }
 
     public DateTime? ModifyDate { get; set; }
@@ -34,8 +32,6 @@ public partial class Product
     public virtual ICollection<Image> Images { get; set; } = new List<Image>();
 
     public virtual ICollection<IssueProduct> IssueProducts { get; set; } = new List<IssueProduct>();
-
-    public virtual Model3D? Model3D { get; set; }
 
     public virtual ICollection<OrderDetail> OrderDetails { get; set; } = new List<OrderDetail>();
 

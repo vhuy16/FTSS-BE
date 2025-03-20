@@ -11,42 +11,42 @@ using FTSS_Model.Paginate;
 
 namespace FTSS_API.Controller
 {
-    public class MaintenanceScheduleController : BaseController<MaintenanceScheduleController>
+    public class BookingController : BaseController<BookingController>
     {
-        private readonly IMaintenanceScheduleService _maintenanceScheduleService;
-        public MaintenanceScheduleController(ILogger<MaintenanceScheduleController> logger, IMaintenanceScheduleService maintenanceScheduleService) : base(logger)
+        private readonly IBookingService _bookingService;
+        public BookingController(ILogger<BookingController> logger, IBookingService bookingService) : base(logger)
         {
-            _maintenanceScheduleService = maintenanceScheduleService;
+            _bookingService = bookingService;
         }
         /// <summary>
-        /// API phân việc cho kỹ thuật viên
+        /// API phân việc cho kỹ thuật viên giao hàng và lắp đặt
         /// </summary>
-        [HttpPost(ApiEndPointConstant.MaintenanceSchedule.AssigningTechnician)]
+        [HttpPost(ApiEndPointConstant.Booking.AssigningTechnician)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status201Created)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
         [ProducesErrorResponseType(typeof(ProblemDetails))]
         public async Task<IActionResult> AssigningTechnician([FromForm] Guid technicianid,[FromForm] Guid userid, [FromForm] AssigningTechnicianRequest request)
         {
-            var response = await _maintenanceScheduleService.AssigningTechnician(technicianid, userid, request);
+            var response = await _bookingService.AssigningTechnician(technicianid, userid, request);
             return StatusCode(int.Parse(response.status), response);
         }
         /// <summary>
         /// API cancel task cho admin, manager, technician.
         /// </summary>
-        [HttpPut(ApiEndPointConstant.MaintenanceSchedule.CancelTask)]
+        [HttpPut(ApiEndPointConstant.Booking.CancelTask)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
         [ProducesErrorResponseType(typeof(ProblemDetails))]
         public async Task<IActionResult> CancelTask(Guid id)
         {
-            var response = await _maintenanceScheduleService.CancelTask(id);
+            var response = await _bookingService.CancelTask(id);
             return StatusCode(int.Parse(response.status), response);
         }
         /// <summary>
         /// API lấy danh sách task cho admin, manager.
         /// </summary>
-        [HttpGet(ApiEndPointConstant.MaintenanceSchedule.GetListTask)]
+        [HttpGet(ApiEndPointConstant.Booking.GetListTask)]
         [ProducesResponseType(typeof(IPaginate<ApiResponse>), StatusCodes.Status200OK)]
         [ProducesErrorResponseType(typeof(ProblemDetails))]
         public async Task<IActionResult> GetListTask(
@@ -57,7 +57,7 @@ namespace FTSS_API.Controller
         {
             int pageNumber = page ?? 1;
             int pageSize = size ?? 10;
-            var response = await _maintenanceScheduleService.GetListTask(pageNumber, pageSize, status, isAscending);
+            var response = await _bookingService.GetListTask(pageNumber, pageSize, status, isAscending);
             if (response == null || response.data == null)
             {
                 return Problem(detail: MessageConstant.MaintenanceScheduleMessage.MaintenanceScheduleIsEmpty,
@@ -69,7 +69,7 @@ namespace FTSS_API.Controller
         /// <summary>
         /// API lấy danh sách task cho technician.
         /// </summary>
-        [HttpGet(ApiEndPointConstant.MaintenanceSchedule.GetListTaskTech)]
+        [HttpGet(ApiEndPointConstant.Booking.GetListTaskTech)]
         [ProducesResponseType(typeof(IPaginate<ApiResponse>), StatusCodes.Status200OK)]
         [ProducesErrorResponseType(typeof(ProblemDetails))]
         public async Task<IActionResult> GetListTaskTech(
@@ -80,7 +80,7 @@ namespace FTSS_API.Controller
         {
             int pageNumber = page ?? 1;
             int pageSize = size ?? 10;
-            var response = await _maintenanceScheduleService.GetListTaskTech(pageNumber, pageSize, status, isAscending);
+            var response = await _bookingService.GetListTaskTech(pageNumber, pageSize, status, isAscending);
             if (response == null || response.data == null)
             {
                 return Problem(detail: MessageConstant.MaintenanceScheduleMessage.MaintenanceScheduleIsEmpty,

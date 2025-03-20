@@ -907,7 +907,7 @@ namespace FTSS_API.Service.Implement
 
                         var newSetupPackageDetails = new List<SetupPackageDetail>();
 
-                        // Xóa các sản phẩm không còn trong danh sách mới
+                        // Xóa sản phẩm không còn trong danh sách mới
                         var toRemove = existingSetupPackageDetails
                             .Where(spd => !groupedProducts.Select(gp => gp.ProductId).Contains(spd.ProductId))
                             .ToList();
@@ -917,29 +917,25 @@ namespace FTSS_API.Service.Implement
                             _unitOfWork.GetRepository<SetupPackageDetail>().DeleteRangeAsync(toRemove);
                         }
 
-                        // Cập nhật hoặc thêm mới sản phẩm
                         foreach (var gp in groupedProducts)
                         {
-                            var existingDetail =
-                                existingSetupPackageDetails.FirstOrDefault(spd => spd.ProductId == gp.ProductId);
+                            var existingDetail = existingSetupPackageDetails.FirstOrDefault(spd => spd.ProductId == gp.ProductId);
                             var product = newProducts.FirstOrDefault(prod => prod.Id == gp.ProductId);
 
                             if (product != null)
                             {
                                 if (existingDetail != null)
                                 {
-                                    // ✅ Cập nhật lại số lượng thay vì cộng dồn
                                     existingDetail.Quantity = gp.TotalQuantity;
                                     existingDetail.Price = product.Price * existingDetail.Quantity;
 
-                                    _unitOfWork.GetRepository<SetupPackageDetail>().UpdateAsync(existingDetail);
+                                    // ✅ Không cần gọi UpdateAsync, vì EF đã theo dõi
                                 }
                                 else
                                 {
-                                    // ✅ Nếu chưa có, thêm mới
                                     newSetupPackageDetails.Add(new SetupPackageDetail
                                     {
-                                        Id = Guid.NewGuid(),
+                                        Id = Guid.NewGuid(), // Đảm bảo không trùng ID
                                         ProductId = gp.ProductId,
                                         SetupPackageId = setupPackage.Id,
                                         Quantity = gp.TotalQuantity,
@@ -955,8 +951,9 @@ namespace FTSS_API.Service.Implement
                             await _unitOfWork.GetRepository<SetupPackageDetail>()
                                 .InsertRangeAsync(newSetupPackageDetails);
                         }
-                                
+
                         await _unitOfWork.CommitAsync();
+
                     }
                 }
                 _unitOfWork.GetRepository<SetupPackage>().UpdateAsync(setupPackage);
