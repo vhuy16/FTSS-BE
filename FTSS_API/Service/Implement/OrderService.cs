@@ -311,7 +311,10 @@ public class OrderService : BaseService<OrderService>, IOrderService
                 Status = OrderStatus.PROCESSING.GetDescriptionFromEnum(),
                 Address = createOrderRequest.Address,
                 Shipcost = createOrderRequest.ShipCost,
-
+                PhoneNumber = createOrderRequest.PhoneNumber,
+                RecipientName = createOrderRequest.RecipientName,
+                SetupPackageId = createOrderRequest.SetupPackageId,
+                
                 //  OrderDetails = orderDetails // remove this to add later
             };
 
@@ -516,6 +519,9 @@ public class OrderService : BaseService<OrderService>, IOrderService
             ShipCost = createOrderRequest.ShipCost,
             TotalPrice = order.TotalPrice,
             Address = order.Address,
+            RecipientName = order.RecipientName,
+            PhoneNumber = order.PhoneNumber,
+            SetupPackageId = order.SetupPackageId,
             userResponse = new CreateOrderResponse.UserResponse
             {
                 Name = order.User.UserName,
@@ -664,6 +670,9 @@ public async Task<ApiResponse> UpdateOrder(Guid orderId, UpdateOrderRequest upda
                 Address = order.Address,
                 CreateDate = order.CreateDate,
                 ModifyDate = order.ModifyDate,
+                SetupPackageId = order.SetupPackageId,
+                PhoneNumber = order.PhoneNumber,
+                BuyerName = order.RecipientName,
                 Discount = order.Voucher?.Discount ?? 0,
                 Payment = new GetOrderResponse.PaymentResponse
                 {
@@ -739,6 +748,7 @@ public async Task<ApiResponse> UpdateOrder(Guid orderId, UpdateOrderRequest upda
                 .Include(o => o.User)
                 .Include(o => o.Voucher)
                 .Include(o => o.Payments)
+                .Include(o => o.SetupPackage)
                 .Include(o => o.OrderDetails)
                 .ThenInclude(od => od.Product)
                 .ThenInclude(p => p.SubCategory) // Bao gồm SubCategory từ Product
@@ -781,6 +791,9 @@ public async Task<ApiResponse> UpdateOrder(Guid orderId, UpdateOrderRequest upda
                 Address = order.Address,
                 CreateDate = order.CreateDate,
                 ModifyDate = order.ModifyDate,
+                SetupPackageId = order.SetupPackageId,
+                PhoneNumber = order.PhoneNumber,
+                BuyerName = order.RecipientName,
                 Discount = order.Voucher?.Discount ?? 0,
                 Payment = new GetOrderResponse.PaymentResponse
                 {
@@ -869,6 +882,9 @@ public async Task<ApiResponse> UpdateOrder(Guid orderId, UpdateOrderRequest upda
                 Address = order.Address,
                 CreateDate = order.CreateDate,
                 ModifyDate = order.ModifyDate,
+                SetupPackageId = order.SetupPackageId,
+                PhoneNumber = order.PhoneNumber,
+                BuyerName = order.RecipientName,
                 Discount = order.Voucher?.Discount ?? 0,
                 Payment = new GetOrderResponse.PaymentResponse
                 {
