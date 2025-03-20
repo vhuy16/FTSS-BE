@@ -16,11 +16,13 @@ namespace FTSS_API.Service.Interface
         Task<ApiResponse> RemoveSetupPackage(Guid id);
         Task<ApiResponse> CopySetupPackage(Guid setupPackageId);
 
-        Task<ApiResponse> UpdateSetupPackage(
-            List<ProductSetupItem> productIds,
-            Guid setupPackageId,
-            AddSetupPackageRequest request,
-            Client client);
+        Task<ApiResponse> UpdateSetupPackage(Guid setupPackageId, List<ProductSetupItem> productIds,
+            UpdateSetupPackageRequest request, Client client);
+        // Task<ApiResponse> UpdateSetupPackage(
+        //     List<ProductSetupItem> productIds,
+        //     Guid setupPackageId,
+        //     AddSetupPackageRequest request,
+        //     Client client);
         // Task<ApiResponse> UpdateSetupPackage(Guid setupPackageId, List<ProductSetupItem> productids, AddSetupPackageRequest request, Supabase.Client client);
         Task<bool> enableSetupPackage(Guid setupPackageId);
     }
