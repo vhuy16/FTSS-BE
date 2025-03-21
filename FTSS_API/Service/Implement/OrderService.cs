@@ -9,6 +9,7 @@ using FTSS_API.Payload.Request;
 using FTSS_API.Payload.Request.Pay;
 using FTSS_API.Payload.Response.Order;
 using FTSS_API.Payload.Response.Pay.Payment;
+using FTSS_API.Payload.Response.SetupPackage;
 using FTSS_API.Service.Interface;
 using FTSS_API.Utils;
 using FTSS_Model.Context;
@@ -629,15 +630,24 @@ public async Task<ApiResponse> UpdateOrder(Guid orderId, UpdateOrderRequest upda
                 .Include(o => o.Payments)
                 .Include(o => o.OrderDetails)
                 .ThenInclude(od => od.Product)
-                .ThenInclude(p => p.SubCategory) // Bao gồm SubCategory
-                .ThenInclude(sc => sc.Category) // Bao gồm Category từ SubCategory
+                .ThenInclude(p => p.SubCategory)
+                .ThenInclude(sc => sc.Category)
                 .Include(o => o.OrderDetails)
                 .ThenInclude(od => od.Product)
-                .ThenInclude(p => p.Images) // Bao gồm hình ảnh sản phẩm
+                .ThenInclude(p => p.Images) // ✅ Hình ảnh sản phẩm trong OrderDetails
+                .Include(o => o.SetupPackage) // ✅ Đảm bảo lấy SetupPackage
+                .ThenInclude(sp => sp.SetupPackageDetails)
+                .ThenInclude(spd => spd.Product)
+                .ThenInclude(p => p.SubCategory)
+                .ThenInclude(sc => sc.Category)
+                .Include(o => o.SetupPackage)
+                .ThenInclude(sp => sp.SetupPackageDetails)
+                .ThenInclude(spd => spd.Product)
+                .ThenInclude(p => p.Images) // ✅ Hình ảnh sản phẩm trong SetupPackage
                 .AsQueryable();
 
             // Sắp xếp nếu cần
-           
+            if (!isAscending.HasValue) isAscending = true;
                 query = isAscending.Value
                     ? query.OrderBy(o => o.CreateDate) // Sắp xếp tăng dần theo CreateDate
                     : query.OrderByDescending(o => o.CreateDate); // Sắp xếp giảm dần theo CreateDate
@@ -670,7 +680,6 @@ public async Task<ApiResponse> UpdateOrder(Guid orderId, UpdateOrderRequest upda
                 Address = order.Address,
                 CreateDate = order.CreateDate,
                 ModifyDate = order.ModifyDate,
-                SetupPackageId = order.SetupPackageId,
                 PhoneNumber = order.PhoneNumber,
                 BuyerName = order.RecipientName,
                 Discount = order.Voucher?.Discount ?? 0,
@@ -679,6 +688,36 @@ public async Task<ApiResponse> UpdateOrder(Guid orderId, UpdateOrderRequest upda
                     PaymentMethod = order.Payments.FirstOrDefault()?.PaymentMethod,
                     PaymentStatus = order.Payments.FirstOrDefault()?.PaymentStatus,
                 },
+                SetupPackage = order.SetupPackage != null ? new SetupPackageResponse()
+                {
+                    SetupPackageId = order.SetupPackageId,
+                    SetupName = order.SetupPackage?.SetupName,
+                    ModifyDate = order.ModifyDate,
+                    Size = order.SetupPackage?.SetupPackageDetails?
+                        .Where(spd => spd.Product?.SubCategory?.Category?.CategoryName == "Bể")
+                        .Select(spd => spd.Product?.Size)
+                        .FirstOrDefault(),
+                    CreateDate = order.CreateDate,
+                    TotalPrice = order.SetupPackage?.Price ?? 0,
+                    Description = order.SetupPackage?.Description ?? "N/A",
+                    IsDelete = order.SetupPackage?.IsDelete ?? false,
+                    Products = order.SetupPackage?.SetupPackageDetails?.Select(spd => new ProductResponse
+                    {
+                        Id = spd.Product?.Id ?? Guid.Empty,
+                        ProductName = spd.Product?.ProductName ?? "Unknown",
+                        Quantity = spd.Quantity,
+                        Price = spd.Product?.Price ?? 0,
+                        InventoryQuantity = spd.Product?.Quantity ?? 0,
+                        Status = spd.Product != null ? spd.Product.Status : "false",
+                        IsDelete = order.SetupPackage?.IsDelete ?? false,
+                        CategoryName = spd.Product?.SubCategory?.Category?.CategoryName ?? "Unknown",
+                        images = spd.Product?.Images?
+                            .Where(img => img.IsDelete == false)
+                            .OrderBy(img => img.CreateDate)
+                            .Select(img => img.LinkImage)
+                            .FirstOrDefault() ?? "NoImageAvailable"
+                    }).ToList() ?? new List<ProductResponse>()
+                } : null,
                 // Lấy thông tin người dùng
                 userResponse = new GetOrderResponse.UserResponse
                 {
@@ -724,123 +763,164 @@ public async Task<ApiResponse> UpdateOrder(Guid orderId, UpdateOrderRequest upda
     }
 
 
-    public async Task<ApiResponse> GetAllOrder(int page, int size, string status, bool? isAscending)
+  public async Task<ApiResponse> GetAllOrder(int page, int size, string status, bool? isAscending)
+{
+    try
     {
-        try
+        Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
+        var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
+            predicate: u => u.Id.Equals(userId) &&
+                            u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()));
+
+        if (user == null)
         {
-            Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
-            var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
-                predicate: u =>
-                    u.Id.Equals(userId) && u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()));
-
-            if (user == null)
+            return new ApiResponse()
             {
-                return new ApiResponse()
-                {
-                    status = StatusCodes.Status401Unauthorized.ToString(),
-                    message = "Unauthorized: Token is missing or expired.",
-                    data = null
-                };
-            }
+                status = StatusCodes.Status401Unauthorized.ToString(),
+                message = "Unauthorized: Token is missing or expired.",
+                data = null
+            };
+        }
 
-            var query = _unitOfWork.Context.Set<Order>()
-                .Where(o => o.UserId == userId && (string.IsNullOrEmpty(status) || o.Status.Equals(status)))
-                .Include(o => o.User)
-                .Include(o => o.Voucher)
-                .Include(o => o.Payments)
-                .Include(o => o.SetupPackage)
-                .Include(o => o.OrderDetails)
-                .ThenInclude(od => od.Product)
-                .ThenInclude(p => p.SubCategory) // Bao gồm SubCategory từ Product
-                .ThenInclude(sc => sc.Category) // Bao gồm Category từ SubCategory
-                .Include(o => o.OrderDetails)
-                .ThenInclude(od => od.Product)
-                .ThenInclude(p => p.Images) // Bao gồm hình ảnh sản phẩm
-                .AsQueryable();
+        var query = _unitOfWork.Context.Set<Order>()
+            .Include(o => o.User)
+            .Include(o => o.Voucher)
+            .Include(o => o.Payments)
+            .Include(o => o.OrderDetails)
+            .ThenInclude(od => od.Product)
+            .ThenInclude(p => p.SubCategory)
+            .ThenInclude(sc => sc.Category)
+            .Include(o => o.OrderDetails)
+            .ThenInclude(od => od.Product)
+            .ThenInclude(p => p.Images) // ✅ Hình ảnh sản phẩm trong OrderDetails
+            .Include(o => o.SetupPackage) // ✅ Đảm bảo lấy SetupPackage
+            .ThenInclude(sp => sp.SetupPackageDetails)
+            .ThenInclude(spd => spd.Product)
+            .ThenInclude(p => p.SubCategory)
+            .ThenInclude(sc => sc.Category)
+            .Include(o => o.SetupPackage)
+            .ThenInclude(sp => sp.SetupPackageDetails)
+            .ThenInclude(spd => spd.Product)
+            .ThenInclude(p => p.Images) // ✅ Hình ảnh sản phẩm trong SetupPackage
+            .AsQueryable();
 
-            // Sắp xếp nếu cần
-           
-                query = isAscending.Value
-                    ? query.OrderBy(o => o.CreateDate)
-                    : query.OrderByDescending(o => o.CreateDate);
-          
-            // Phân trang
-            var totalItems = await query.CountAsync();
-            var orders = await query
-                .Skip((page - 1) * size)
-                .Take(size)
-                .ToListAsync();
 
-            if (!orders.Any())
+        // Sắp xếp nếu cần
+        if (!isAscending.HasValue) isAscending = true;
+        query = isAscending.Value
+            ? query.OrderBy(o => o.CreateDate)
+            : query.OrderByDescending(o => o.CreateDate);
+
+        // Phân trang
+        var totalItems = await query.CountAsync();
+        var orders = await query
+            .Skip((page - 1) * size)
+            .Take(size)
+            .ToListAsync();
+
+        if (!orders.Any())
+        {
+            return new ApiResponse
             {
-                return new ApiResponse
-                {
-                    status = StatusCodes.Status404NotFound.ToString(),
-                    message = "No orders found for the specified user.",
-                    data = null
-                };
-            }
+                status = StatusCodes.Status404NotFound.ToString(),
+                message = "No orders found for the specified user.",
+                data = null
+            };
+        }
 
-            // Chuyển đổi dữ liệu sang response
-            var orderResponses = orders.Select(order => new GetOrderResponse
+        // Chuyển đổi dữ liệu sang response
+        var orderResponses = orders.Select(order => new GetOrderResponse
+        {
+            Id = order.Id,
+            TotalPrice = order.TotalPrice,
+            Status = order.Status,
+            ShipCost = order.Shipcost,
+            Address = order.Address,
+            CreateDate = order.CreateDate,
+            ModifyDate = order.ModifyDate,
+            PhoneNumber = order.PhoneNumber,
+            BuyerName = order.RecipientName,
+            Discount = order.Voucher?.Discount ?? 0,
+
+            SetupPackage = order.SetupPackage != null ? new SetupPackageResponse()
             {
-                Id = order.Id,
-                TotalPrice = order.TotalPrice,
-                Status = order.Status,
-                ShipCost = order.Shipcost,
-                Address = order.Address,
-                CreateDate = order.CreateDate,
-                ModifyDate = order.ModifyDate,
                 SetupPackageId = order.SetupPackageId,
-                PhoneNumber = order.PhoneNumber,
-                BuyerName = order.RecipientName,
-                Discount = order.Voucher?.Discount ?? 0,
-                Payment = new GetOrderResponse.PaymentResponse
+                SetupName = order.SetupPackage?.SetupName,
+                ModifyDate = order.ModifyDate,
+                Size = order.SetupPackage?.SetupPackageDetails?
+                    .Where(spd => spd.Product?.SubCategory?.Category?.CategoryName == "Bể")
+                    .Select(spd => spd.Product?.Size)
+                    .FirstOrDefault(),
+                CreateDate = order.CreateDate,
+                TotalPrice = order.SetupPackage?.Price ?? 0,
+                Description = order.SetupPackage?.Description ?? "N/A",
+                IsDelete = order.SetupPackage?.IsDelete ?? false,
+                Products = order.SetupPackage?.SetupPackageDetails?.Select(spd => new ProductResponse
                 {
-                    PaymentMethod = order.Payments.FirstOrDefault()?.PaymentMethod,
-                    PaymentStatus = order.Payments.FirstOrDefault()?.PaymentStatus,
-                },
-                userResponse = new GetOrderResponse.UserResponse
-                {
-                    Name = order.User?.UserName,
-                    Email = order.User?.Email,
-                    PhoneNumber = order.User?.PhoneNumber
-                },
-                OrderDetails = order.OrderDetails.Select(od => new GetOrderResponse.OrderDetailCreateResponse
-                {
-                    ProductName = od.Product.ProductName,
-                    Price = od.Price,
-                    Quantity = od.Quantity,
-                    LinkImage = od.Product.Images.FirstOrDefault()?.LinkImage ?? "NoImageAvailable",
-                    SubCategoryName = od.Product.SubCategory?.SubCategoryName ?? "NoSubCategory",
-                    CategoryName = od.Product.SubCategory?.Category?.CategoryName ?? "NoCategory"
-                }).ToList()
-            }).ToList();
+                    Id = spd.Product?.Id ?? Guid.Empty,
+                    ProductName = spd.Product?.ProductName ?? "Unknown",
+                    Quantity = spd.Quantity,
+                    Price = spd.Product?.Price ?? 0,
+                    InventoryQuantity = spd.Product?.Quantity ?? 0,
+                    Status = spd.Product != null ? spd.Product.Status : "false",
+                    IsDelete = order.SetupPackage?.IsDelete ?? false,
+                    CategoryName = spd.Product?.SubCategory?.Category?.CategoryName ?? "Unknown",
+                    images = spd.Product?.Images?
+                        .Where(img => img.IsDelete == false)
+                        .OrderBy(img => img.CreateDate)
+                        .Select(img => img.LinkImage)
+                        .FirstOrDefault() ?? "NoImageAvailable"
+                }).ToList() ?? new List<ProductResponse>()
+            } : null,
 
-            // Tạo response kết quả
-            return new ApiResponse
+            Payment = order.Payments != null && order.Payments.Any() ? new GetOrderResponse.PaymentResponse
             {
-                status = StatusCodes.Status200OK.ToString(),
-                message = "Orders retrieved successfully.",
-                data = new
-                {
-                    TotalItems = totalItems,
-                    Page = page,
-                    PageSize = size,
-                    Orders = orderResponses
-                }
-            };
-        }
-        catch (Exception ex)
+                PaymentMethod = order.Payments.FirstOrDefault()?.PaymentMethod ?? "Unknown",
+                PaymentStatus = order.Payments.FirstOrDefault()?.PaymentStatus ?? "Unknown"
+            } : null,
+
+            userResponse = order.User != null ? new GetOrderResponse.UserResponse
+            {
+                Name = order.User.UserName ?? "Unknown",
+                Email = order.User.Email ?? "Unknown",
+                PhoneNumber = order.User.PhoneNumber ?? "Unknown"
+            } : null,
+
+            OrderDetails = order.OrderDetails?.Select(od => new GetOrderResponse.OrderDetailCreateResponse
+            {
+                ProductName = od.Product?.ProductName ?? "Unknown",
+                Price = od.Price,
+                Quantity = od.Quantity,
+                LinkImage = od.Product?.Images?.FirstOrDefault()?.LinkImage ?? "NoImageAvailable",
+                SubCategoryName = od.Product?.SubCategory?.SubCategoryName ?? "NoSubCategory",
+                CategoryName = od.Product?.SubCategory?.Category?.CategoryName ?? "NoCategory"
+            }).ToList() ?? new List<GetOrderResponse.OrderDetailCreateResponse>()
+        }).ToList();
+
+        // Tạo response kết quả
+        return new ApiResponse
         {
-            return new ApiResponse
+            status = StatusCodes.Status200OK.ToString(),
+            message = "Orders retrieved successfully.",
+            data = new
             {
-                status = StatusCodes.Status500InternalServerError.ToString(),
-                message = "An error occurred while retrieving orders.",
-                data = ex.Message
-            };
-        }
+                TotalItems = totalItems,
+                Page = page,
+                PageSize = size,
+                Orders = orderResponses
+            }
+        };
     }
+    catch (Exception ex)
+    {
+        return new ApiResponse
+        {
+            status = StatusCodes.Status500InternalServerError.ToString(),
+            message = "An error occurred while retrieving orders.",
+            data = ex.Message
+        };
+    }
+}
 
 
     public async Task<ApiResponse> GetOrderById(Guid id)
@@ -849,15 +929,24 @@ public async Task<ApiResponse> UpdateOrder(Guid orderId, UpdateOrderRequest upda
         {
             // Truy vấn để lấy thông tin đơn hàng
             var order = await _unitOfWork.Context.Set<Order>()
-                .Include(o => o.User) // Bao gồm thông tin người dùng
-                .Include(o => o.Voucher) // Bao gồm thông tin voucher
-                .Include(o => o.Payments) // Bao gồm thông tin thanh toán
-                .Include(o => o.OrderDetails) // Bao gồm chi tiết đơn hàng
-                .ThenInclude(od => od.Product) // Bao gồm thông tin sản phẩm
-                .ThenInclude(p => p.SubCategory) // Bao gồm SubCategory từ Product
+                .Include(o => o.User)
+                .Include(o => o.Voucher)
+                .Include(o => o.Payments)
+                .Include(o => o.OrderDetails)
+                .ThenInclude(od => od.Product)
+                .ThenInclude(p => p.SubCategory) // Bao gồm SubCategory
                 .ThenInclude(sc => sc.Category) // Bao gồm Category từ SubCategory
                 .Include(o => o.OrderDetails)
                 .ThenInclude(od => od.Product)
+                .ThenInclude(p => p.Images) // Bao gồm hình ảnh sản phẩm
+                .Include(o => o.SetupPackage) // Bao gồm SetupPackage
+                .ThenInclude(sp => sp.SetupPackageDetails) // Bao gồm SetupPackageDetails
+                .ThenInclude(spd => spd.Product) // Bao gồm Product trong SetupPackageDetails
+                .ThenInclude(p => p.SubCategory) // Bao gồm SubCategory
+                .ThenInclude(sc => sc.Category) // Bao gồm Category từ SubCategory
+                .Include(o => o.SetupPackage)
+                .ThenInclude(sp => sp.SetupPackageDetails)
+                .ThenInclude(spd => spd.Product)
                 .ThenInclude(p => p.Images) // Bao gồm hình ảnh của sản phẩm
                 .FirstOrDefaultAsync(o => o.Id == id);
 
@@ -882,10 +971,39 @@ public async Task<ApiResponse> UpdateOrder(Guid orderId, UpdateOrderRequest upda
                 Address = order.Address,
                 CreateDate = order.CreateDate,
                 ModifyDate = order.ModifyDate,
-                SetupPackageId = order.SetupPackageId,
                 PhoneNumber = order.PhoneNumber,
                 BuyerName = order.RecipientName,
                 Discount = order.Voucher?.Discount ?? 0,
+                SetupPackage = new SetupPackageResponse()
+                {
+                    SetupPackageId = order.SetupPackageId,
+                    SetupName = order.SetupPackage.SetupName,
+                    ModifyDate = order.ModifyDate,
+                    Size = order.SetupPackage.SetupPackageDetails
+                        .Where(spd => spd.Product.SubCategory.Category.CategoryName == "Bể")
+                        .Select(spd => spd.Product.Size)
+                        .FirstOrDefault(),
+                    CreateDate = order.CreateDate,
+                    TotalPrice = order.SetupPackage.Price,
+                    Description = order.SetupPackage.Description,
+                    IsDelete = order.SetupPackage.IsDelete,
+                    Products = order.SetupPackage.SetupPackageDetails.Select(spd => new ProductResponse
+                    {
+                        Id = spd.Product.Id,
+                        ProductName = spd.Product.ProductName,
+                        Quantity = spd.Quantity,
+                        Price = spd.Product.Price,
+                        InventoryQuantity = spd.Product.Quantity,
+                        Status = spd.Product.Status,
+                        IsDelete = order.SetupPackage.IsDelete,
+                        CategoryName = spd.Product.SubCategory.Category.CategoryName,
+                        images = spd.Product.Images
+                            .Where(img => img.IsDelete == false)
+                            .OrderBy(img => img.CreateDate)
+                            .Select(img => img.LinkImage)
+                            .FirstOrDefault()
+                    }).ToList()
+                },
                 Payment = new GetOrderResponse.PaymentResponse
                 {
                     PaymentMethod = order.Payments.FirstOrDefault()?.PaymentMethod,
