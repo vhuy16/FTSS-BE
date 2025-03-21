@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Mvc;
 using FTSS_API.Payload.Request.MaintenanceSchedule;
 using FTSS_API.Payload.Request.Category;
 using FTSS_Model.Paginate;
+using FTSS_API.Payload.Request.Book;
 
 namespace FTSS_API.Controller
 {
@@ -25,13 +26,37 @@ namespace FTSS_API.Controller
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status201Created)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
         [ProducesErrorResponseType(typeof(ProblemDetails))]
-        public async Task<IActionResult> AssigningTechnician([FromForm] Guid technicianid,[FromForm] Guid userid, [FromForm] AssigningTechnicianRequest request)
+        public async Task<IActionResult> AssigningTechnician([FromForm] Guid technicianid, [FromForm] AssigningTechnicianRequest request)
         {
-            var response = await _bookingService.AssigningTechnician(technicianid, userid, request);
+            var response = await _bookingService.AssigningTechnician(technicianid, request);
             return StatusCode(int.Parse(response.status), response);
         }
         /// <summary>
-        /// API cancel task cho admin, manager, technician.
+        /// API phân việc cho kỹ thuật viên với những booking có sẵn
+        /// </summary>
+        [HttpPost(ApiEndPointConstant.Booking.AssigningTechnicianBooking)]
+        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status201Created)]
+        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
+        [ProducesErrorResponseType(typeof(ProblemDetails))]
+        public async Task<IActionResult> AssigningTechnicianBooking([FromForm] Guid bookingid, [FromForm] Guid technicianid, [FromForm] AssignTechBookingRequest request)
+        {
+            var response = await _bookingService.AssigningTechnicianBooking(bookingid, technicianid, request);
+            return StatusCode(int.Parse(response.status), response);
+        }
+        /// <summary>
+        /// API đặt lịch cho khách hàng có order đã thanh toán
+        /// </summary>
+        [HttpPost(ApiEndPointConstant.Booking.BookingSchedule)]
+        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status201Created)]
+        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
+        [ProducesErrorResponseType(typeof(ProblemDetails))]
+        public async Task<IActionResult> BookingSchedule([FromForm] List<Guid> serviceid,[FromForm] Guid orderid, [FromForm] BookingScheduleRequest request)
+        {
+            var response = await _bookingService.BookingSchedule(serviceid, orderid, request);
+            return StatusCode(int.Parse(response.status), response);
+        }
+        /// <summary>
+        /// API cancel mission cho manager, technician.
         /// </summary>
         [HttpPut(ApiEndPointConstant.Booking.CancelTask)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
@@ -44,20 +69,21 @@ namespace FTSS_API.Controller
             return StatusCode(int.Parse(response.status), response);
         }
         /// <summary>
-        /// API lấy danh sách task cho admin, manager.
+        /// API lấy danh sách booking cho manager.
         /// </summary>
-        [HttpGet(ApiEndPointConstant.Booking.GetListTask)]
+        [HttpGet(ApiEndPointConstant.Booking.GetListBookingForManager)]
         [ProducesResponseType(typeof(IPaginate<ApiResponse>), StatusCodes.Status200OK)]
         [ProducesErrorResponseType(typeof(ProblemDetails))]
-        public async Task<IActionResult> GetListTask(
+        public async Task<IActionResult> GetListBookingForManager(
             [FromQuery] int? page,
             [FromQuery] int? size,
             [FromQuery] string? status,
-            [FromQuery] bool? isAscending = null)
+            [FromQuery] bool? isAscending = null,
+            [FromQuery] bool? isAssigned = null)
         {
             int pageNumber = page ?? 1;
             int pageSize = size ?? 10;
-            var response = await _bookingService.GetListTask(pageNumber, pageSize, status, isAscending);
+            var response = await _bookingService.GetListBookingForManager(pageNumber, pageSize, status, isAscending, isAssigned);
             if (response == null || response.data == null)
             {
                 return Problem(detail: MessageConstant.MaintenanceScheduleMessage.MaintenanceScheduleIsEmpty,
@@ -67,7 +93,7 @@ namespace FTSS_API.Controller
             return Ok(response);
         }
         /// <summary>
-        /// API lấy danh sách task cho technician.
+        /// API lấy danh sách mission cho technician.
         /// </summary>
         [HttpGet(ApiEndPointConstant.Booking.GetListTaskTech)]
         [ProducesResponseType(typeof(IPaginate<ApiResponse>), StatusCodes.Status200OK)]
@@ -81,6 +107,28 @@ namespace FTSS_API.Controller
             int pageNumber = page ?? 1;
             int pageSize = size ?? 10;
             var response = await _bookingService.GetListTaskTech(pageNumber, pageSize, status, isAscending);
+            if (response == null || response.data == null)
+            {
+                return Problem(detail: MessageConstant.MaintenanceScheduleMessage.MaintenanceScheduleIsEmpty,
+                    statusCode: StatusCodes.Status404NotFound);
+            }
+
+            return Ok(response);
+        }
+        /// <summary>
+        /// API lấy danh sách service package cho booking.
+        /// </summary>
+        [HttpGet(ApiEndPointConstant.Booking.GetServicePackage)]
+        [ProducesResponseType(typeof(IPaginate<ApiResponse>), StatusCodes.Status200OK)]
+        [ProducesErrorResponseType(typeof(ProblemDetails))]
+        public async Task<IActionResult> GetServicePackage(
+            [FromQuery] int? page,
+            [FromQuery] int? size,
+            [FromQuery] bool? isAscending = null)
+        {
+            int pageNumber = page ?? 1;
+            int pageSize = size ?? 10;
+            var response = await _bookingService.GetServicePackage(pageNumber, pageSize, isAscending);
             if (response == null || response.data == null)
             {
                 return Problem(detail: MessageConstant.MaintenanceScheduleMessage.MaintenanceScheduleIsEmpty,

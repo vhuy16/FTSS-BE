@@ -21,6 +21,8 @@ public partial class Booking
 
     public Guid? OrderId { get; set; }
 
+    public bool? IsAssigned { get; set; }
+
     public virtual ICollection<BookingDetail> BookingDetails { get; set; } = new List<BookingDetail>();
 
     public virtual ICollection<Mission> Missions { get; set; } = new List<Mission>();
