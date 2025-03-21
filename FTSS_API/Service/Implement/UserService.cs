@@ -240,7 +240,8 @@ public class UserService : BaseService<UserService>, IUserService
             RoleEnum = role.ToString(),
             UserId = user.Id,
             UserName = user.UserName,
-            token = token // Assign the generated token
+            token = token, // Assign the generated token
+            Status = user.Status.ToString()
         };
 
         // Return a success response
