@@ -2,22 +2,13 @@
 
 public class UpdateSetupPackageRequest
 {
-   
-    public string SetupName { get; set; }  // Tên mới của SetupPackage
-    public string Description { get; set; }  // Mô tả mới
+    public string? SetupName { get; set; }
+    public string? Description { get; set; }
+    public IFormFile? ImageFile { get; set; }
     
-    public string Status {get; set;}
-    public IFormFile? ImageFile { get; set; }  // Ảnh mới (nếu có)
-    public List<UpdateProductSetupItem> ProductList { get; set; }  // Danh sách sản phẩm cần cập nhật
-
-    public UpdateSetupPackageRequest()
-    {
-        ProductList = new List<UpdateProductSetupItem>();
-    }
-}
-
-public class UpdateProductSetupItem
-{
-    public Guid ProductId { get; set; }  // ID của sản phẩm
-    public int Quantity { get; set; }  // Số lượng sản phẩm
+    /// <summary>
+    /// JSON string containing the list of products with their quantities
+    /// Format: [{"ProductId":"guid","Quantity":1},{"ProductId":"guid","Quantity":2}]
+    /// </summary>
+    public string? ProductItemsJson { get; set; }
 }
