@@ -2,7 +2,7 @@
 {
     public class SetupPackageResponse
     {
-        public Guid SetupPackageId { get; set; }
+        public Guid? SetupPackageId { get; set; }
         public string SetupName { get; set; } = null!;
         public string? Description { get; set; }
         public decimal? TotalPrice { get; set; }

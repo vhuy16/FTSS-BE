@@ -48,7 +48,7 @@ public class OrderController : BaseController<OrderController>
     [ProducesResponseType(typeof(IPaginate<ApiResponse>), StatusCodes.Status200OK)]
     [ProducesErrorResponseType(typeof(ProblemDetails))]
     public async Task<IActionResult> GetListOrder([FromQuery] int? page, [FromQuery] int? size,
-        [FromQuery] bool? isAscending = null)
+        [FromQuery] bool? isAscending)
     {
         int pageNumber = page ?? 1;
         int pageSize = size ?? 10;
@@ -102,7 +102,7 @@ public class OrderController : BaseController<OrderController>
         [FromQuery] int? page,
         [FromQuery] int? size,
         [FromQuery] string? status,
-        [FromQuery] bool? isAscending = null)
+        [FromQuery] bool? isAscending)
     {
         int pageNumber = page ?? 1;
         int pageSize = size ?? 10;
