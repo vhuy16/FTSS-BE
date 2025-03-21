@@ -2,6 +2,7 @@
 
 public enum BookingStatusEnum
 {
-    Available,
-    Unavailable
+    NOTPAID,
+    PAID,
+    FREE
 }

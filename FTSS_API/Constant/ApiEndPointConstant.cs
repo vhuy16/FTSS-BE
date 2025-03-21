@@ -143,7 +143,10 @@ public static class ApiEndPointConstant
         public const string BookingEndPoint = ApiEndpoint + "/booking";
         public const string AssigningTechnician = BookingEndPoint;
         public const string CancelTask = BookingEndPoint + "{id}";
-        public const string GetListTask = BookingEndPoint;
+        public const string GetListBookingForManager = BookingEndPoint;
         public const string GetListTaskTech = BookingEndPoint + "/list-task-tech";
+        public const string BookingSchedule = BookingEndPoint + "/booking-schedule";
+        public const string AssigningTechnicianBooking = BookingEndPoint + "/assign-booking";
+        public const string GetServicePackage = BookingEndPoint + "/servicepackage";
     }
 }
