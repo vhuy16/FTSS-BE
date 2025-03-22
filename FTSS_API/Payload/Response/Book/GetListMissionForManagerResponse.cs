@@ -15,5 +15,8 @@
         public string? Address { get; set; }
 
         public string? PhoneNumber { get; set; }
+        public Guid? TechnicianId { get; set; }
+        public string TechnicianName { get; set; } = null!;
+        public Guid? BookingId { get; set; }
     }
 }
