@@ -586,7 +586,7 @@ namespace FTSS_API.Service.Implement
                     TotalPrice = b.TotalPrice,
                     UserId = b.User?.Id,
                     UserName = b.User?.UserName ?? "Unknown",
-                    FullName = b.User?.FullName ?? "Unknown",
+                    FullName = b.FullName,
                     OrderId = b.OrderId,
                     IsAssigned = b.IsAssigned
                 }).ToList();
@@ -608,6 +608,76 @@ namespace FTSS_API.Service.Implement
                 };
             }
         }
+
+        public async Task<ApiResponse> GetListMissionForManager(int pageNumber, int pageSize, string? status, bool? isAscending)
+        {
+            try
+            {
+                // Lấy UserId từ HttpContext
+                Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
+                var userr = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
+                    predicate: u => u.Id.Equals(userId) &&
+                                    u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) &&
+                                    u.IsDelete == false &&
+                                    u.Role.Equals(RoleEnum.Manager.GetDescriptionFromEnum()));
+
+                if (userr == null)
+                {
+                    return new ApiResponse
+                    {
+                        status = StatusCodes.Status403Forbidden.ToString(),
+                        message = "You don't have permission to do this.",
+                        data = null
+                    };
+                }
+
+                // Lọc danh sách Mission dựa trên điều kiện
+                Expression<Func<Mission, bool>> filter = m =>
+                    (string.IsNullOrEmpty(status) || m.Status == status) &&
+                    (m.IsDelete == false || m.IsDelete == null);
+
+                // Sắp xếp tăng hoặc giảm dần theo lịch trình nhiệm vụ
+                Func<IQueryable<Mission>, IOrderedQueryable<Mission>> orderBy = query =>
+                    isAscending == true ? query.OrderBy(m => m.MissionSchedule) : query.OrderByDescending(m => m.MissionSchedule);
+
+                // Lấy danh sách Mission theo trang
+                var missions = await _unitOfWork.GetRepository<Mission>().GetPagingListAsync(
+                    predicate: filter,
+                    orderBy: orderBy,
+                    page: pageNumber,
+                    size: pageSize
+                );
+
+                // Chuyển đổi sang response
+                var response = missions.Items.Select(m => new GetListMissionForManagerResponse
+                {
+                    Id = m.Id,
+                    MissionName = m.MissionName,
+                    MissionDescription = m.MissionDescription,
+                    Status = m.Status,
+                    MissionSchedule = m.MissionSchedule,
+                    Address = m.Address,
+                    PhoneNumber = m.PhoneNumber
+                }).ToList();
+
+                return new ApiResponse
+                {
+                    status = StatusCodes.Status200OK.ToString(),
+                    message = "List of missions retrieved successfully.",
+                    data = response
+                };
+            }
+            catch (Exception ex)
+            {
+                return new ApiResponse
+                {
+                    status = StatusCodes.Status500InternalServerError.ToString(),
+                    message = "An error occurred while retrieving the list of missions.",
+                    data = ex.Message
+                };
+            }
+        }
+
         public async Task<ApiResponse> GetListTaskTech(int pageNumber, int pageSize, string? status, bool? isAscending)
         {
             // Lấy UserId từ HttpContext
