@@ -150,5 +150,17 @@ namespace FTSS_API.Controller
             var response = await _bookingService.GetListMissionForManager(pageNumber, pageSize, status, isAscending);
             return StatusCode(int.Parse(response.status), response);
         }
+        /// <summary>
+        /// API lấy danh sách ngày không thể book.
+        /// </summary>
+        /// 
+        [HttpGet(ApiEndPointConstant.Booking.GetDateUnavailable)]
+        [ProducesResponseType(typeof(IPaginate<ApiResponse>), StatusCodes.Status200OK)]
+        [ProducesErrorResponseType(typeof(ProblemDetails))]
+        public async Task<IActionResult> GetDateUnavailable()
+        {
+            var response = await _bookingService.GetDateUnavailable();
+            return StatusCode(int.Parse(response.status), response);
+        }
     }
 }

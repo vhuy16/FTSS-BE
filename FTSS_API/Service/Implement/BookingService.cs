@@ -539,6 +539,44 @@ namespace FTSS_API.Service.Implement
                 };
             }
         }
+
+        public async Task<ApiResponse> GetDateUnavailable()
+        {
+            try
+            {
+                // Đếm số lượng mission theo từng ngày MissionSchedule
+                var unavailableDates = await _unitOfWork.GetRepository<Mission>()
+                    .GetListAsync(
+                        predicate: m => m.MissionSchedule != null && (m.IsDelete == false || m.IsDelete == null),
+                        selector: m => m.MissionSchedule.Value.Date // Lấy chỉ ngày (không lấy giờ phút giây)
+                    );
+
+                // Nhóm theo ngày và lọc ra những ngày có từ 5 mission trở lên
+                var groupedUnavailableDates = unavailableDates
+                    .GroupBy(date => date)
+                    .Where(group => group.Count() >= 5)
+                    .Select(group => new GetDateUnavailableResponse { ScheduleDate = group.Key })
+                    .ToList();
+
+                return new ApiResponse
+                {
+                    status = StatusCodes.Status200OK.ToString(),
+                    message = "List of unavailable dates retrieved successfully.",
+                    data = groupedUnavailableDates
+                };
+            }
+            catch (Exception ex)
+            {
+                return new ApiResponse
+                {
+                    status = StatusCodes.Status500InternalServerError.ToString(),
+                    message = "An error occurred while retrieving unavailable dates.",
+                    data = ex.Message
+                };
+            }
+        }
+
+
         public async Task<ApiResponse> GetListBookingForManager(int pageNumber, int pageSize, string? status, bool? isAscending, bool? isAssigned)
         {
             try
