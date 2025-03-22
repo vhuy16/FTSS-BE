@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    # 1. Lấy mã nguồn từ repository
+    # 1. Lấy mã nguồn từ repository.
     - name: Checkout repository
       uses: actions/checkout@v3
 
