@@ -241,32 +241,133 @@ public class OrderService : BaseService<OrderService>, IOrderService
     //         throw new BadHttpRequestException("An unexpected error occurred while creating the order.", ex);
     //     }
     // }
-    public async Task<ApiResponse> CreateOrder(CreateOrderRequest createOrderRequest)
+   public async Task<ApiResponse> CreateOrder(CreateOrderRequest createOrderRequest)
+{
+    Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
+    if (userId == null)
     {
-        Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
-        if (userId == null)
+        return new ApiResponse()
         {
-            return new ApiResponse()
-            {
-                status = StatusCodes.Status401Unauthorized.ToString(),
-                message = "Unauthorized: Token is missing or expired.",
-                data = null
-            };
-        }
+            status = StatusCodes.Status401Unauthorized.ToString(),
+            message = "Unauthorized: Token is missing or expired.",
+            data = null
+        };
+    }
 
-        // Validate if the CartItem list is empty
-        if (createOrderRequest.CartItem == null || !createOrderRequest.CartItem.Any())
+    // Validate if either SetupPackageId or CartItem is provided
+    if ((createOrderRequest.SetupPackageId == null || createOrderRequest.SetupPackageId == Guid.Empty) && 
+        (createOrderRequest.CartItem == null || !createOrderRequest.CartItem.Any()))
+    {
+        return new ApiResponse()
         {
-            return new ApiResponse()
+            status = StatusCodes.Status400BadRequest.ToString(),
+            message = "Either Setup Package ID or Cart Items must be provided for placing an order.",
+            data = null
+        };
+    }
+
+    try
+    {
+        List<OrderDetail> orderDetails = new List<OrderDetail>();
+        decimal totalProductPrice = 0;
+        Order order = new Order
+        {
+            Id = Guid.NewGuid(),
+            TotalPrice = 0,
+            CreateDate = TimeUtils.GetCurrentSEATime(),
+            UserId = userId,
+            Status = OrderStatus.PROCESSING.GetDescriptionFromEnum(),
+            Address = createOrderRequest.Address,
+            Shipcost = createOrderRequest.ShipCost,
+            PhoneNumber = createOrderRequest.PhoneNumber,
+            RecipientName = createOrderRequest.RecipientName,
+            SetupPackageId = createOrderRequest.SetupPackageId
+        };
+
+        // Branch the flow based on whether we're using SetupPackageId or CartItem
+        if (createOrderRequest.SetupPackageId != null && createOrderRequest.SetupPackageId != Guid.Empty)
+        {
+            // Process order from Setup Package
+            var setupPackage = await _unitOfWork.GetRepository<SetupPackage>()
+                .SingleOrDefaultAsync(predicate: p => p.Id.Equals(createOrderRequest.SetupPackageId) && p.IsDelete.Equals(false));
+            
+            if (setupPackage == null)
             {
-                status = StatusCodes.Status400BadRequest.ToString(),
-                message = "No Cart Items provided. Please add items to your cart before placing an order.",
-                data = null
-            };
+                return new ApiResponse()
+                {
+                    status = StatusCodes.Status404NotFound.ToString(),
+                    message = "Setup Package not found or has been deleted.",
+                    data = null
+                };
+            }
+
+            // Get setup package items
+            var setupItems = await _unitOfWork.GetRepository<SetupPackageDetail>()
+                .GetListAsync(predicate: si => si.SetupPackageId.Equals(setupPackage.Id));
+            
+            if (setupItems == null || !setupItems.Any())
+            {
+                return new ApiResponse()
+                {
+                    status = StatusCodes.Status400BadRequest.ToString(),
+                    message = "The selected Setup Package does not contain any items.",
+                    data = null
+                };
+            }
+
+            // Get all product IDs from setup items
+            List<Guid> productIds = setupItems.Select(x => x.ProductId).ToList();
+            var products = await _unitOfWork.GetRepository<Product>()
+                .GetListAsync(predicate: p => productIds.Contains(p.Id) && p.IsDelete.Equals(false));
+            
+            var productsDict = products.ToDictionary(x => x.Id, x => x);
+
+            // Create order details from setup items
+            foreach (var setupItem in setupItems)
+            {
+                if (productsDict.ContainsKey(setupItem.ProductId))
+                {
+                    var product = productsDict[setupItem.ProductId];
+                    if (product.Quantity < setupItem.Quantity)
+                    {
+                        return new ApiResponse()
+                        {
+                            status = StatusCodes.Status400BadRequest.ToString(),
+                            message = $"Sản phẩm '{product.ProductName}' chỉ còn {product.Quantity} trong kho, không đủ để đặt hàng.",
+                            data = null
+                        };
+                    }
+                    
+                    decimal itemPrice = (decimal)setupItem.Quantity * product.Price;
+                    totalProductPrice += itemPrice;
+                    
+                    var newOrderDetail = new OrderDetail
+                    {
+                        Id = Guid.NewGuid(),
+                        OrderId = order.Id,
+                        ProductId = product.Id,
+                        Quantity = (int)setupItem.Quantity,
+                        Price = product.Price,
+                    };
+                    orderDetails.Add(newOrderDetail);
+                    
+                    // Update product quantity
+                    product.Quantity -= setupItem.Quantity;
+                     _unitOfWork.GetRepository<Product>().UpdateAsync(product);
+                }
+                else
+                {
+                    
+                    return new ApiResponse()
+                    {
+                        status = StatusCodes.Status400BadRequest.ToString(),
+                        message = "One of the products in the setup package is not found",
+                        data = null
+                    };
+                }
+            }
         }
-
-
-        try
+        else // Process order from Cart Items
         {
             var cart = await _unitOfWork.GetRepository<Cart>()
                 .SingleOrDefaultAsync(predicate: p => p.UserId.Equals(userId),
@@ -297,72 +398,32 @@ public class OrderService : BaseService<OrderService>, IOrderService
                 };
             }
 
-            decimal totalprice = 0;
+            // Get all product IDs from cart items
             List<Guid> productIds = cartItems.Select(x => x.ProductId).ToList();
             var products = await _unitOfWork.GetRepository<Product>()
-                .GetListAsync(predicate: p => productIds.Contains(p.Id));
+                .GetListAsync(predicate: p => productIds.Contains(p.Id) && p.IsDelete.Equals(false));
+            
             var productsDict = products.ToDictionary(x => x.Id, x => x);
 
-            Order order = new Order
-            {
-                Id = Guid.NewGuid(),
-                TotalPrice = 0,
-                CreateDate = TimeUtils.GetCurrentSEATime(),
-                UserId = userId,
-                Status = OrderStatus.PROCESSING.GetDescriptionFromEnum(),
-                Address = createOrderRequest.Address,
-                Shipcost = createOrderRequest.ShipCost,
-                PhoneNumber = createOrderRequest.PhoneNumber,
-                RecipientName = createOrderRequest.RecipientName,
-                SetupPackageId = createOrderRequest.SetupPackageId,
-                
-                //  OrderDetails = orderDetails // remove this to add later
-            };
-
-
-            // Voucher Implementation
-            Voucher? voucher = null;
-            if (createOrderRequest.VoucherId != null)
-            {
-                voucher = await _unitOfWork.GetRepository<Voucher>().SingleOrDefaultAsync(predicate: v =>
-                    v.Id == createOrderRequest.VoucherId &&
-                    v.Status.Equals(VoucherEnum.Active.GetDescriptionFromEnum()) &&
-                    v.IsDelete.Equals(false) && // Use .Equals(false)
-                    v.ExpiryDate >= TimeUtils.GetCurrentSEATime());
-
-                if (voucher == null)
-                {
-                    return new ApiResponse
-                    {
-                        status = StatusCodes.Status400BadRequest.ToString(),
-                        message = "Invalid or expired voucher ID.",
-                        data = null
-                    };
-                }
-
-                if (voucher.Quantity <= 0)
-                {
-                    return new ApiResponse
-                    {
-                        status = StatusCodes.Status400BadRequest.ToString(),
-                        message = "This voucher has been fully used",
-                        data = null
-                    };
-                }
-            }
-
-
-            //Calculate order details
-            List<OrderDetail> orderDetails = new List<OrderDetail>();
+            // Create order details from cart items
             foreach (var cartItem in cartItems)
             {
                 if (productsDict.ContainsKey(cartItem.ProductId))
                 {
                     var product = productsDict[cartItem.ProductId];
                     if (product.Quantity < cartItem.Quantity)
-                        throw new Exception(
-                            $"Sản phẩm '{product.ProductName}' chỉ còn {product.Quantity} trong kho, không đủ để đặt hàng.");
-                    totalprice += cartItem.Quantity * product.Price;
+                    {
+                        return new ApiResponse()
+                        {
+                            status = StatusCodes.Status400BadRequest.ToString(),
+                            message = $"Sản phẩm '{product.ProductName}' chỉ còn {product.Quantity} trong kho, không đủ để đặt hàng.",
+                            data = null
+                        };
+                    }
+                    
+                    decimal itemPrice = cartItem.Quantity * product.Price;
+                    totalProductPrice += itemPrice;
+                    
                     var newOrderDetail = new OrderDetail
                     {
                         Id = Guid.NewGuid(),
@@ -372,60 +433,104 @@ public class OrderService : BaseService<OrderService>, IOrderService
                         Price = product.Price,
                     };
                     orderDetails.Add(newOrderDetail);
+                    
+                    // Update product quantity
+                    product.Quantity -= cartItem.Quantity;
+                     _unitOfWork.GetRepository<Product>().UpdateAsync(product);
                 }
                 else
                 {
-                    // Handle error if product not found. Maybe log it and skip or return bad request
                     _logger.LogError(
-                        $"Product not found for cart item ID: {cartItem.Id} Product Id : {cartItem.ProductId}");
+                        $"Product not found for cart item ID: {cartItem.Id} Product Id: {cartItem.ProductId}");
                     return new ApiResponse()
                     {
                         status = StatusCodes.Status400BadRequest.ToString(),
-                        message = "One of the Product on the cart is not found",
+                        message = "One of the Products in the cart is not found",
                         data = null
                     };
                 }
             }
+        }
 
-            if (createOrderRequest.VoucherId != null && voucher != null)
+        // No order details created - issue with products
+        if (!orderDetails.Any())
+        {
+            return new ApiResponse()
             {
-                if (totalprice < voucher.MaximumOrderValue)
-                {
-                    return new ApiResponse
-                    {
-                        status = StatusCodes.Status400BadRequest.ToString(),
-                        message = "Your order value is less than the minimum for this voucher.",
-                        data = null
-                    };
-                }
+                status = StatusCodes.Status400BadRequest.ToString(),
+                message = "Could not create order details. Please check product availability.",
+                data = null
+            };
+        }
 
-                // Apply the discount logic
-                decimal discountAmount = 0;
-                if (voucher.DiscountType.Equals(VoucherTypeEnum.Percentage.GetDescriptionFromEnum()))
-                {
-                    discountAmount = totalprice * (voucher.Discount / 100);
-                }
-                else if (voucher.DiscountType.Equals(VoucherTypeEnum.Fixed.GetDescriptionFromEnum()))
-                {
-                    discountAmount = voucher.Discount;
-                }
+        // Apply voucher if provided
+        decimal discountAmount = 0;
+        if (createOrderRequest.VoucherId != null)
+        {
+            var voucher = await _unitOfWork.GetRepository<Voucher>().SingleOrDefaultAsync(predicate: v =>
+                v.Id == createOrderRequest.VoucherId &&
+                v.Status.Equals(VoucherEnum.Active.GetDescriptionFromEnum()) &&
+                v.IsDelete.Equals(false) &&
+                v.ExpiryDate >= TimeUtils.GetCurrentSEATime());
 
-                totalprice -= discountAmount;
-                voucher.Quantity -= 1;
-                _unitOfWork.GetRepository<Voucher>().UpdateAsync(voucher);
-                await _unitOfWork.CommitAsync();
-
+            if (voucher == null)
+            {
+                return new ApiResponse
+                {
+                    status = StatusCodes.Status400BadRequest.ToString(),
+                    message = "Invalid or expired voucher ID.",
+                    data = null
+                };
             }
 
-            order.OrderDetails = orderDetails;
-            order.TotalPrice = totalprice + createOrderRequest.ShipCost;
-            // Insert the Order into the database
-            await _unitOfWork.GetRepository<Order>().InsertAsync(order);
+            if (voucher.Quantity <= 0)
+            {
+                return new ApiResponse
+                {
+                    status = StatusCodes.Status400BadRequest.ToString(),
+                    message = "This voucher has been fully used",
+                    data = null
+                };
+            }
 
-            // insert orderDetails
-            await _unitOfWork.GetRepository<OrderDetail>().InsertRangeAsync(orderDetails);
+            if (totalProductPrice < voucher.MaximumOrderValue)
+            {
+                return new ApiResponse
+                {
+                    status = StatusCodes.Status400BadRequest.ToString(),
+                    message = "Your order value is less than the minimum for this voucher.",
+                    data = null
+                };
+            }
 
-         bool isSuccessOrder = false;
+            // Apply the discount logic
+            if (voucher.DiscountType.Equals(VoucherTypeEnum.Percentage.GetDescriptionFromEnum()))
+            {
+                discountAmount = totalProductPrice * (voucher.Discount / 100);
+            }
+            else if (voucher.DiscountType.Equals(VoucherTypeEnum.Fixed.GetDescriptionFromEnum()))
+            {
+                discountAmount = voucher.Discount;
+            }
+
+            // Update voucher usage
+            voucher.Quantity -= 1;
+             _unitOfWork.GetRepository<Voucher>().UpdateAsync(voucher);
+        }
+
+        // Calculate final price
+        decimal finalPrice = totalProductPrice - discountAmount + createOrderRequest.ShipCost;
+        order.TotalPrice = finalPrice;
+        order.OrderDetails = orderDetails;
+
+        // Insert the Order into the database
+        await _unitOfWork.GetRepository<Order>().InsertAsync(order);
+
+        // Insert order details
+        await _unitOfWork.GetRepository<OrderDetail>().InsertRangeAsync(orderDetails);
+
+        // Commit with retry
+        bool isSuccessOrder = false;
         int retryCount = 3;
         while (retryCount > 0)
         {
@@ -438,7 +543,7 @@ public class OrderService : BaseService<OrderService>, IOrderService
             {
                 _logger.LogError($"CommitAsync failed, retrying... ({3 - retryCount + 1}/3) - Error: {ex.Message}");
                 retryCount--;
-                await Task.Delay(200); // Đợi 200ms trước khi thử lại
+                await Task.Delay(200); // Wait 200ms before retry
             }
         }
 
@@ -452,6 +557,7 @@ public class OrderService : BaseService<OrderService>, IOrderService
             };
         }
 
+        // Create payment
         var createPaymentRequest = new CreatePaymentRequest
         {
             OrderId = order.Id,
@@ -464,13 +570,9 @@ public class OrderService : BaseService<OrderService>, IOrderService
             payment = paymentResponse.data as CreatePaymentResponse;
         }
 
-        // Xóa CartItems có trạng thái "buyed"
-        // await _unitOfWork.GetRepository<CartItem>().DeleteAsync(cartItems);
-        // await _unitOfWork.CommitAsync(); // Commit sau khi xóa
-
-        // Lấy thông tin chi tiết đơn hàng
+        // Prepare order details for response
         var orderDetailsResponse = new List<CreateOrderResponse.OrderDetailCreateResponse>();
-        foreach (var od in order.OrderDetails)
+        foreach (var od in orderDetails)
         {
             var product = await _unitOfWork.GetRepository<Product>()
                 .SingleOrDefaultAsync(predicate: p => p.Id.Equals(od.ProductId));
@@ -486,9 +588,9 @@ public class OrderService : BaseService<OrderService>, IOrderService
             }
         }
 
-        // Lấy lại thông tin order và user
+        // Get updated order and user info
         order = await _unitOfWork.GetRepository<Order>()
-            .SingleOrDefaultAsync(predicate:p => p.Id.Equals(order.Id),
+            .SingleOrDefaultAsync(predicate: p => p.Id.Equals(order.Id),
                 include: query => query.Include(o => o.User));
 
         if (order == null || order.User == null)
@@ -513,6 +615,7 @@ public class OrderService : BaseService<OrderService>, IOrderService
             };
         }
 
+        // Build response
         var createOrderResponse = new CreateOrderResponse
         {
             Id = order.Id,
