@@ -23,7 +23,7 @@ namespace FTSS_API.Service.Implement
         public BookingService(IUnitOfWork<MyDbContext> unitOfWork, ILogger<BookingService> logger, IMapper mapper, IHttpContextAccessor httpContextAccessor) : base(unitOfWork, logger, mapper, httpContextAccessor)
         {
         }
-        public async Task<ApiResponse> AssigningTechnician(Guid technicianid, Guid orderid, AssigningTechnicianRequest request)
+        public async Task<ApiResponse> AssigningTechnician(AssigningTechnicianRequest request)
         {
             try
             {
@@ -82,7 +82,7 @@ namespace FTSS_API.Service.Implement
 
                 // Kiểm tra technician có tồn tại và hợp lệ không
                 var technician = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
-                    predicate: t => t.Id.Equals(technicianid) &&
+                    predicate: t => t.Id.Equals(request.TechnicianId) &&
                                     t.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) &&
                                     t.IsDelete == false &&
                                     t.Role.Equals(RoleEnum.Technician.GetDescriptionFromEnum()));
@@ -98,7 +98,7 @@ namespace FTSS_API.Service.Implement
                 }
                 // Kiểm tra technician đã có mission vào ngày này chưa
                 var existingMission = await _unitOfWork.GetRepository<Mission>().SingleOrDefaultAsync(
-                    predicate: m => m.Userid.Equals(technicianid) &&
+                    predicate: m => m.Userid.Equals(request.TechnicianId) &&
                                     m.MissionSchedule.Value.Date == request.MissionSchedule.Value.Date &&
                                     m.IsDelete == false);
 
@@ -113,7 +113,7 @@ namespace FTSS_API.Service.Implement
                 }
                 // Truy vấn Order theo orderid để lấy Address và PhoneNumber
                 var order = await _unitOfWork.GetRepository<Order>().SingleOrDefaultAsync(
-                    predicate: o => o.Id.Equals(orderid) && o.IsDelete == false);
+                    predicate: o => o.Id.Equals(request.OrderId) && o.IsDelete == false);
 
                 if (order == null)
                 {
@@ -146,7 +146,7 @@ namespace FTSS_API.Service.Implement
                     MissionSchedule = request.MissionSchedule,
                     Address = order.Address,
                     PhoneNumber = order.PhoneNumber,
-                    Userid = technicianid // Gán technicianid từ request vào userid của MaintenanceTask
+                    Userid = request.TechnicianId // Gán technicianid từ request vào userid của MaintenanceTask
                 };
 
                 await _unitOfWork.Context.Set<Mission>().AddAsync(newTask);
@@ -160,7 +160,7 @@ namespace FTSS_API.Service.Implement
                     MissionDescription = newTask.MissionDescription,
                     Status = newTask.Status,
                     MissionSchedule = newTask.MissionSchedule,
-                    TechnicianId = technicianid,
+                    TechnicianId = request.TechnicianId,
                     TechnicianName = technician.FullName ?? "Unknown",
                     Address = newTask.Address,
                     PhoneNumber = newTask.PhoneNumber,
@@ -184,7 +184,7 @@ namespace FTSS_API.Service.Implement
             }
         }
 
-        public async Task<ApiResponse> AssigningTechnicianBooking(Guid bookingid, Guid technicianid, AssignTechBookingRequest request)
+        public async Task<ApiResponse> AssigningTechnicianBooking(AssignTechBookingRequest request)
         {
             try
             {
@@ -224,7 +224,7 @@ namespace FTSS_API.Service.Implement
                 // Kiểm tra Booking có tồn tại không
                 var booking = await _unitOfWork.GetRepository<Booking>()
                         .SingleOrDefaultAsync(
-                            predicate: b => b.Id == bookingid && (b.IsAssigned == false),
+                            predicate: b => b.Id == request.BookingId && (b.IsAssigned == false),
                             include: b => b.Include(x => x.User));
                 // Load thông tin User của Booking
 
@@ -240,7 +240,7 @@ namespace FTSS_API.Service.Implement
 
                 // Kiểm tra technician có tồn tại và hợp lệ không
                 var technician = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
-                    predicate: t => t.Id.Equals(technicianid) &&
+                    predicate: t => t.Id.Equals(request.TechnicianId) &&
                                     t.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) &&
                                     t.IsDelete == false &&
                                     t.Role.Equals(RoleEnum.Technician.GetDescriptionFromEnum()));
@@ -257,7 +257,7 @@ namespace FTSS_API.Service.Implement
 
                 // Kiểm tra kỹ thuật viên đã có nhiệm vụ trong ngày đó chưa
                 var assignedMission = await _unitOfWork.GetRepository<Mission>().SingleOrDefaultAsync(
-                    predicate: m => m.Userid == technicianid &&
+                    predicate: m => m.Userid == request.TechnicianId &&
                                     m.MissionSchedule.HasValue &&
                                     m.MissionSchedule.Value.Date == booking.ScheduleDate.Value.Date);
 
@@ -275,13 +275,13 @@ namespace FTSS_API.Service.Implement
                 var newTask = new Mission
                 {
                     Id = Guid.NewGuid(),
-                    BookingId = bookingid,
+                    BookingId = request.BookingId,
                     MissionName = request.MissionName,
                     MissionDescription = request.MissionDescription,
                     Status = MissionStatusEnum.NotStarted.GetDescriptionFromEnum(),
                     IsDelete = false,
                     MissionSchedule = booking.ScheduleDate,
-                    Userid = technicianid,
+                    Userid = request.TechnicianId,
                     Address = booking.Address,
                     PhoneNumber = booking.PhoneNumber,
                 };
@@ -311,9 +311,9 @@ namespace FTSS_API.Service.Implement
                     MissionDescription = newTask.MissionDescription,
                     Status = newTask.Status,
                     MissionSchedule = newTask.MissionSchedule,
-                    TechnicianId = technicianid,
+                    TechnicianId = request.TechnicianId,
                     TechnicianName = technician.UserName,
-                    BookingId = bookingid,
+                    BookingId = request.BookingId,
                     UserId = bookingUser?.Id ?? Guid.Empty,
                     UserName = bookingUser?.UserName ?? "Unknown",
                     FullName = bookingUser?.FullName ?? "Unknown",
@@ -339,7 +339,7 @@ namespace FTSS_API.Service.Implement
             }
         }
 
-        public async Task<ApiResponse> BookingSchedule(List<Guid> serviceid, Guid orderid, BookingScheduleRequest request)
+        public async Task<ApiResponse> BookingSchedule(BookingScheduleRequest request)
         {
             try
             {
@@ -398,7 +398,7 @@ namespace FTSS_API.Service.Implement
 
                 // Kiểm tra đơn hàng có tồn tại và có trạng thái COMPLETED không
                 var order = await _unitOfWork.GetRepository<Order>().SingleOrDefaultAsync(
-                    predicate: o => o.Id.Equals(orderid) &&
+                    predicate: o => o.Id.Equals(request.OrderId) &&
                                     o.Status.Equals(OrderStatus.COMPLETED.ToString()) &&
                                     o.IsDelete == false);
 
@@ -413,7 +413,7 @@ namespace FTSS_API.Service.Implement
                 }
                 // Kiểm tra xem có booking nào trùng ngày không
                 var existingBooking = await _unitOfWork.GetRepository<Booking>().GetListAsync(
-                    predicate: b => b.OrderId.Equals(orderid) && b.ScheduleDate.Value.Date == request.ScheduleDate.Value.Date);
+                    predicate: b => b.OrderId.Equals(request.OrderId) && b.ScheduleDate.Value.Date == request.ScheduleDate.Value.Date);
 
                 if (existingBooking.Any())
                 {
@@ -427,11 +427,11 @@ namespace FTSS_API.Service.Implement
 
                 // Kiểm tra số lượng booking của order này
                 var existingBookings = await _unitOfWork.GetRepository<Booking>().GetListAsync(
-                    predicate: b => b.OrderId.Equals(orderid));
+                    predicate: b => b.OrderId.Equals(request.OrderId));
 
                 // Kiểm tra nếu số lượng booking đã có > 3 thì serviceid không được rỗng
                 bool isOverLimit = existingBookings.Count() >= 3;
-                if (isOverLimit && (serviceid == null || !serviceid.Any()))
+                if (isOverLimit && (request.ServiceIds == null || !request.ServiceIds.Any()))
                 {
                     return new ApiResponse
                     {
@@ -444,22 +444,26 @@ namespace FTSS_API.Service.Implement
                 // Tính tổng TotalPrice khi có hơn 3 booking và kiểm tra serviceid
                 decimal totalPrice = 0;
                 List<ServicePackage> selectedServices = new();
+
+                // Lấy danh sách ServiceId từ request.ServiceIds
+                List<Guid> serviceIds = request.ServiceIds?.Select(s => s.ServiceId).ToList() ?? new List<Guid>();
+
                 if (isOverLimit)
                 {
                     selectedServices = (List<ServicePackage>)await _unitOfWork.GetRepository<ServicePackage>().GetListAsync(
-                        predicate: sp => serviceid.Contains(sp.Id) &&
+                        predicate: sp => serviceIds.Contains(sp.Id) &&
                                          sp.Status.Equals(ServicePackageStatus.Available.GetDescriptionFromEnum()) &&
                                          sp.IsDelete == false);
 
-                    // Kiểm tra nếu có serviceid không hợp lệ
-                    var invalidServices = serviceid.Except(selectedServices.Select(sp => sp.Id)).ToList();
+                    // Kiểm tra nếu có serviceId không hợp lệ
+                    var invalidServices = serviceIds.Except(selectedServices.Select(sp => sp.Id)).ToList();
                     if (invalidServices.Any())
                     {
                         return new ApiResponse
                         {
                             status = StatusCodes.Status400BadRequest.ToString(),
-                            message = "Invalid servicepackgeid.",
-                            data = null
+                            message = "Invalid service package ID(s).",
+                            data = invalidServices // Trả về danh sách ID không hợp lệ để debug dễ hơn
                         };
                     }
 
@@ -482,7 +486,7 @@ namespace FTSS_API.Service.Implement
                     FullName = request.FullName,
                     TotalPrice = totalPrice,  // Gán totalPrice mới tính được
                     UserId = userId,
-                    OrderId = orderid,
+                    OrderId = request.OrderId,
                     IsAssigned = false
                 };
 
@@ -515,7 +519,7 @@ namespace FTSS_API.Service.Implement
                     UserId = user.Id,
                     UserName = user.UserName,
                     FullName = newBooking.FullName,
-                    OrderId = orderid
+                    OrderId = request.OrderId
                 };
 
                 return new ApiResponse

@@ -28,9 +28,9 @@ namespace FTSS_API.Controller
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status201Created)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
         [ProducesErrorResponseType(typeof(ProblemDetails))]
-        public async Task<IActionResult> AssigningTechnician([FromForm] Guid technicianid, [FromForm] Guid orderid, [FromForm] AssigningTechnicianRequest request)
+        public async Task<IActionResult> AssigningTechnician([FromBody] AssigningTechnicianRequest request)
         {
-            var response = await _bookingService.AssigningTechnician(technicianid, orderid,  request);
+            var response = await _bookingService.AssigningTechnician(request);
             return StatusCode(int.Parse(response.status), response);
         }
         /// <summary>
@@ -40,9 +40,9 @@ namespace FTSS_API.Controller
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status201Created)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
         [ProducesErrorResponseType(typeof(ProblemDetails))]
-        public async Task<IActionResult> AssigningTechnicianBooking([FromForm] Guid bookingid, [FromForm] Guid technicianid, [FromForm] AssignTechBookingRequest request)
+        public async Task<IActionResult> AssigningTechnicianBooking([FromBody] AssignTechBookingRequest request)
         {
-            var response = await _bookingService.AssigningTechnicianBooking(bookingid, technicianid, request);
+            var response = await _bookingService.AssigningTechnicianBooking(request);
             return StatusCode(int.Parse(response.status), response);
         }
         /// <summary>
@@ -52,9 +52,9 @@ namespace FTSS_API.Controller
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status201Created)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
         [ProducesErrorResponseType(typeof(ProblemDetails))]
-        public async Task<IActionResult> BookingSchedule([FromForm] List<Guid> serviceid,[FromForm] Guid orderid, [FromForm] BookingScheduleRequest request)
+        public async Task<IActionResult> BookingSchedule([FromBody] BookingScheduleRequest request)
         {
-            var response = await _bookingService.BookingSchedule(serviceid, orderid, request);
+            var response = await _bookingService.BookingSchedule(request);
             return StatusCode(int.Parse(response.status), response);
         }
         /// <summary>
@@ -128,7 +128,7 @@ namespace FTSS_API.Controller
         [HttpPost(ApiEndPointConstant.Booking.GetListTech)]
         [ProducesResponseType(typeof(IPaginate<ApiResponse>), StatusCodes.Status200OK)]
         [ProducesErrorResponseType(typeof(ProblemDetails))]
-        public async Task<IActionResult> GetListTech([FromForm] GetListTechRequest request)
+        public async Task<IActionResult> GetListTech([FromBody] GetListTechRequest request)
         {
             var response = await _bookingService.GetListTech(request);
             return StatusCode(int.Parse(response.status), response);
