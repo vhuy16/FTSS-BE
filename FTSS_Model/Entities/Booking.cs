@@ -23,6 +23,8 @@ public partial class Booking
 
     public bool? IsAssigned { get; set; }
 
+    public string? FullName { get; set; }
+
     public virtual ICollection<BookingDetail> BookingDetails { get; set; } = new List<BookingDetail>();
 
     public virtual ICollection<Mission> Missions { get; set; } = new List<Mission>();
