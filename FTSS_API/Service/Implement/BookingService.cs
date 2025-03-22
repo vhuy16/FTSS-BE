@@ -640,10 +640,11 @@ namespace FTSS_API.Service.Implement
                 Func<IQueryable<Mission>, IOrderedQueryable<Mission>> orderBy = query =>
                     isAscending == true ? query.OrderBy(m => m.MissionSchedule) : query.OrderByDescending(m => m.MissionSchedule);
 
-                // Lấy danh sách Mission theo trang
+                // Lấy danh sách Mission theo trang, bao gồm thông tin của Technician (User)
                 var missions = await _unitOfWork.GetRepository<Mission>().GetPagingListAsync(
                     predicate: filter,
                     orderBy: orderBy,
+                    include: m => m.Include(x => x.User),
                     page: pageNumber,
                     size: pageSize
                 );
@@ -657,7 +658,10 @@ namespace FTSS_API.Service.Implement
                     Status = m.Status,
                     MissionSchedule = m.MissionSchedule,
                     Address = m.Address,
-                    PhoneNumber = m.PhoneNumber
+                    PhoneNumber = m.PhoneNumber,
+                    BookingId = m.BookingId,
+                    TechnicianId = m.Userid, 
+                    TechnicianName = m.User?.FullName ?? "Unknown" // Lấy FullName của Technician nếu có
                 }).ToList();
 
                 return new ApiResponse
@@ -677,6 +681,7 @@ namespace FTSS_API.Service.Implement
                 };
             }
         }
+
 
         public async Task<ApiResponse> GetListTaskTech(int pageNumber, int pageSize, string? status, bool? isAscending)
         {
@@ -744,28 +749,40 @@ namespace FTSS_API.Service.Implement
             };
         }
 
-        public async Task<ApiResponse> GetListTech()
+        public async Task<ApiResponse> GetListTech(GetListTechRequest request)
         {
             try
             {
-                // Lấy danh sách các User có Role là Technician và chưa bị xóa
-                var technicians = await _unitOfWork.GetRepository<User>().GetListAsync(
-                    predicate: u => u.Role.Equals(RoleEnum.Technician.GetDescriptionFromEnum()) &&
-                                    u.IsDelete == false);
+                // Lấy ngày từ request (nếu có)
+                DateTime? requestedDate = request.ScheduleDate?.Date;
 
-                // Chuyển đổi dữ liệu sang GetListTechResponse
-                var responseList = technicians.Select(t => new GetListTechResponse
-                {
-                    TechId = t.Id,
-                    TechName = t.UserName,
-                    FullName = t.FullName
-                }).ToList();
+                // Lấy danh sách tất cả kỹ thuật viên có Role là Technician và chưa bị xóa
+                var allTechnicians = await _unitOfWork.GetRepository<User>().GetListAsync(
+                    predicate: u => u.Role.Equals(RoleEnum.Technician.GetDescriptionFromEnum()) &&
+                                    u.IsDelete == false && u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()));
+
+                // Lấy danh sách nhiệm vụ có MissionSchedule trong ngày được request
+                var missionsOnRequestedDate = await _unitOfWork.GetRepository<Mission>().GetListAsync(
+                    predicate: m => m.MissionSchedule.Value.Date == request.ScheduleDate.Value.Date &&
+                                    (m.IsDelete == false || m.IsDelete == null));
+
+                // Lọc ra các kỹ thuật viên chưa có nhiệm vụ trong ngày đó
+                var availableTechnicians = allTechnicians
+                    .Where(tech => !missionsOnRequestedDate.Any(m => m.Userid == tech.Id))
+                    .Select(t => new GetListTechResponse
+                    {
+                        TechId = t.Id,
+                        TechName = t.UserName,
+                        FullName = t.FullName
+                    })
+                    .ToList();
+
 
                 return new ApiResponse
                 {
                     status = StatusCodes.Status200OK.ToString(),
-                    message = "List of technicians retrieved successfully.",
-                    data = responseList
+                    message = "List of available technicians retrieved successfully.",
+                    data = availableTechnicians
                 };
             }
             catch (Exception ex)
@@ -773,12 +790,11 @@ namespace FTSS_API.Service.Implement
                 return new ApiResponse
                 {
                     status = StatusCodes.Status500InternalServerError.ToString(),
-                    message = "An error occurred while retrieving technician list.",
+                    message = "An error occurred while retrieving the technician list.",
                     data = ex.Message
                 };
             }
         }
-
 
         public async Task<ApiResponse> GetServicePackage(int pageNumber, int pageSize, bool? isAscending)
         {
