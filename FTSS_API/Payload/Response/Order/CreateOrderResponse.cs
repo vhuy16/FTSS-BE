@@ -5,6 +5,7 @@ public class CreateOrderResponse
     public Guid Id { get; set; }
     public decimal? TotalPrice { get; set; }
     public int? ShipCost { get; set; }
+    public string? OrderCode { get; set; }
     public string? Address { get; set; }
     public Guid? SetupPackageId { get; set; }
     public string? PhoneNumber { get; set; }
