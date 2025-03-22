@@ -270,6 +270,8 @@ public class OrderService : BaseService<OrderService>, IOrderService
     {
         List<OrderDetail> orderDetails = new List<OrderDetail>();
         decimal totalProductPrice = 0;
+        // Initialize the new isEligible flag (default to false)
+        bool isEligible = false;
         Order order = new Order
         {
             Id = Guid.NewGuid(),
@@ -281,7 +283,8 @@ public class OrderService : BaseService<OrderService>, IOrderService
             Shipcost = createOrderRequest.ShipCost,
             PhoneNumber = createOrderRequest.PhoneNumber,
             RecipientName = createOrderRequest.RecipientName,
-            SetupPackageId = createOrderRequest.SetupPackageId
+            SetupPackageId = createOrderRequest.SetupPackageId,
+            IsEligible = false
         };
 
         // Branch the flow based on whether we're using SetupPackageId or CartItem
@@ -366,6 +369,10 @@ public class OrderService : BaseService<OrderService>, IOrderService
                     };
                 }
             }
+            // Check if totalProductPrice is at least 2,000,000 for setup packages
+            // and set isEligible flag
+            const decimal eligibilityThreshold = 2000000; // 2 million VND
+            isEligible = totalProductPrice >= eligibilityThreshold;
         }
         else // Process order from Cart Items
         {
@@ -450,8 +457,9 @@ public class OrderService : BaseService<OrderService>, IOrderService
                     };
                 }
             }
+            isEligible = false;
         }
-
+        order.IsEligible = isEligible;
         // No order details created - issue with products
         if (!orderDetails.Any())
         {
@@ -626,6 +634,7 @@ public class OrderService : BaseService<OrderService>, IOrderService
             RecipientName = order.RecipientName,
             PhoneNumber = order.PhoneNumber,
             SetupPackageId = order.SetupPackageId,
+            IsEligible  = order.IsEligible,
             userResponse = new CreateOrderResponse.UserResponse
             {
                 Name = order.User.UserName,
@@ -782,6 +791,7 @@ public async Task<ApiResponse> UpdateOrder(Guid orderId, UpdateOrderRequest upda
                 ShipCost = order.Shipcost,
                 Address = order.Address,
                 CreateDate = order.CreateDate,
+                IsEligible = order.IsEligible,
                 ModifyDate = order.ModifyDate,
                 PhoneNumber = order.PhoneNumber,
                 BuyerName = order.RecipientName,
@@ -886,6 +896,7 @@ public async Task<ApiResponse> UpdateOrder(Guid orderId, UpdateOrderRequest upda
         }
 
         var query = _unitOfWork.Context.Set<Order>()
+            .Where(x => x.Status.Equals(status))
             .Include(o => o.User)
             .Include(o => o.Voucher)
             .Include(o => o.Payments)
@@ -940,6 +951,7 @@ public async Task<ApiResponse> UpdateOrder(Guid orderId, UpdateOrderRequest upda
             ShipCost = order.Shipcost,
             Address = order.Address,
             CreateDate = order.CreateDate,
+            IsEligible = order.IsEligible,
             ModifyDate = order.ModifyDate,
             PhoneNumber = order.PhoneNumber,
             BuyerName = order.RecipientName,
@@ -1073,6 +1085,7 @@ public async Task<ApiResponse> UpdateOrder(Guid orderId, UpdateOrderRequest upda
                 ShipCost = order.Shipcost,
                 Address = order.Address,
                 CreateDate = order.CreateDate,
+                IsEligible = order.IsEligible,
                 ModifyDate = order.ModifyDate,
                 PhoneNumber = order.PhoneNumber,
                 BuyerName = order.RecipientName,

@@ -80,6 +80,10 @@ public partial class MyDbContext : DbContext
             entity.Property(e => e.Address)
                 .HasMaxLength(255)
                 .HasColumnName("address");
+            entity.Property(e => e.FullName)
+                .HasMaxLength(255)
+                .HasColumnName("fullName");
+            entity.Property(e => e.IsAssigned).HasColumnName("isAssigned");
             entity.Property(e => e.OrderId).HasColumnName("orderId");
             entity.Property(e => e.PhoneNumber)
                 .HasMaxLength(15)
@@ -348,6 +352,9 @@ public partial class MyDbContext : DbContext
             entity.Property(e => e.Id)
                 .HasDefaultValueSql("(newid())")
                 .HasColumnName("id");
+            entity.Property(e => e.Address)
+                .HasMaxLength(255)
+                .HasColumnName("address");
             entity.Property(e => e.BookingId).HasColumnName("bookingId");
             entity.Property(e => e.IsDelete)
                 .HasDefaultValue(false)
@@ -359,6 +366,9 @@ public partial class MyDbContext : DbContext
             entity.Property(e => e.MissionSchedule)
                 .HasColumnType("datetime")
                 .HasColumnName("missionSchedule");
+            entity.Property(e => e.PhoneNumber)
+                .HasMaxLength(20)
+                .HasColumnName("phoneNumber");
             entity.Property(e => e.Status)
                 .HasMaxLength(50)
                 .IsUnicode(false)
@@ -392,6 +402,7 @@ public partial class MyDbContext : DbContext
             entity.Property(e => e.IsDelete)
                 .HasDefaultValue(false)
                 .HasColumnName("isDelete");
+            entity.Property(e => e.IsEligible).HasColumnName("isEligible");
             entity.Property(e => e.ModifyDate)
                 .HasColumnType("datetime")
                 .HasColumnName("modifyDate");

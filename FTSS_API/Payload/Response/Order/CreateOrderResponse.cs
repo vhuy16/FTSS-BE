@@ -8,6 +8,7 @@ public class CreateOrderResponse
     public string? Address { get; set; }
     public Guid? SetupPackageId { get; set; }
     public string? PhoneNumber { get; set; }
+    public bool? IsEligible  {get; set;}
 
     public string? RecipientName { get; set; }
     public UserResponse userResponse { get; set; } // Fixed property declaration and removed invalid initialization
