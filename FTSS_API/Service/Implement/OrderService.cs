@@ -284,7 +284,8 @@ public class OrderService : BaseService<OrderService>, IOrderService
             PhoneNumber = createOrderRequest.PhoneNumber,
             RecipientName = createOrderRequest.RecipientName,
             SetupPackageId = createOrderRequest.SetupPackageId,
-            IsEligible = false
+            IsEligible = false,
+            IsAssigned = false
         };
 
         // Branch the flow based on whether we're using SetupPackageId or CartItem
@@ -791,6 +792,7 @@ public async Task<ApiResponse> UpdateOrder(Guid orderId, UpdateOrderRequest upda
                 ShipCost = order.Shipcost,
                 Address = order.Address,
                 CreateDate = order.CreateDate,
+                IsAssigned = order.IsAssigned,
                 IsEligible = order.IsEligible,
                 ModifyDate = order.ModifyDate,
                 PhoneNumber = order.PhoneNumber,
@@ -951,6 +953,7 @@ public async Task<ApiResponse> UpdateOrder(Guid orderId, UpdateOrderRequest upda
             ShipCost = order.Shipcost,
             Address = order.Address,
             CreateDate = order.CreateDate,
+            IsAssigned = order.IsAssigned,
             IsEligible = order.IsEligible,
             ModifyDate = order.ModifyDate,
             PhoneNumber = order.PhoneNumber,
@@ -1086,6 +1089,7 @@ public async Task<ApiResponse> UpdateOrder(Guid orderId, UpdateOrderRequest upda
                 Address = order.Address,
                 CreateDate = order.CreateDate,
                 IsEligible = order.IsEligible,
+                IsAssigned = order.IsAssigned,
                 ModifyDate = order.ModifyDate,
                 PhoneNumber = order.PhoneNumber,
                 BuyerName = order.RecipientName,
