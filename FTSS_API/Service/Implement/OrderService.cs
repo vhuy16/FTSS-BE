@@ -707,7 +707,7 @@ public async Task<ApiResponse> UpdateOrder(Guid orderId, UpdateOrderRequest upda
 
             order.Status = updateOrderRequest.Status;
         }
-
+        order.ModifyDate = DateTime.Now;
         _unitOfWork.GetRepository<Order>().UpdateAsync(order);
         
         // Commit tất cả thay đổi
