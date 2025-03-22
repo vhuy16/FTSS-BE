@@ -31,6 +31,8 @@ public partial class Order
 
     public string? RecipientName { get; set; }
 
+    public bool? IsEligible { get; set; }
+
     public virtual ICollection<Booking> Bookings { get; set; } = new List<Booking>();
 
     public virtual ICollection<OrderDetail> OrderDetails { get; set; } = new List<OrderDetail>();

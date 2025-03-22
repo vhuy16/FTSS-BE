@@ -281,7 +281,7 @@ public class OrderService : BaseService<OrderService>, IOrderService
             Shipcost = createOrderRequest.ShipCost,
             PhoneNumber = createOrderRequest.PhoneNumber,
             RecipientName = createOrderRequest.RecipientName,
-            SetupPackageId = createOrderRequest.SetupPackageId
+            SetupPackageId = createOrderRequest.SetupPackageId,
         };
 
         // Branch the flow based on whether we're using SetupPackageId or CartItem
