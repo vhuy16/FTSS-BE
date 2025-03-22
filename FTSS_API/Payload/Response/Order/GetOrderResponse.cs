@@ -9,7 +9,7 @@ namespace FTSS_API.Payload.Response.Order
         public string? Status { get; set; }
         public decimal? ShipCost { get; set; }
         public DateTime? CreateDate { get; set; }
-
+        public bool? IsEligible {get; set;}
         public DateTime? ModifyDate { get; set; }
         public string? Address { get; set; }
         public string? PhoneNumber { get; set; }
