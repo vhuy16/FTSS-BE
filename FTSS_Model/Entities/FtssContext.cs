@@ -79,6 +79,9 @@ public partial class FtssContext : DbContext
             entity.Property(e => e.Address)
                 .HasMaxLength(255)
                 .HasColumnName("address");
+            entity.Property(e => e.FullName)
+                .HasMaxLength(255)
+                .HasColumnName("fullName");
             entity.Property(e => e.IsAssigned).HasColumnName("isAssigned");
             entity.Property(e => e.OrderId).HasColumnName("orderId");
             entity.Property(e => e.PhoneNumber)

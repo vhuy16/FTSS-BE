@@ -9,6 +9,8 @@ using FTSS_API.Payload.Request.MaintenanceSchedule;
 using FTSS_API.Payload.Request.Category;
 using FTSS_Model.Paginate;
 using FTSS_API.Payload.Request.Book;
+using Azure;
+using System.Drawing;
 
 namespace FTSS_API.Controller
 {
@@ -26,9 +28,9 @@ namespace FTSS_API.Controller
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status201Created)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
         [ProducesErrorResponseType(typeof(ProblemDetails))]
-        public async Task<IActionResult> AssigningTechnician([FromForm] Guid technicianid, [FromForm] AssigningTechnicianRequest request)
+        public async Task<IActionResult> AssigningTechnician([FromForm] Guid technicianid, [FromForm] Guid orderid, [FromForm] AssigningTechnicianRequest request)
         {
-            var response = await _bookingService.AssigningTechnician(technicianid, request);
+            var response = await _bookingService.AssigningTechnician(technicianid, orderid,  request);
             return StatusCode(int.Parse(response.status), response);
         }
         /// <summary>
@@ -56,16 +58,16 @@ namespace FTSS_API.Controller
             return StatusCode(int.Parse(response.status), response);
         }
         /// <summary>
-        /// API cancel mission cho manager, technician.
+        /// API update mission cho technician.
         /// </summary>
-        [HttpPut(ApiEndPointConstant.Booking.CancelTask)]
+        [HttpPut(ApiEndPointConstant.Booking.UpdateStatusMission)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
         [ProducesErrorResponseType(typeof(ProblemDetails))]
-        public async Task<IActionResult> CancelTask(Guid id)
+        public async Task<IActionResult> UpdateStatusMission(Guid id, string status)
         {
-            var response = await _bookingService.CancelTask(id);
+            var response = await _bookingService.UpdateStatusMission(id, status);
             return StatusCode(int.Parse(response.status), response);
         }
         /// <summary>
@@ -109,7 +111,7 @@ namespace FTSS_API.Controller
             var response = await _bookingService.GetListTaskTech(pageNumber, pageSize, status, isAscending);
             if (response == null || response.data == null)
             {
-                return Problem(detail: MessageConstant.MaintenanceScheduleMessage.MaintenanceScheduleIsEmpty,
+                return Problem(detail: MessageConstant.MaintenanceScheduleMessage.MissionIsEmpty,
                     statusCode: StatusCodes.Status404NotFound);
             }
 
@@ -131,7 +133,25 @@ namespace FTSS_API.Controller
             var response = await _bookingService.GetServicePackage(pageNumber, pageSize, isAscending);
             if (response == null || response.data == null)
             {
-                return Problem(detail: MessageConstant.MaintenanceScheduleMessage.MaintenanceScheduleIsEmpty,
+                return Problem(detail: MessageConstant.MaintenanceScheduleMessage.ServiceIsEmpty,
+                    statusCode: StatusCodes.Status404NotFound);
+            }
+
+            return Ok(response);
+        }
+        /// <summary>
+        /// API lấy danh sách technician cho booking.
+        /// </summary>
+        /// 
+        [HttpGet(ApiEndPointConstant.Booking.GetListTech)]
+        [ProducesResponseType(typeof(IPaginate<ApiResponse>), StatusCodes.Status200OK)]
+        [ProducesErrorResponseType(typeof(ProblemDetails))]
+        public async Task<IActionResult> GetListTech()
+        {
+            var response = await _bookingService.GetListTech();
+            if (response == null || response.data == null)
+            {
+                return Problem(detail: MessageConstant.MaintenanceScheduleMessage.TechIsEmpty,
                     statusCode: StatusCodes.Status404NotFound);
             }
 

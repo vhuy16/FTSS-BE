@@ -23,7 +23,7 @@ namespace FTSS_API.Service.Implement
         public BookingService(IUnitOfWork<MyDbContext> unitOfWork, ILogger<BookingService> logger, IMapper mapper, IHttpContextAccessor httpContextAccessor) : base(unitOfWork, logger, mapper, httpContextAccessor)
         {
         }
-        public async Task<ApiResponse> AssigningTechnician(Guid technicianid, AssigningTechnicianRequest request)
+        public async Task<ApiResponse> AssigningTechnician(Guid technicianid, Guid orderid, AssigningTechnicianRequest request)
         {
             try
             {
@@ -111,6 +111,29 @@ namespace FTSS_API.Service.Implement
                         data = null
                     };
                 }
+                // Truy vấn Order theo orderid để lấy Address và PhoneNumber
+                var order = await _unitOfWork.GetRepository<Order>().SingleOrDefaultAsync(
+                    predicate: o => o.Id.Equals(orderid) && o.IsDelete == false);
+
+                if (order == null)
+                {
+                    return new ApiResponse
+                    {
+                        status = StatusCodes.Status400BadRequest.ToString(),
+                        message = "Order not found or has been deleted.",
+                        data = null
+                    };
+                }
+                // Kiểm tra trạng thái Order phải là CONFIRMED
+                if (!order.Status.Equals(OrderStatus.CONFIRMED.ToString(), StringComparison.OrdinalIgnoreCase))
+                {
+                    return new ApiResponse
+                    {
+                        status = StatusCodes.Status400BadRequest.ToString(),
+                        message = "Order status must be CONFIRMED before assigning a technician.",
+                        data = null
+                    };
+                }
                 // Tạo mới MaintenanceTask
                 var newTask = new Mission
                 {
@@ -121,8 +144,8 @@ namespace FTSS_API.Service.Implement
                     Status = MissionStatusEnum.Processing.GetDescriptionFromEnum(),
                     IsDelete = false,
                     MissionSchedule = request.MissionSchedule,
-                    Address = request.Address,
-                    PhoneNumber = request.PhoneNumber,
+                    Address = order.Address,
+                    PhoneNumber = order.PhoneNumber,
                     Userid = technicianid // Gán technicianid từ request vào userid của MaintenanceTask
                 };
 
@@ -255,7 +278,7 @@ namespace FTSS_API.Service.Implement
                     BookingId = bookingid,
                     MissionName = request.MissionName,
                     MissionDescription = request.MissionDescription,
-                    Status = MissionStatusEnum.Processing.GetDescriptionFromEnum(),
+                    Status = MissionStatusEnum.NotStarted.GetDescriptionFromEnum(),
                     IsDelete = false,
                     MissionSchedule = booking.ScheduleDate,
                     Userid = technicianid,
@@ -456,6 +479,7 @@ namespace FTSS_API.Service.Implement
                     Status = bookingStatus, // Đặt status theo yêu cầu
                     Address = request.Address,
                     PhoneNumber = request.PhoneNumber,
+                    FullName = request.FullName,
                     TotalPrice = totalPrice,  // Gán totalPrice mới tính được
                     UserId = userId,
                     OrderId = orderid,
@@ -490,7 +514,7 @@ namespace FTSS_API.Service.Implement
                     TotalPrice = newBooking.TotalPrice,
                     UserId = user.Id,
                     UserName = user.UserName,
-                    FullName = user.FullName,
+                    FullName = newBooking.FullName,
                     OrderId = orderid
                 };
 
@@ -511,66 +535,6 @@ namespace FTSS_API.Service.Implement
                 };
             }
         }
-
-        public async Task<ApiResponse> CancelTask(Guid id)
-        {
-            try
-            {
-                // Lấy UserId từ HttpContext
-                Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
-                var userr = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
-                    predicate: u => u.Id.Equals(userId) &&
-                                    u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) && u.IsDelete == false &&
-                                    (u.Role == RoleEnum.Manager.GetDescriptionFromEnum() || u.Role == RoleEnum.Technician.GetDescriptionFromEnum()));
-
-                if (userr == null)
-                {
-                    throw new BadHttpRequestException("You don't have permission to do this.");
-                }
-
-                // Tìm MaintenanceTask cần hủy
-                var task = await _unitOfWork.GetRepository<Mission>().SingleOrDefaultAsync(
-                    predicate: t => t.Id.Equals(id) && t.IsDelete == false
-                );
-
-                if (task == null)
-                {
-                    return new ApiResponse
-                    {
-                        status = StatusCodes.Status404NotFound.ToString(),
-                        message = "Task not found.",
-                        data = null
-                    };
-                }
-
-                // Cập nhật trạng thái thành "Cancel"
-                task.Status = MissionStatusEnum.Cancel.GetDescriptionFromEnum();
-                _unitOfWork.GetRepository<Mission>().UpdateAsync(task);
-                await _unitOfWork.CommitAsync();
-
-                return new ApiResponse
-                {
-                    status = StatusCodes.Status200OK.ToString(),
-                    message = "Task has been cancelled successfully.",
-                    data = new
-                    {
-                        task.Id,
-                        task.MissionName,
-                        task.Status
-                    }
-                };
-            }
-            catch (Exception ex)
-            {
-                return new ApiResponse
-                {
-                    status = StatusCodes.Status500InternalServerError.ToString(),
-                    message = "An error occurred while cancelling the task.",
-                    data = ex.Message
-                };
-            }
-        }
-
         public async Task<ApiResponse> GetListBookingForManager(int pageNumber, int pageSize, string? status, bool? isAscending, bool? isAssigned)
         {
             try
@@ -644,8 +608,6 @@ namespace FTSS_API.Service.Implement
                 };
             }
         }
-
-
         public async Task<ApiResponse> GetListTaskTech(int pageNumber, int pageSize, string? status, bool? isAscending)
         {
             // Lấy UserId từ HttpContext
@@ -712,6 +674,42 @@ namespace FTSS_API.Service.Implement
             };
         }
 
+        public async Task<ApiResponse> GetListTech()
+        {
+            try
+            {
+                // Lấy danh sách các User có Role là Technician và chưa bị xóa
+                var technicians = await _unitOfWork.GetRepository<User>().GetListAsync(
+                    predicate: u => u.Role.Equals(RoleEnum.Technician.GetDescriptionFromEnum()) &&
+                                    u.IsDelete == false);
+
+                // Chuyển đổi dữ liệu sang GetListTechResponse
+                var responseList = technicians.Select(t => new GetListTechResponse
+                {
+                    TechId = t.Id,
+                    TechName = t.UserName,
+                    FullName = t.FullName
+                }).ToList();
+
+                return new ApiResponse
+                {
+                    status = StatusCodes.Status200OK.ToString(),
+                    message = "List of technicians retrieved successfully.",
+                    data = responseList
+                };
+            }
+            catch (Exception ex)
+            {
+                return new ApiResponse
+                {
+                    status = StatusCodes.Status500InternalServerError.ToString(),
+                    message = "An error occurred while retrieving technician list.",
+                    data = ex.Message
+                };
+            }
+        }
+
+
         public async Task<ApiResponse> GetServicePackage(int pageNumber, int pageSize, bool? isAscending)
         {
             // Lấy danh sách gói dịch vụ từ repository với điều kiện lọc
@@ -741,5 +739,75 @@ namespace FTSS_API.Service.Implement
                 data = response
             };
         }
+
+        public async Task<ApiResponse> UpdateStatusMission(Guid id, string status)
+        {
+            try
+            {
+                // Lấy UserId từ HttpContext
+                Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
+                var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
+                    predicate: u => u.Id.Equals(userId) &&
+                                    u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) &&
+                                    u.IsDelete == false &&
+                                    u.Role.Equals(RoleEnum.Technician.GetDescriptionFromEnum()));
+
+                if (user == null)
+                {
+                    return new ApiResponse
+                    {
+                        status = StatusCodes.Status403Forbidden.ToString(),
+                        message = "You don't have permission to update this mission.",
+                        data = null
+                    };
+                }
+
+                // Kiểm tra Mission có tồn tại không
+                var mission = await _unitOfWork.GetRepository<Mission>().SingleOrDefaultAsync(
+                    predicate: m => m.Id.Equals(id) && m.IsDelete == false);
+
+                if (mission == null)
+                {
+                    return new ApiResponse
+                    {
+                        status = StatusCodes.Status404NotFound.ToString(),
+                        message = "Mission not found.",
+                        data = null
+                    };
+                }
+
+                // Kiểm tra status có hợp lệ không
+                if (!Enum.TryParse(status, true, out MissionStatusEnum validStatus))
+                {
+                    return new ApiResponse
+                    {
+                        status = StatusCodes.Status400BadRequest.ToString(),
+                        message = "Invalid status. Allowed values: Done, Cancel, Processing, NotStarted.",
+                        data = null
+                    };
+                }
+
+                // Cập nhật Status
+                mission.Status = validStatus.ToString();
+                await _unitOfWork.CommitAsync();
+
+                return new ApiResponse
+                {
+                    status = StatusCodes.Status200OK.ToString(),
+                    message = "Mission status updated successfully.",
+                    data = new { mission.Id, mission.Status }
+                };
+            }
+            catch (Exception ex)
+            {
+                return new ApiResponse
+                {
+                    status = StatusCodes.Status500InternalServerError.ToString(),
+                    message = "An error occurred while updating mission status.",
+                    data = ex.Message
+                };
+            }
+        }
+
     }
 }
