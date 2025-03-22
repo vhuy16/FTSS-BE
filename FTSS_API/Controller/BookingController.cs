@@ -46,7 +46,7 @@ namespace FTSS_API.Controller
             return StatusCode(int.Parse(response.status), response);
         }
         /// <summary>
-        /// API đặt lịch cho khách hàng có order đã thanh toán
+        /// API đặt lịch cho khách hàng có order đã thanh toán.
         /// </summary>
         [HttpPost(ApiEndPointConstant.Booking.BookingSchedule)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status201Created)]
