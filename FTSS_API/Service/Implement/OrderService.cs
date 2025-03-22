@@ -886,6 +886,7 @@ public async Task<ApiResponse> UpdateOrder(Guid orderId, UpdateOrderRequest upda
         }
 
         var query = _unitOfWork.Context.Set<Order>()
+            .Where(x => x.Status.Equals(status))
             .Include(o => o.User)
             .Include(o => o.Voucher)
             .Include(o => o.Payments)
