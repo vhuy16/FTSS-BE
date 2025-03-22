@@ -150,5 +150,6 @@ public static class ApiEndPointConstant
         public const string GetServicePackage = BookingEndPoint + "/servicepackage";
         public const string GetListTech = BookingEndPoint + "/list-tech";
         public const string GetListMissionForManager = BookingEndPoint + "/list-mission-manager";
+        public const string GetDateUnavailable = BookingEndPoint + "/date-unavailable";
     }
 }

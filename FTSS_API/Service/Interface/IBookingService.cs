@@ -10,6 +10,7 @@ namespace FTSS_API.Service.Interface
         Task<ApiResponse> AssigningTechnician(AssigningTechnicianRequest request);
         Task<ApiResponse> AssigningTechnicianBooking(AssignTechBookingRequest request);
         Task<ApiResponse> BookingSchedule(BookingScheduleRequest request);
+        Task<ApiResponse> GetDateUnavailable();
         Task<ApiResponse> GetListBookingForManager(int pageNumber, int pageSize, string? status, bool? isAscending, bool? isAssigned);
         Task<ApiResponse> GetListMissionForManager(int pageNumber, int pageSize, string? status, bool? isAscending);
         Task<ApiResponse> GetListTaskTech(int pageNumber, int pageSize, string? status, bool? isAscending);
