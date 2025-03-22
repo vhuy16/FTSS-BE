@@ -1090,36 +1090,36 @@ public async Task<ApiResponse> UpdateOrder(Guid orderId, UpdateOrderRequest upda
                 PhoneNumber = order.PhoneNumber,
                 BuyerName = order.RecipientName,
                 Discount = order.Voucher?.Discount ?? 0,
-                SetupPackage = new SetupPackageResponse()
+                SetupPackage = order.SetupPackage != null ? new SetupPackageResponse()
                 {
                     SetupPackageId = order.SetupPackageId,
-                    SetupName = order.SetupPackage.SetupName,
+                    SetupName = order.SetupPackage?.SetupName,
                     ModifyDate = order.ModifyDate,
-                    Size = order.SetupPackage.SetupPackageDetails
-                        .Where(spd => spd.Product.SubCategory.Category.CategoryName == "Bể")
-                        .Select(spd => spd.Product.Size)
+                    Size = order.SetupPackage?.SetupPackageDetails?
+                        .Where(spd => spd.Product?.SubCategory?.Category?.CategoryName == "Bể")
+                        .Select(spd => spd.Product?.Size)
                         .FirstOrDefault(),
                     CreateDate = order.CreateDate,
-                    TotalPrice = order.SetupPackage.Price,
-                    Description = order.SetupPackage.Description,
-                    IsDelete = order.SetupPackage.IsDelete,
-                    Products = order.SetupPackage.SetupPackageDetails.Select(spd => new ProductResponse
+                    TotalPrice = order.SetupPackage?.Price ?? 0,
+                    Description = order.SetupPackage?.Description ?? "N/A",
+                    IsDelete = order.SetupPackage?.IsDelete ?? false,
+                    Products = order.SetupPackage?.SetupPackageDetails?.Select(spd => new ProductResponse
                     {
-                        Id = spd.Product.Id,
-                        ProductName = spd.Product.ProductName,
+                        Id = spd.Product?.Id ?? Guid.Empty,
+                        ProductName = spd.Product?.ProductName ?? "Unknown",
                         Quantity = spd.Quantity,
-                        Price = spd.Product.Price,
-                        InventoryQuantity = spd.Product.Quantity,
-                        Status = spd.Product.Status,
-                        IsDelete = order.SetupPackage.IsDelete,
-                        CategoryName = spd.Product.SubCategory.Category.CategoryName,
-                        images = spd.Product.Images
+                        Price = spd.Product?.Price ?? 0,
+                        InventoryQuantity = spd.Product?.Quantity ?? 0,
+                        Status = spd.Product != null ? spd.Product.Status : "false",
+                        IsDelete = order.SetupPackage?.IsDelete ?? false,
+                        CategoryName = spd.Product?.SubCategory?.Category?.CategoryName ?? "Unknown",
+                        images = spd.Product?.Images?
                             .Where(img => img.IsDelete == false)
                             .OrderBy(img => img.CreateDate)
                             .Select(img => img.LinkImage)
-                            .FirstOrDefault()
-                    }).ToList()
-                },
+                            .FirstOrDefault() ?? "NoImageAvailable"
+                    }).ToList() ?? new List<ProductResponse>()
+                } : null,
                 Payment = new GetOrderResponse.PaymentResponse
                 {
                     PaymentMethod = order.Payments.FirstOrDefault()?.PaymentMethod,

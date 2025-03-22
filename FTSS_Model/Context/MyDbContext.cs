@@ -366,6 +366,7 @@ public partial class MyDbContext : DbContext
             entity.Property(e => e.MissionSchedule)
                 .HasColumnType("datetime")
                 .HasColumnName("missionSchedule");
+            entity.Property(e => e.OrderId).HasColumnName("orderId");
             entity.Property(e => e.PhoneNumber)
                 .HasMaxLength(20)
                 .HasColumnName("phoneNumber");
@@ -378,6 +379,10 @@ public partial class MyDbContext : DbContext
             entity.HasOne(d => d.Booking).WithMany(p => p.Missions)
                 .HasForeignKey(d => d.BookingId)
                 .HasConstraintName("FK_Mission_Booking");
+
+            entity.HasOne(d => d.Order).WithMany(p => p.Missions)
+                .HasForeignKey(d => d.OrderId)
+                .HasConstraintName("FK_Mission_Order");
 
             entity.HasOne(d => d.User).WithMany(p => p.Missions)
                 .HasForeignKey(d => d.Userid)
@@ -399,6 +404,7 @@ public partial class MyDbContext : DbContext
             entity.Property(e => e.CreateDate)
                 .HasColumnType("datetime")
                 .HasColumnName("createDate");
+            entity.Property(e => e.IsAssigned).HasColumnName("isAssigned");
             entity.Property(e => e.IsDelete)
                 .HasDefaultValue(false)
                 .HasColumnName("isDelete");

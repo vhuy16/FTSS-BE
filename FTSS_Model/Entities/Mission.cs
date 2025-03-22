@@ -25,7 +25,11 @@ public partial class Mission
 
     public string? PhoneNumber { get; set; }
 
+    public Guid? OrderId { get; set; }
+
     public virtual Booking? Booking { get; set; }
+
+    public virtual Order? Order { get; set; }
 
     public virtual User? User { get; set; }
 }
