@@ -97,7 +97,7 @@ namespace FTSS_API.Controller
         /// <summary>
         /// API lấy danh sách mission cho technician.
         /// </summary>
-        [HttpGet(ApiEndPointConstant.Booking.GetListTaskTech)]
+        [HttpGet(ApiEndPointConstant.Booking.GetListMissionTech)]
         [ProducesResponseType(typeof(IPaginate<ApiResponse>), StatusCodes.Status200OK)]
         [ProducesErrorResponseType(typeof(ProblemDetails))]
         public async Task<IActionResult> GetListTaskTech(
@@ -152,6 +152,29 @@ namespace FTSS_API.Controller
             if (response == null || response.data == null)
             {
                 return Problem(detail: MessageConstant.MaintenanceScheduleMessage.TechIsEmpty,
+                    statusCode: StatusCodes.Status404NotFound);
+            }
+
+            return Ok(response);
+        }
+        /// <summary>
+        /// API lấy danh sách mission cho technician.
+        /// </summary>
+        [HttpGet(ApiEndPointConstant.Booking.GetListMissionForManager)]
+        [ProducesResponseType(typeof(IPaginate<ApiResponse>), StatusCodes.Status200OK)]
+        [ProducesErrorResponseType(typeof(ProblemDetails))]
+        public async Task<IActionResult> GetListMissionForManager(
+            [FromQuery] int? page,
+            [FromQuery] int? size,
+            [FromQuery] string? status,
+            [FromQuery] bool? isAscending = null)
+        {
+            int pageNumber = page ?? 1;
+            int pageSize = size ?? 10;
+            var response = await _bookingService.GetListMissionForManager(pageNumber, pageSize, status, isAscending);
+            if (response == null || response.data == null)
+            {
+                return Problem(detail: MessageConstant.MaintenanceScheduleMessage.MissionIsEmpty,
                     statusCode: StatusCodes.Status404NotFound);
             }
 
