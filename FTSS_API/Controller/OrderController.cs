@@ -48,11 +48,11 @@ public class OrderController : BaseController<OrderController>
     [ProducesResponseType(typeof(IPaginate<ApiResponse>), StatusCodes.Status200OK)]
     [ProducesErrorResponseType(typeof(ProblemDetails))]
     public async Task<IActionResult> GetListOrder([FromQuery] int? page, [FromQuery] int? size,
-        [FromQuery] bool? isAscending)
+        [FromQuery] bool? isAscending, [FromQuery] string? orderCode)
     {
         int pageNumber = page ?? 1;
         int pageSize = size ?? 10;
-        var response = await _orderService.GetListOrder(pageNumber, pageSize, isAscending);
+        var response = await _orderService.GetListOrder(pageNumber, pageSize, isAscending, orderCode);
         if (response == null || response.data == null)
         {
             return Problem(detail: MessageConstant.OrderMessage.OrderIsEmpty,
