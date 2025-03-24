@@ -33,7 +33,9 @@ public partial class Order
 
     public bool? IsEligible { get; set; }
 
-    public int? IsAssigned { get; set; }
+    public bool? IsAssigned { get; set; }
+
+    public string? OrderCode { get; set; }
 
     public virtual ICollection<Booking> Bookings { get; set; } = new List<Booking>();
 

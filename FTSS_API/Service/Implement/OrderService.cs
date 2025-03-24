@@ -284,7 +284,9 @@ public class OrderService : BaseService<OrderService>, IOrderService
             PhoneNumber = createOrderRequest.PhoneNumber,
             RecipientName = createOrderRequest.RecipientName,
             SetupPackageId = createOrderRequest.SetupPackageId,
-            IsEligible = false
+            IsEligible = false,
+            IsAssigned = false,
+            OrderCode =  GenerateOrderCode().Trim()
         };
 
         // Branch the flow based on whether we're using SetupPackageId or CartItem
@@ -633,6 +635,7 @@ public class OrderService : BaseService<OrderService>, IOrderService
             Address = order.Address,
             RecipientName = order.RecipientName,
             PhoneNumber = order.PhoneNumber,
+            OrderCode = order.OrderCode,
             SetupPackageId = order.SetupPackageId,
             IsEligible  = order.IsEligible,
             userResponse = new CreateOrderResponse.UserResponse
@@ -731,7 +734,7 @@ public async Task<ApiResponse> UpdateOrder(Guid orderId, UpdateOrderRequest upda
     }
 }
 
-    public async Task<ApiResponse> GetListOrder(int page, int size, bool? isAscending)
+    public async Task<ApiResponse> GetListOrder(int page, int size, bool? isAscending, string orderCode)
     {
         try
         {
@@ -763,8 +766,11 @@ public async Task<ApiResponse> UpdateOrder(Guid orderId, UpdateOrderRequest upda
                 query = isAscending.Value
                     ? query.OrderBy(o => o.CreateDate) // Sắp xếp tăng dần theo CreateDate
                     : query.OrderByDescending(o => o.CreateDate); // Sắp xếp giảm dần theo CreateDate
-          
 
+                if (orderCode != null)
+                {
+                    query = query.Where(o => o.OrderCode == orderCode);
+                }
             // Phân trang
             var totalItems = await query.CountAsync();
             var orders = await query
@@ -791,6 +797,8 @@ public async Task<ApiResponse> UpdateOrder(Guid orderId, UpdateOrderRequest upda
                 ShipCost = order.Shipcost,
                 Address = order.Address,
                 CreateDate = order.CreateDate,
+                OderCode = order.OrderCode,
+                IsAssigned = order.IsAssigned,
                 IsEligible = order.IsEligible,
                 ModifyDate = order.ModifyDate,
                 PhoneNumber = order.PhoneNumber,
@@ -951,7 +959,9 @@ public async Task<ApiResponse> UpdateOrder(Guid orderId, UpdateOrderRequest upda
             ShipCost = order.Shipcost,
             Address = order.Address,
             CreateDate = order.CreateDate,
+            IsAssigned = order.IsAssigned,
             IsEligible = order.IsEligible,
+            OderCode = order.OrderCode,
             ModifyDate = order.ModifyDate,
             PhoneNumber = order.PhoneNumber,
             BuyerName = order.RecipientName,
@@ -1086,6 +1096,8 @@ public async Task<ApiResponse> UpdateOrder(Guid orderId, UpdateOrderRequest upda
                 Address = order.Address,
                 CreateDate = order.CreateDate,
                 IsEligible = order.IsEligible,
+                OderCode = order.OrderCode,
+                IsAssigned = order.IsAssigned,
                 ModifyDate = order.ModifyDate,
                 PhoneNumber = order.PhoneNumber,
                 BuyerName = order.RecipientName,
@@ -1161,6 +1173,29 @@ public async Task<ApiResponse> UpdateOrder(Guid orderId, UpdateOrderRequest upda
         }
     }
 
+    #region tạo orderCode
+
+    private string GenerateOrderCode()
+    {
+        var now = DateTime.UtcNow; // Lấy thời gian hiện tại theo UTC để tránh trùng lặp
+        string timestamp = now.ToString("yyyyMMddHHmmssfff"); // VD: 20250322153045999
+        string randomLetters = GenerateRandomLetters(7).Trim(); // Loại bỏ khoảng trắng
+        string lastThreeDigits = timestamp[^3..]; // Lấy 3 số cuối của timestamp
+
+        return $"{randomLetters}{lastThreeDigits}"; // VD: ABC999
+    }
+
+// Hàm tạo 3 chữ cái ngẫu nhiên
+    private string GenerateRandomLetters(int length)
+    {
+        const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        var random = new Random();
+        return new string(Enumerable.Range(0, length)
+            .Select(_ => chars[random.Next(chars.Length)])
+            .ToArray());
+    }
+
+    #endregion
 
     public Task<ApiResponse> CancelOrder(Guid id)
     {
