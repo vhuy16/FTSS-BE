@@ -134,22 +134,36 @@ namespace FTSS_API.Service.Implement
                         data = null
                     };
                 }
+                // ✅ Kiểm tra Order đã được phân công chưa
+                if (order.IsAssigned == true)
+                {
+                    return new ApiResponse
+                    {
+                        status = StatusCodes.Status400BadRequest.ToString(),
+                        message = "Order has already been assigned to a technician.",
+                        data = null
+                    };
+                }
                 // Tạo mới MaintenanceTask
                 var newTask = new Mission
                 {
                     Id = Guid.NewGuid(),
-                    BookingId = null, // Lấy ID của MaintenanceSchedule vừa tạo
+                    BookingId = null, 
                     MissionName = request.MissionName,
                     MissionDescription = request.MissionDescription,
-                    Status = MissionStatusEnum.Processing.GetDescriptionFromEnum(),
+                    Status = MissionStatusEnum.NotStarted.GetDescriptionFromEnum(),
                     IsDelete = false,
                     MissionSchedule = request.MissionSchedule,
                     Address = order.Address,
                     PhoneNumber = order.PhoneNumber,
-                    Userid = request.TechnicianId // Gán technicianid từ request vào userid của MaintenanceTask
+                    Userid = request.TechnicianId, // Gán technicianid từ request vào userid của MaintenanceTask
+                    OrderId = order.Id,
                 };
 
                 await _unitOfWork.Context.Set<Mission>().AddAsync(newTask);
+                // ✅ Cập nhật trạng thái IsAssigned của Order thành true
+                order.IsAssigned = true;
+                _unitOfWork.GetRepository<Order>().UpdateAsync(order);
                 await _unitOfWork.CommitAsync();
 
                 // Chuẩn bị response
@@ -164,6 +178,7 @@ namespace FTSS_API.Service.Implement
                     TechnicianName = technician.FullName ?? "Unknown",
                     Address = newTask.Address,
                     PhoneNumber = newTask.PhoneNumber,
+                    OrderId = newTask.OrderId
                 };
 
                 return new ApiResponse
@@ -270,7 +285,16 @@ namespace FTSS_API.Service.Implement
                         data = null
                     };
                 }
-
+                // ✅ Kiểm tra Booking đã được phân công chưa
+                if (booking.IsAssigned == true)
+                {
+                    return new ApiResponse
+                    {
+                        status = StatusCodes.Status400BadRequest.ToString(),
+                        message = "Booking has already been assigned to a technician.",
+                        data = null
+                    };
+                }
                 // Tạo nhiệm vụ mới
                 var newTask = new Mission
                 {
@@ -290,7 +314,7 @@ namespace FTSS_API.Service.Implement
 
                 // Cập nhật trạng thái booking đã được gán
                 booking.IsAssigned = true;
-                _unitOfWork.Context.Set<Booking>().Update(booking);
+                _unitOfWork.GetRepository<Booking>().UpdateAsync(booking);
 
                 await _unitOfWork.CommitAsync();
 
@@ -355,6 +379,7 @@ namespace FTSS_API.Service.Implement
                 {
                     throw new BadHttpRequestException("You don't have permission to do this.");
                 }
+
                 if (string.IsNullOrWhiteSpace(request.Address))
                 {
                     return new ApiResponse
@@ -364,6 +389,7 @@ namespace FTSS_API.Service.Implement
                         data = null
                     };
                 }
+
                 string phonePattern = @"^0\d{9}$";
                 if (!Regex.IsMatch(request.PhoneNumber, phonePattern))
                 {
@@ -374,6 +400,7 @@ namespace FTSS_API.Service.Implement
                         data = null
                     };
                 }
+
                 if (request.ScheduleDate == null)
                 {
                     return new ApiResponse
@@ -384,7 +411,6 @@ namespace FTSS_API.Service.Implement
                     };
                 }
 
-                // Kiểm tra ScheduleDate phải trễ hơn thời gian hiện tại theo SEATime
                 var currentSEATime = TimeUtils.GetCurrentSEATime();
                 if (request.ScheduleDate <= currentSEATime)
                 {
@@ -411,45 +437,43 @@ namespace FTSS_API.Service.Implement
                         data = null
                     };
                 }
-                // Kiểm tra xem có booking nào trùng ngày không
-                var existingBooking = await _unitOfWork.GetRepository<Booking>().GetListAsync(
-                    predicate: b => b.OrderId.Equals(request.OrderId) && b.ScheduleDate.Value.Date == request.ScheduleDate.Value.Date);
 
-                if (existingBooking.Any())
+                // Kiểm tra xem đã có booking nào cùng ngày với order chưa
+                var existingBooking = await _unitOfWork.GetRepository<Booking>().GetListAsync(
+                        predicate: b => b.OrderId.Equals(request.OrderId) &&
+                                        b.ScheduleDate.Value.Date == request.ScheduleDate.Value.Date);
+
+                bool hasBookingSameDate = existingBooking.Any();
+
+                if (hasBookingSameDate)
                 {
                     return new ApiResponse
                     {
                         status = StatusCodes.Status400BadRequest.ToString(),
-                        message = "A booking already exists for this order on the selected date.",
+                        message = "Order already has a booking on this date.",
                         data = null
                     };
                 }
 
-                // Kiểm tra số lượng booking của order này
+
+                // Kiểm tra số lượng booking đã có của order này
                 var existingBookings = await _unitOfWork.GetRepository<Booking>().GetListAsync(
                     predicate: b => b.OrderId.Equals(request.OrderId));
 
-                // Kiểm tra nếu số lượng booking đã có > 3 thì serviceid không được rỗng
-                bool isOverLimit = existingBookings.Count() >= 3;
-                if (isOverLimit && (request.ServiceIds == null || !request.ServiceIds.Any()))
-                {
-                    return new ApiResponse
-                    {
-                        status = StatusCodes.Status400BadRequest.ToString(),
-                        message = "Service package selection is required when there are more than 3 bookings.",
-                        data = null
-                    };
-                }
+                bool isFirstBooking = existingBookings.Count() == 0;
+                bool isEligibleForFreeBooking = order.IsEligible == true && isFirstBooking;
 
-                // Tính tổng TotalPrice khi có hơn 3 booking và kiểm tra serviceid
+                // Xác định trạng thái booking
+                string bookingStatus = isEligibleForFreeBooking ? BookingStatusEnum.FREE.ToString() : BookingStatusEnum.NOTPAID.ToString();
+
+                // Tính TotalPrice nếu không miễn phí
                 decimal totalPrice = 0;
                 List<ServicePackage> selectedServices = new();
-
-                // Lấy danh sách ServiceId từ request.ServiceIds
                 List<Guid> serviceIds = request.ServiceIds?.Select(s => s.ServiceId).ToList() ?? new List<Guid>();
 
-                if (isOverLimit)
+                if (!isEligibleForFreeBooking) // Nếu không được miễn phí, phải tính tiền
                 {
+                    // Lấy danh sách ServicePackage từ serviceIds
                     selectedServices = (List<ServicePackage>)await _unitOfWork.GetRepository<ServicePackage>().GetListAsync(
                         predicate: sp => serviceIds.Contains(sp.Id) &&
                                          sp.Status.Equals(ServicePackageStatus.Available.GetDescriptionFromEnum()) &&
@@ -463,37 +487,33 @@ namespace FTSS_API.Service.Implement
                         {
                             status = StatusCodes.Status400BadRequest.ToString(),
                             message = "Invalid service package ID(s).",
-                            data = invalidServices // Trả về danh sách ID không hợp lệ để debug dễ hơn
+                            data = invalidServices
                         };
                     }
 
+                    // Tính tổng giá dịch vụ
                     totalPrice = selectedServices.Sum(sp => sp.Price);
                 }
-
-                // Chọn trạng thái booking dựa vào số lượng booking hiện tại
-                string bookingStatus = isOverLimit
-                    ? BookingStatusEnum.NOTPAID.ToString()
-                    : BookingStatusEnum.FREE.ToString();
 
                 // Tạo mới Booking
                 var newBooking = new Booking
                 {
                     Id = Guid.NewGuid(),
                     ScheduleDate = request.ScheduleDate,
-                    Status = bookingStatus, // Đặt status theo yêu cầu
+                    Status = bookingStatus,
                     Address = request.Address,
                     PhoneNumber = request.PhoneNumber,
                     FullName = request.FullName,
-                    TotalPrice = totalPrice,  // Gán totalPrice mới tính được
+                    TotalPrice = totalPrice,
                     UserId = userId,
                     OrderId = request.OrderId,
                     IsAssigned = false
                 };
 
-                await _unitOfWork.Context.Set<Booking>().AddAsync(newBooking);
+                await _unitOfWork.GetRepository<Booking>().InsertAsync(newBooking);
 
-                // Thêm BookingDetail nếu có serviceid
-                if (isOverLimit)
+                // Nếu không miễn phí, thêm BookingDetail
+                if (!isEligibleForFreeBooking && selectedServices.Any())
                 {
                     var bookingDetails = selectedServices.Select(service => new BookingDetail
                     {
@@ -503,6 +523,13 @@ namespace FTSS_API.Service.Implement
                     }).ToList();
 
                     await _unitOfWork.Context.Set<BookingDetail>().AddRangeAsync(bookingDetails);
+                }
+
+                // Nếu là lần đầu tiên booking và IsEligible == true, cập nhật lại IsEligible của Order thành false
+                if (isEligibleForFreeBooking)
+                {
+                    order.IsEligible = false;
+                    _unitOfWork.GetRepository<Order>().UpdateAsync(order);
                 }
 
                 await _unitOfWork.CommitAsync();
@@ -536,6 +563,66 @@ namespace FTSS_API.Service.Implement
                     status = StatusCodes.Status500InternalServerError.ToString(),
                     message = "An error occurred while booking the schedule.",
                     data = ex.Message
+                };
+            }
+        }
+
+        public async Task<ApiResponse> GetBookingById(Guid bookingId)
+        {
+            try
+            {
+                // Truy vấn Booking từ DB với thông tin User và BookingDetails
+                var booking = await _unitOfWork.GetRepository<Booking>().SingleOrDefaultAsync(
+                    predicate: b => b.Id == bookingId,
+                    include: b => b.Include(x => x.User)
+                                   .Include(x => x.BookingDetails)
+                                   .ThenInclude(bd => bd.ServicePackage)
+                );
+
+                // Kiểm tra nếu không tìm thấy booking
+                if (booking == null)
+                {
+                    return new ApiResponse
+                    {
+                        status = StatusCodes.Status404NotFound.ToString(),
+                        message = "Booking not found.",
+                        data = null
+                    };
+                }
+
+                // Chuyển đổi dữ liệu Booking sang response
+                var response = new GetBookingById
+                {
+                    Id = booking.Id,
+                    ScheduleDate = booking.ScheduleDate,
+                    Status = booking.Status,
+                    Address = booking.Address,
+                    PhoneNumber = booking.PhoneNumber,
+                    TotalPrice = booking.TotalPrice,
+                    OrderId = booking.OrderId,
+                    IsAssigned = booking.IsAssigned,
+                    Services = booking.BookingDetails.Select(bd => new ServicePackageResponse
+                    {
+                        Id = bd.ServicePackage.Id,
+                        ServiceName = bd.ServicePackage.ServiceName,
+                        Price = bd.ServicePackage.Price
+                    }).ToList()
+                };
+
+                return new ApiResponse
+                {
+                    status = StatusCodes.Status200OK.ToString(),
+                    message = "Success",
+                    data = response
+                };
+            }
+            catch (Exception ex)
+            {
+                return new ApiResponse
+                {
+                    status = StatusCodes.Status500InternalServerError.ToString(),
+                    message = $"An error occurred: {ex.Message}",
+                    data = null
                 };
             }
         }
@@ -650,6 +737,67 @@ namespace FTSS_API.Service.Implement
                 };
             }
         }
+
+        public async Task<ApiResponse> GetListBookingForUser(int pageNumber, int pageSize, string? status, bool? isAscending)
+        {
+            try
+            {
+                // Lấy UserId từ HttpContext
+                Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
+                var userr = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
+                    predicate: u => u.Id.Equals(userId) &&
+                                    u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) &&
+                                    u.IsDelete == false &&
+                                    u.Role.Equals(RoleEnum.Customer.GetDescriptionFromEnum()));
+
+                if (userr == null)
+                {
+                    return new ApiResponse
+                    {
+                        status = StatusCodes.Status403Forbidden.ToString(),
+                        message = "You don't have permission to do this.",
+                        data = null
+                    };
+                }
+
+                // Lấy danh sách booking của Customer đó
+                var bookings = await _unitOfWork.GetRepository<Booking>().GetPagingListAsync(
+                    predicate: b => b.UserId == userId && (string.IsNullOrEmpty(status) || b.Status == status),
+                    orderBy: q => isAscending == true ? q.OrderBy(b => b.ScheduleDate) : q.OrderByDescending(b => b.ScheduleDate),
+                    page: pageNumber,
+                    size: pageSize
+                );
+
+                var response = bookings.Items.Select(b => new GetListBookingForUserResponse
+                {
+                    Id = b.Id,
+                    ScheduleDate = b.ScheduleDate,
+                    Status = b.Status,
+                    Address = b.Address,
+                    PhoneNumber = b.PhoneNumber,
+                    TotalPrice = b.TotalPrice,
+                    OrderId = b.OrderId,
+                    IsAssigned = b.IsAssigned
+                }).ToList();
+
+                return new ApiResponse
+                {
+                    status = StatusCodes.Status200OK.ToString(),
+                    message = "Booking list retrieved successfully.",
+                    data = response
+                };
+            }
+            catch (Exception ex)
+            {
+                return new ApiResponse
+                {
+                    status = StatusCodes.Status500InternalServerError.ToString(),
+                    message = "An error occurred while retrieving the booking list.",
+                    data = ex.Message // Trả về lỗi để debug, nhưng có thể log lại thay vì hiển thị trực tiếp
+                };
+            }
+        }
+
 
         public async Task<ApiResponse> GetListMissionForManager(int pageNumber, int pageSize, string? status, bool? isAscending)
         {
