@@ -38,6 +38,16 @@ public static class ApiEndPointConstant
         public const string CreatePaymentUrl = "api/vnpay/create-payment-url";
         public const string ValidatePaymentResponse = "api/vnpay/validate-payment-response";
     }
+    public static class IssueCategory
+    {
+        public const string IssueCategoryEndPoint = ApiEndpoint + "/issue-category";
+        public const string CreateIssueCategory = IssueCategoryEndPoint;
+        public const string GetAllIssueCategories = IssueCategoryEndPoint;
+        public const string GetIssueCategoryById = IssueCategoryEndPoint + "/{id}";
+        public const string UpdateIssueCategory = IssueCategoryEndPoint + "/{id}";
+        public const string DeleteIssueCategory = IssueCategoryEndPoint + "/{id}";
+    }
+
     public static class Shipment
     {
         public const string ShipmentEndPoint = ApiEndpoint + "/shipment";
