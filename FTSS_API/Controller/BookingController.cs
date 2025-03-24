@@ -162,5 +162,33 @@ namespace FTSS_API.Controller
             var response = await _bookingService.GetDateUnavailable();
             return StatusCode(int.Parse(response.status), response);
         }
+        /// <summary>
+        /// API lấy danh sách booking cho user.
+        /// </summary>
+        [HttpGet(ApiEndPointConstant.Booking.GetListBookingForUser)]
+        [ProducesResponseType(typeof(IPaginate<ApiResponse>), StatusCodes.Status200OK)]
+        [ProducesErrorResponseType(typeof(ProblemDetails))]
+        public async Task<IActionResult> GetListBookingForUser(
+            [FromQuery] int? page,
+            [FromQuery] int? size,
+            [FromQuery] string? status,
+            [FromQuery] bool? isAscending = null)
+        {
+            int pageNumber = page ?? 1;
+            int pageSize = size ?? 10;
+            var response = await _bookingService.GetListBookingForUser(pageNumber, pageSize, status, isAscending);
+            return StatusCode(int.Parse(response.status), response);
+        }
+        /// <summary>
+        /// API lấy booking detail.
+        /// </summary>
+        [HttpGet(ApiEndPointConstant.Booking.GetBookingById)]
+        [ProducesResponseType(typeof(IPaginate<ApiResponse>), StatusCodes.Status200OK)]
+        [ProducesErrorResponseType(typeof(ProblemDetails))]
+        public async Task<IActionResult> GetBookingById(Guid bookingid)
+        {
+            var response = await _bookingService.GetBookingById(bookingid);
+            return StatusCode(int.Parse(response.status), response);
+        }
     }
 }
