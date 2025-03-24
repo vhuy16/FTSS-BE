@@ -180,7 +180,7 @@ namespace FTSS_API.Controller
             return StatusCode(int.Parse(response.status), response);
         }
         /// <summary>
-        /// API lấy booking detail
+        /// API lấy booking detail.
         /// </summary>
         [HttpGet(ApiEndPointConstant.Booking.GetBookingById)]
         [ProducesResponseType(typeof(IPaginate<ApiResponse>), StatusCodes.Status200OK)]
