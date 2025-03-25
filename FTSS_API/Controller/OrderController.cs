@@ -53,13 +53,18 @@ public class OrderController : BaseController<OrderController>
         int pageNumber = page ?? 1;
         int pageSize = size ?? 10;
         var response = await _orderService.GetListOrder(pageNumber, pageSize, isAscending, orderCode);
-        if (response == null || response.data == null)
+        if (response.status == StatusCodes.Status200OK.ToString())
         {
-            return Problem(detail: MessageConstant.OrderMessage.OrderIsEmpty,
-                statusCode: StatusCodes.Status404NotFound);
+            return Ok(response);
         }
-
-        return Ok(response);
+        else if (response.status == StatusCodes.Status401Unauthorized.ToString())
+        {
+            return Unauthorized(response);
+        }
+        else
+        {
+            return StatusCode(StatusCodes.Status500InternalServerError, response);
+        }
     }
     /// <summary>
     /// API cập nhật đơn hàng
@@ -107,13 +112,20 @@ public class OrderController : BaseController<OrderController>
         int pageNumber = page ?? 1;
         int pageSize = size ?? 10;
         var response = await _orderService.GetAllOrder(pageNumber, pageSize, status, isAscending);
-        if (response == null || response.data == null)
+        
+        if (response.status == StatusCodes.Status200OK.ToString())
         {
-            return Problem(detail: MessageConstant.OrderMessage.OrderIsEmpty,
-                statusCode: StatusCodes.Status404NotFound);
+            return Ok(response);
         }
-
-        return Ok(response);
+        else if (response.status == StatusCodes.Status401Unauthorized.ToString())
+        {
+            return Unauthorized(response);
+        }
+        else
+        {
+            return StatusCode(StatusCodes.Status500InternalServerError, response);
+        }
+        
     }
 
     /// <summary>
