@@ -782,9 +782,9 @@ public async Task<ApiResponse> UpdateOrder(Guid orderId, UpdateOrderRequest upda
             {
                 return new ApiResponse
                 {
-                    status = StatusCodes.Status404NotFound.ToString(),
+                    status = StatusCodes.Status200OK.ToString(),
                     message = "No orders found.",
-                    data = null
+                    data = new List<Order>()
                 };
             }
 
@@ -944,9 +944,9 @@ public async Task<ApiResponse> UpdateOrder(Guid orderId, UpdateOrderRequest upda
         {
             return new ApiResponse
             {
-                status = StatusCodes.Status404NotFound.ToString(),
+                status = StatusCodes.Status200OK.ToString(),
                 message = "No orders found for the specified user.",
-                data = null
+                data = new List<Order>()
             };
         }
 
