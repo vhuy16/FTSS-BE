@@ -784,7 +784,7 @@ public async Task<ApiResponse> UpdateOrder(Guid orderId, UpdateOrderRequest upda
                 {
                     status = StatusCodes.Status200OK.ToString(),
                     message = "No orders found.",
-                    data = null
+                    data = new List<Order>()
                 };
             }
 
@@ -946,7 +946,7 @@ public async Task<ApiResponse> UpdateOrder(Guid orderId, UpdateOrderRequest upda
             {
                 status = StatusCodes.Status200OK.ToString(),
                 message = "No orders found for the specified user.",
-                data = null
+                data = new List<Order>()
             };
         }
 
