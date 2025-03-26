@@ -38,7 +38,10 @@
         }
         public static class MaintenanceScheduleMessage
         {
-            public const string MaintenanceScheduleIsEmpty = "Không có MaintenanceSchedule nào";
+            public const string MaintenanceScheduleIsEmpty = "Không có Booking nào";
+            public const string MissionIsEmpty = "Không có mission nào";
+            public const string ServiceIsEmpty = "Không có service package nào";
+            public const string TechIsEmpty = "Không có technician nào";
         }
 
         public static class CategoryMessage

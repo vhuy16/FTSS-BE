@@ -2,10 +2,11 @@
 {
     public class AssigningTechnicianRequest
     {
-        public string TaskName { get; set; } = null!;
+        public Guid TechnicianId { get; set; }
+        public Guid OrderId { get; set; }
+        public string MissionName { get; set; } = null!;
 
-        public string? TaskDescription { get; set; }
-        public DateTime? ScheduleDate { get; set; }
-        public string? Address { get; set; }
+        public string? MissionDescription { get; set; }
+        public DateTime? MissionSchedule { get; set; }
     }
 }
