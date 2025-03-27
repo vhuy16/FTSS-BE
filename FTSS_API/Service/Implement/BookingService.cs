@@ -582,64 +582,68 @@ namespace FTSS_API.Service.Implement
         }
 
         public async Task<ApiResponse> GetBookingById(Guid bookingId)
+{
+    try
+    {
+        // Truy vấn Booking từ DB với thông tin User và BookingDetails
+        var booking = await _unitOfWork.GetRepository<Booking>().SingleOrDefaultAsync(
+            predicate: b => b.Id == bookingId,
+            include: b => b.Include(x => x.User)
+                           .Include(x => x.BookingDetails)
+                           .ThenInclude(bd => bd.ServicePackage)
+        );
+
+        // Kiểm tra nếu không tìm thấy booking
+        if (booking == null)
         {
-            try
+            return new ApiResponse
             {
-                // Truy vấn Booking từ DB với thông tin User và BookingDetails
-                var booking = await _unitOfWork.GetRepository<Booking>().SingleOrDefaultAsync(
-                    predicate: b => b.Id == bookingId,
-                    include: b => b.Include(x => x.User)
-                                   .Include(x => x.BookingDetails)
-                                   .ThenInclude(bd => bd.ServicePackage)
-                );
-
-                // Kiểm tra nếu không tìm thấy booking
-                if (booking == null)
-                {
-                    return new ApiResponse
-                    {
-                        status = StatusCodes.Status404NotFound.ToString(),
-                        message = "Booking not found.",
-                        data = null
-                    };
-                }
-
-                // Chuyển đổi dữ liệu Booking sang response
-                var response = new GetBookingById
-                {
-                    Id = booking.Id,
-                    ScheduleDate = booking.ScheduleDate,
-                    Status = booking.Status,
-                    Address = booking.Address,
-                    PhoneNumber = booking.PhoneNumber,
-                    TotalPrice = booking.TotalPrice,
-                    OrderId = booking.OrderId,
-                    IsAssigned = booking.IsAssigned,
-                    Services = booking.BookingDetails.Select(bd => new ServicePackageResponse
-                    {
-                        Id = bd.ServicePackage.Id,
-                        ServiceName = bd.ServicePackage.ServiceName,
-                        Price = bd.ServicePackage.Price
-                    }).ToList()
-                };
-
-                return new ApiResponse
-                {
-                    status = StatusCodes.Status200OK.ToString(),
-                    message = "Success",
-                    data = response
-                };
-            }
-            catch (Exception ex)
-            {
-                return new ApiResponse
-                {
-                    status = StatusCodes.Status500InternalServerError.ToString(),
-                    message = $"An error occurred: {ex.Message}",
-                    data = null
-                };
-            }
+                status = StatusCodes.Status404NotFound.ToString(),
+                message = "Booking not found.",
+                data = null
+            };
         }
+
+        // Chuyển đổi dữ liệu Booking sang response
+        var response = new GetBookingById
+        {
+            Id = booking.Id,
+            ScheduleDate = booking.ScheduleDate,
+            Status = booking.Status,
+            UserId = booking.UserId,
+            UserName = booking.User?.UserName ?? "Unknown",  
+            FullName = booking.User?.FullName ?? "Unknown",  
+            Address = booking.Address,
+            PhoneNumber = booking.PhoneNumber,
+            TotalPrice = booking.TotalPrice,
+            OrderId = booking.OrderId,
+            IsAssigned = booking.IsAssigned,
+            Services = booking.BookingDetails.Select(bd => new ServicePackageResponse
+            {
+                Id = bd.ServicePackage.Id,
+                ServiceName = bd.ServicePackage.ServiceName,
+                Price = bd.ServicePackage.Price
+            }).ToList()
+        };
+
+        return new ApiResponse
+        {
+            status = StatusCodes.Status200OK.ToString(),
+            message = "Success",
+            data = response
+        };
+    }
+    catch (Exception ex)
+    {
+        return new ApiResponse
+        {
+            status = StatusCodes.Status500InternalServerError.ToString(),
+            message = $"An error occurred: {ex.Message}",
+            data = null
+        };
+    }
+}
+
 
         public async Task<ApiResponse> GetDateUnavailable()
         {
@@ -774,15 +778,20 @@ namespace FTSS_API.Service.Implement
                     };
                 }
 
-                // Lấy danh sách booking của Customer đó
-                var bookings = await _unitOfWork.GetRepository<Booking>().GetPagingListAsync(
+                // Truy vấn danh sách Booking từ repository
+                var bookingPaginate = await _unitOfWork.GetRepository<Booking>().GetPagingListAsync(
                     predicate: b => b.UserId == userId && (string.IsNullOrEmpty(status) || b.Status == status),
-                    orderBy: q => isAscending == true ? q.OrderBy(b => b.ScheduleDate) : q.OrderByDescending(b => b.ScheduleDate),
+                    orderBy: isAscending == true
+                        ? q => q.OrderBy(b => b.ScheduleDate)
+                        : q => q.OrderByDescending(b => b.ScheduleDate),
+                    include: q => q.Include(b => b.BookingDetails)
+                                   .ThenInclude(bd => bd.ServicePackage),
                     page: pageNumber,
                     size: pageSize
                 );
 
-                var response = bookings.Items.Select(b => new GetListBookingForUserResponse
+                // Chuyển đổi dữ liệu sang DTO response
+                var response = bookingPaginate.Items.Select(b => new GetListBookingForUserResponse
                 {
                     Id = b.Id,
                     ScheduleDate = b.ScheduleDate,
@@ -791,7 +800,13 @@ namespace FTSS_API.Service.Implement
                     PhoneNumber = b.PhoneNumber,
                     TotalPrice = b.TotalPrice,
                     OrderId = b.OrderId,
-                    IsAssigned = b.IsAssigned
+                    IsAssigned = b.IsAssigned,
+                    Services = b.BookingDetails.Select(bd => new ServicePackageResponse
+                    {
+                        Id = bd.ServicePackage.Id,
+                        ServiceName = bd.ServicePackage.ServiceName,
+                        Price = bd.ServicePackage.Price
+                    }).ToList()
                 }).ToList();
 
                 return new ApiResponse
@@ -807,7 +822,7 @@ namespace FTSS_API.Service.Implement
                 {
                     status = StatusCodes.Status500InternalServerError.ToString(),
                     message = "An error occurred while retrieving the booking list.",
-                    data = ex.Message // Trả về lỗi để debug, nhưng có thể log lại thay vì hiển thị trực tiếp
+                    data = ex.Message
                 };
             }
         }
