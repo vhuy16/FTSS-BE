@@ -191,7 +191,7 @@ namespace FTSS_API.Controller
             return StatusCode(int.Parse(response.status), response);
         }
         /// <summary>
-        /// API cập nhật thông tin mission.
+        /// API cập nhật thông tin mission cho manager.
         /// </summary>
         [HttpPut(ApiEndPointConstant.Booking.UpdateMission)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
