@@ -163,5 +163,6 @@ public static class ApiEndPointConstant
         public const string GetDateUnavailable = BookingEndPoint + "/date-unavailable";
         public const string GetListBookingForUser = BookingEndPoint + "/list-booking-user";
         public const string GetBookingById = BookingEndPoint + "{bookingid}";
+        public const string UpdateMission = BookingEndPoint + "/update-mission/{missionid}";
     }
 }
