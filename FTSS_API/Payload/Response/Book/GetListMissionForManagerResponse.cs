@@ -18,5 +18,6 @@
         public Guid? TechnicianId { get; set; }
         public string TechnicianName { get; set; } = null!;
         public Guid? BookingId { get; set; }
+        public Guid? OrderId { get; set; }
     }
 }
