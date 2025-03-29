@@ -579,7 +579,7 @@ namespace FTSS_API.Service.Implement
                         };
                     }
 
-                    // Chuẩn bị response
+                    // Chuẩn bị respons
                     var response = new BookingScheduleResponse
                     {
                         Id = newBooking.Id,
