@@ -16,6 +16,7 @@ using Microsoft.EntityFrameworkCore;
 using System.Linq.Expressions;
 using System.Text.RegularExpressions;
 using FTSS_API.Payload.Request.Pay;
+using FTSS_API.Payload.Response.Pay.Payment;
 
 namespace FTSS_API.Service.Implement
 {
@@ -567,16 +568,30 @@ namespace FTSS_API.Service.Implement
                     };
 
                     var paymentResponse = await _paymentService.CreatePayment(paymentRequest);
-
-
-                    if (paymentResponse.status != StatusCodes.Status200OK.ToString())
+    
+                    // Kiểm tra null và status code
+                    if (paymentResponse == null || paymentResponse.status != StatusCodes.Status200OK.ToString())
                     {
                         return new ApiResponse
                         {
                             status = StatusCodes.Status500InternalServerError.ToString(),
                             message = "Đặt lịch thành công nhưng lỗi thanh toán",
-                            data = paymentResponse.data
+                            data = paymentResponse?.data
                         };
+                    }
+
+                    // Lấy URL từ response.data (không cần cast)
+                    string paymentUrl = string.Empty;
+                    if (paymentResponse.data is Dictionary<string, object> dict)
+                    {
+                        paymentUrl = dict.TryGetValue("PaymentURL", out var url) ? url.ToString() : "";
+                    }
+                    else if (paymentResponse.data != null)
+                    {
+                        // Dùng reflection nếu cần
+                        var type = paymentResponse.data.GetType();
+                        var prop = type.GetProperty("PaymentURL") ?? type.GetProperty("paymentUrl");
+                        paymentUrl = prop?.GetValue(paymentResponse.data)?.ToString() ?? "";
                     }
 
                     // Chuẩn bị respons
@@ -591,7 +606,8 @@ namespace FTSS_API.Service.Implement
                         UserId = user.Id,
                         UserName = user.UserName,
                         FullName = newBooking.FullName,
-                        OrderId = request.OrderId
+                        OrderId = request.OrderId,
+                        Url = paymentUrl
                     };
 
                     return new ApiResponse
