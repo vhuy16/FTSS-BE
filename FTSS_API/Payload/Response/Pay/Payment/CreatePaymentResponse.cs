@@ -3,7 +3,7 @@
 public class CreatePaymentResponse
 {
     public Guid Id { get; set; }
-    public Guid OrderId { get; set; }
+    public Guid? OrderId { get; set; }
     public decimal? AmoundPaid { get; set; }
     public DateTime? PaymentDate { get; set; }
     public string? PaymentStatus { get; set; }

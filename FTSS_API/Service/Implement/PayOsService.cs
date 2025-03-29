@@ -49,7 +49,7 @@ public class PayOsService : BaseService<PayOsService>, IPayOSService
     }
 
 
-    public async Task<Result<PaymentLinkResponse>> CreatePaymentUrlRegisterCreator(Guid orderId)
+    public async Task<Result<PaymentLinkResponse>> CreatePaymentUrlRegisterCreator(Guid? orderId, Guid? bookingId)
     {
         var items = new List<ItemData>();
         Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
@@ -61,41 +61,70 @@ public class PayOsService : BaseService<PayOsService>, IPayOSService
 
         var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
             predicate: u => u.Id.Equals(userId) && u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()));
+
         if (user == null)
         {
             return Result<PaymentLinkResponse>.Failure("You need to login");
         }
 
-        var order = await _unitOfWork.GetRepository<Order>()
-            .SingleOrDefaultAsync(
-                predicate: o => o.Id.Equals(orderId),
-                include: o => o.Include(o => o.OrderDetails)
-                    .ThenInclude(od => od.Product)
-            );
+        decimal? totalPrice = 0;
+        string description = "";
 
-        if (order == null)
+        if (orderId.HasValue)
         {
-            return Result<PaymentLinkResponse>.Failure("Order not found");
-        }
+            // 🔹 Lấy thông tin Order
+            var order = await _unitOfWork.GetRepository<Order>()
+                .SingleOrDefaultAsync(
+                    predicate: o => o.Id.Equals(orderId),
+                    include: o => o.Include(o => o.OrderDetails)
+                        .ThenInclude(od => od.Product)
+                );
 
-        var orderDetailIds = order.OrderDetails.Select(od => od.Id).ToList();
-
-        foreach (var orderDetailId in orderDetailIds)
-        {
-            var orderDetail = await _unitOfWork.GetRepository<OrderDetail>().SingleOrDefaultAsync(
-                predicate: o => o.Id.Equals(orderDetailId),
-                include: od => od.Include(od => od.Product)
-            );
-
-            if (orderDetail != null && orderDetail.Product != null)
+            if (order == null)
             {
-                var price = orderDetail.Price;
-                var productName = orderDetail.Product.ProductName;
-                var quantity = orderDetail.Quantity;
+                return Result<PaymentLinkResponse>.Failure("Order not found");
+            }
 
-                var itemData = new ItemData(productName, (int)quantity, (int)price);
+            // 🔹 Thêm chi tiết sản phẩm vào danh sách items
+            foreach (var orderDetail in order.OrderDetails)
+            {
+                var itemData = new ItemData(orderDetail.Product.ProductName, (int)orderDetail.Quantity,
+                    (int)orderDetail.Price);
                 items.Add(itemData);
             }
+
+            totalPrice = order.TotalPrice;
+            description = $"Payment for Order #{order.Id}";
+        }
+        else if (bookingId.HasValue)
+        {
+            // 🔹 Lấy thông tin Booking
+            var booking = await _unitOfWork.GetRepository<Booking>()
+                .SingleOrDefaultAsync(
+                    predicate: b => b.Id.Equals(bookingId),
+                    include: b => b.Include(b => b.BookingDetails)
+                        .ThenInclude(bd => bd.ServicePackage)
+                );
+
+            if (booking == null)
+            {
+                return Result<PaymentLinkResponse>.Failure("Booking not found");
+            }
+
+            // 🔹 Thêm chi tiết dịch vụ vào danh sách items
+            foreach (var bookingDetail in booking.BookingDetails)
+            {
+                var itemData = new ItemData(bookingDetail.ServicePackage.ServiceName, 1,
+                    (int)bookingDetail.ServicePackage.Price);
+                items.Add(itemData);
+            }
+
+            totalPrice = booking.TotalPrice;
+            description = $"Payment for Booking #{booking.Id}";
+        }
+        else
+        {
+            return Result<PaymentLinkResponse>.Failure("Either orderId or bookingId must be provided");
         }
 
         string buyerName = user.FullName;
@@ -104,8 +133,6 @@ public class PayOsService : BaseService<PayOsService>, IPayOSService
 
         Random random = new Random();
         long orderCode = (DateTime.Now.Ticks % 1000000000000000L) * 10 + random.Next(0, 1000);
-        var description = "VQRIO123";
-        var totalPrice = order.TotalPrice;
 
         var signatureData = new Dictionary<string, object>
         {
@@ -153,6 +180,7 @@ public class PayOsService : BaseService<PayOsService>, IPayOSService
         return Result<PaymentLinkResponse>.Failure("Failed to create payment link");
     }
 
+
     public Task<ApiResponse> HandlePaymentCallback(string paymentLinkId, long orderCode)
     {
         throw new NotImplementedException();
@@ -165,15 +193,24 @@ public class PayOsService : BaseService<PayOsService>, IPayOSService
         {
             var existingPayment = await _unitOfWork.GetRepository<Payment>()
                 .SingleOrDefaultAsync(predicate: p => p.OrderCode == webhookBody.data.orderCode);
-            // Update payment and order status based on webhook result
+
+            if (existingPayment == null)
+            {
+                _logger.LogError("Payment not found for orderCode: {OrderCode}", webhookBody.data.orderCode);
+                return Result.Failure("Payment not found");
+            }
+
             if (webhookBody.data.code == "00" && webhookBody.success)
             {
-                await HandleSuccessfulPayment(existingPayment);
+                if (existingPayment.Order.Id != null)
+                {
+                    await HandleSuccessfulPayment(existingPayment);
+                }
+                else if (existingPayment.BookingId != null)
+                {
+                    await HandleSuccessfulBookingPayment(existingPayment);
+                }
             }
-            // else
-            // {
-            //     await HandleFailedPayment(existingPayment);
-            // }
 
             await _unitOfWork.CommitAsync();
             _logger.LogInformation("Successfully processed webhook for orderCode: {OrderCode}",
@@ -185,6 +222,66 @@ public class PayOsService : BaseService<PayOsService>, IPayOSService
             _logger.LogError(ex, "An error occurred while handling webhook in service");
             return Result.Failure("An error occurred while handling webhook");
         }
+    }
+
+    private async Task HandleSuccessfulBookingPayment(Payment payment)
+    {
+        payment.PaymentStatus = PaymentStatusEnum.Completed.ToString();
+        payment.PaymentDate = DateTime.UtcNow;
+
+        var booking = await _unitOfWork.GetRepository<Booking>()
+            .SingleOrDefaultAsync(predicate:
+                b => b.Id == payment.BookingId);
+
+        if (booking == null)
+            throw new InvalidOperationException("Booking not found.");
+
+        booking.Status = BookingStatusEnum.PAID.GetDescriptionFromEnum();
+
+
+        _unitOfWork.GetRepository<Booking>().UpdateAsync(booking);
+        _unitOfWork.GetRepository<Payment>().UpdateAsync(payment);
+    }
+
+    public async Task<ApiResponse> HandleFailedBookingPayment(Payment payment)
+    {
+        if (payment == null)
+        {
+            return new ApiResponse
+            {
+                data = null,
+                message = "Payment could not be found",
+                status = StatusCodes.Status404NotFound.ToString()
+            };
+        }
+
+        var booking = await _unitOfWork.GetRepository<Booking>()
+            .SingleOrDefaultAsync(predicate: b => b.Id == payment.BookingId);
+
+        if (booking == null)
+        {
+            return new ApiResponse
+            {
+                data = null,
+                message = "Booking could not be found",
+                status = StatusCodes.Status404NotFound.ToString()
+            };
+        }
+
+        payment.PaymentStatus = PaymentStatusEnum.Cancelled.ToString();
+        payment.PaymentDate = DateTime.UtcNow;
+        booking.Status = BookingStatusEnum.NOTPAID.GetDescriptionFromEnum();
+
+        _unitOfWork.GetRepository<Payment>().UpdateAsync(payment);
+        _unitOfWork.GetRepository<Booking>().UpdateAsync(booking);
+        await _unitOfWork.CommitAsync();
+
+        return new ApiResponse
+        {
+            data = payment,
+            message = "Booking payment could not be completed",
+            status = StatusCodes.Status200OK.ToString()
+        };
     }
 
     private async Task HandleSuccessfulPayment(Payment payment)
@@ -229,7 +326,7 @@ public class PayOsService : BaseService<PayOsService>, IPayOSService
             }
         }
 
-        
+
         order.ModifyDate = DateTime.UtcNow;
         _unitOfWork.GetRepository<Order>().UpdateAsync(order);
 
@@ -249,19 +346,36 @@ public class PayOsService : BaseService<PayOsService>, IPayOSService
                 status = StatusCodes.Status404NotFound.ToString()
             };
         }
-        var order = await _unitOfWork.GetRepository<Order>().SingleOrDefaultAsync(predicate: o => o.Id == payment.OrderId);
-        if (order == null)
+
+        if (payment.OrderId != null)
         {
-            return new ApiResponse()
+            var order = await _unitOfWork.GetRepository<Order>()
+                .SingleOrDefaultAsync(predicate: o => o.Id == payment.OrderId);
+            if (order == null)
             {
-                data = null,
-                message = "Order could not be found",
-                status = StatusCodes.Status404NotFound.ToString()
-            };
+                return new ApiResponse()
+                {
+                    data = null,
+                    message = "Order could not be found",
+                    status = StatusCodes.Status404NotFound.ToString()
+                };
+            }
+
+            order.Status = OrderStatus.CANCELLED.GetDescriptionFromEnum();
         }
+
+
+        else
+        {
+            if (payment.BookingId != null)
+            {
+                await HandleFailedBookingPayment(payment);
+            }
+        }
+
         payment.PaymentStatus = PaymentStatusEnum.Cancelled.ToString();
         payment.PaymentDate = DateTime.UtcNow;
-        order.Status = OrderStatus.CANCELLED.GetDescriptionFromEnum();
+
         _unitOfWork.GetRepository<Payment>().UpdateAsync(payment);
         await _unitOfWork.CommitAsync();
         return new ApiResponse()

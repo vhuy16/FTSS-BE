@@ -25,132 +25,121 @@ public class PaymentService : BaseService<PaymentService>, IPaymentService
         _vnPayService = vnPayService;
     }
 
-   public async Task<ApiResponse> CreatePayment(CreatePaymentRequest request)
+  public async Task<ApiResponse> CreatePayment(CreatePaymentRequest request)
 {
-    var order = await _unitOfWork.GetRepository<Order>()
-        .SingleOrDefaultAsync(
+    Order? order = null;
+    Booking? booking = null;
+
+    if (request.OrderId != null)
+    {
+        order = await _unitOfWork.GetRepository<Order>().SingleOrDefaultAsync(
             predicate: o => o.Id.Equals(request.OrderId)
         );
 
-    if (order == null)
+        if (order == null)
+        {
+            return new ApiResponse
+            {
+                data = string.Empty,
+                message = "Order not found",
+                status = StatusCodes.Status404NotFound.ToString(),
+            };
+        }
+    }
+
+    if (request.BookingId != null)
+    {
+        booking = await _unitOfWork.GetRepository<Booking>().SingleOrDefaultAsync(
+            predicate: b => b.Id.Equals(request.BookingId)
+        );
+
+        if (booking == null)
+        {
+            return new ApiResponse
+            {
+                data = string.Empty,
+                message = "Booking not found",
+                status = StatusCodes.Status404NotFound.ToString(),
+            };
+        }
+    }
+
+    if (order == null && booking == null)
     {
         return new ApiResponse
         {
             data = string.Empty,
-            message = "Order not found",
-            status = StatusCodes.Status404NotFound.ToString(),
+            message = "Invalid payment request",
+            status = StatusCodes.Status400BadRequest.ToString(),
         };
     }
 
-    if (request.PaymentMethod == PaymenMethodEnum.PayOs.GetDescriptionFromEnum())
+    decimal amountToPay = order?.TotalPrice ?? booking?.TotalPrice ?? 0;
+
+    if (amountToPay <= 0)
     {
-        var result = await _payOSService.CreatePaymentUrlRegisterCreator(request.OrderId);
-        
+        return new ApiResponse
+        {
+            data = string.Empty,
+            message = "No payment required",
+            status = StatusCodes.Status400BadRequest.ToString(),
+        };
+    }
+
+    // Xử lý tạo Payment URL dựa vào phương thức thanh toán
+    string paymentUrl = string.Empty;
+    string paymentMethod = request.PaymentMethod;
+    long orderCode = DateTime.Now.Ticks % 1000000000000000L * 10 + new Random().Next(0, 1000);
+
+    if (paymentMethod == PaymenMethodEnum.PayOs.GetDescriptionFromEnum())
+    {
+        var result = await _payOSService.CreatePaymentUrlRegisterCreator(request.OrderId, request.BookingId);
+
         if (result.IsSuccess && result.Value != null)
         {
-            var paymentLinkResponse = result.Value;
-            var createPaymentResponse = new CreatePaymentResponse
-            {
-                Id = Guid.NewGuid(),
-                OrderId = order.Id,
-                PaymentMethod = PaymenMethodEnum.PayOs.GetDescriptionFromEnum(),
-                AmoundPaid = order.TotalPrice,
-                PaymentDate = DateTime.Now,
-                PaymentStatus = PaymentStatusEnum.Processing.ToString(),
-                PaymentURL = paymentLinkResponse.checkoutUrl,
-                PaymentCode = paymentLinkResponse.orderCode,
-                Description = paymentLinkResponse.description,
-                
-               
-            };
-        
-            // Save payment to the database
-            var payment = new Payment
-            {
-                Id = createPaymentResponse.Id,
-                OrderId = createPaymentResponse.OrderId,
-                PaymentMethod = createPaymentResponse.PaymentMethod,
-                AmountPaid = createPaymentResponse.AmoundPaid,
-                PaymentDate = createPaymentResponse.PaymentDate,
-                PaymentStatus = PaymentStatusEnum.Processing.ToString(),
-                OrderCode = createPaymentResponse.PaymentCode
-            };
-        
-            await _unitOfWork.GetRepository<Payment>().InsertAsync(payment);
-            await _unitOfWork.CommitAsync();
-        
-            return new ApiResponse
-            {
-                data = createPaymentResponse,
-                message = "Payment created successfully",
-                status = StatusCodes.Status200OK.ToString(),
-            };
-        }
-        else
-        {
-            return new ApiResponse
-            {
-                data = string.Empty,
-                message = "Failed to create payment URL",
-                // status = response.status,
-            };
+            paymentUrl = result.Value.checkoutUrl;
         }
     }
-    else if( request.PaymentMethod == PaymenMethodEnum.VnPay.GetDescriptionFromEnum())
+    else if (paymentMethod == PaymenMethodEnum.VnPay.GetDescriptionFromEnum())
     {
-        var paymentUrl = await _vnPayService.CreatePaymentUrl(request.OrderId);
-        Random random = new Random();
-        long orderCode = (DateTime.Now.Ticks % 1000000000000000L) * 10 + random.Next(0, 1000);
-        if (paymentUrl != null)
+        paymentUrl = await _vnPayService.CreatePaymentUrl(request.OrderId, request.BookingId);
+    }
+
+    if (string.IsNullOrEmpty(paymentUrl))
+    {
+        return new ApiResponse
         {
-          
-            var createPaymentResponse = new CreatePaymentResponse
-            {
-                Id = Guid.NewGuid(),
-                OrderId = order.Id,
-                PaymentMethod = PaymenMethodEnum.VnPay.GetDescriptionFromEnum(),
-                AmoundPaid = order.TotalPrice,
-                PaymentDate = DateTime.Now,
-                PaymentStatus = PaymentStatusEnum.Processing.ToString(),
-                PaymentURL = paymentUrl,
-                PaymentCode = orderCode
-               
-            };
-            var payment = new Payment
-            {
-                Id = createPaymentResponse.Id,
-                OrderId = createPaymentResponse.OrderId,
-                PaymentMethod = createPaymentResponse.PaymentMethod,
-                AmountPaid = createPaymentResponse.AmoundPaid,
-                PaymentDate = createPaymentResponse.PaymentDate,
-                PaymentStatus = PaymentStatusEnum.Processing.ToString(),
-                OrderCode = createPaymentResponse.PaymentCode
-            };
-        
-            await _unitOfWork.GetRepository<Payment>().InsertAsync(payment);
-            await _unitOfWork.CommitAsync();
-            return new ApiResponse()
-            {
-                data = createPaymentResponse,
-                message = "Payment created successfully",
-                status = StatusCodes.Status200OK.ToString(),
-            };
-            
-        }
-        else
-        {
-            return new ApiResponse
-            {
-                data = string.Empty,
-                message = "Failed to create payment URL",
-                // status = response.status,
-            };
-        }    }
+            data = string.Empty,
+            message = "Failed to create payment URL",
+            status = StatusCodes.Status500InternalServerError.ToString(),
+        };
+    }
+
+    var newPayment = new Payment
+    {
+        Id = Guid.NewGuid(),
+        OrderId = order.Id,
+        BookingId = booking?.Id,
+        PaymentMethod = paymentMethod,
+        AmountPaid = amountToPay,
+        PaymentDate = DateTime.Now,
+        PaymentStatus = PaymentStatusEnum.Processing.ToString(),
+        OrderCode = orderCode
+    };
+
+    await _unitOfWork.GetRepository<Payment>().InsertAsync(newPayment);
+    await _unitOfWork.CommitAsync();
+
     return new ApiResponse
     {
-        data = string.Empty,
-        message = "Invalid payment method",
-        status = StatusCodes.Status400BadRequest.ToString(),
+        data = new
+        {
+            PaymentId = newPayment.Id,
+            PaymentURL = paymentUrl,
+            Amount = newPayment.AmountPaid
+        },
+        message = "Payment created successfully",
+        status = StatusCodes.Status200OK.ToString(),
     };
 }
 
