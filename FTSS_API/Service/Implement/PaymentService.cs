@@ -126,7 +126,7 @@ public class PaymentService : BaseService<PaymentService>, IPaymentService
             Id = Guid.NewGuid(),
             OrderId = order?.Id,
             BookingId = booking?.Id,
-            PaymentMethod = "PayOs",
+            PaymentMethod = paymentMethod,
             AmountPaid = amountToPay, // Đảm bảo không bị null
             PaymentDate = DateTime.Now,
             PaymentStatus = PaymentStatusEnum.Processing.ToString(),
