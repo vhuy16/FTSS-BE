@@ -119,6 +119,20 @@ namespace FTSS_API.Service.Implement;
           {
               var payment = await _unitOfWork.GetRepository<Payment>()
                   .SingleOrDefaultAsync(predicate: p => p.OrderId.Equals(orderId));
+              if (payment == null)
+              {
+                  payment = await _unitOfWork.GetRepository<Payment>().SingleOrDefaultAsync(
+                      predicate: p => p.BookingId.Equals(orderId));
+                  if (payment == null)
+                  {
+                      return new ApiResponse()
+                      {
+                          data = null,
+                          status = StatusCodes.Status404NotFound.ToString(),
+                          message = "Payment not found"
+                      };
+                  }
+              }
               if (status == "00")
               {
                   await HandleSuccessfulPayment(payment);
