@@ -120,7 +120,7 @@ public class PayOsService : BaseService<PayOsService>, IPayOSService
             }
 
             totalPrice = booking.TotalPrice;
-            description = $"Payment for Booking #{booking.Id}";
+            description = $"Booking #{booking.Id}";
         }
         else
         {
@@ -133,7 +133,7 @@ public class PayOsService : BaseService<PayOsService>, IPayOSService
 
         Random random = new Random();
         long orderCode = (DateTime.Now.Ticks % 1000000000000000L) * 10 + random.Next(0, 1000);
-
+        description = description.Length > 25 ? description.Substring(0, 25) : description;
         var signatureData = new Dictionary<string, object>
         {
             { "amount", totalPrice },

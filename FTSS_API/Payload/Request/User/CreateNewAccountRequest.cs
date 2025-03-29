@@ -14,4 +14,6 @@ public class CreateNewAccountRequest
     public string FullName { get; set; }
     public string Address { get; set; }
     public string PhoneNumber { get; set; }
+    public string CityId { get; set; }
+    public string DistrictId { get; set; }
 }

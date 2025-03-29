@@ -25,125 +25,143 @@ public class PaymentService : BaseService<PaymentService>, IPaymentService
         _vnPayService = vnPayService;
     }
 
-  public async Task<ApiResponse> CreatePayment(CreatePaymentRequest request)
-{
-    Order? order = null;
-    Booking? booking = null;
-
-    if (request.OrderId != null)
+    public async Task<ApiResponse> CreatePayment(CreatePaymentRequest request)
     {
-        order = await _unitOfWork.GetRepository<Order>().SingleOrDefaultAsync(
-            predicate: o => o.Id.Equals(request.OrderId)
-        );
+        Order? order = null;
+        Booking? booking = null;
 
-        if (order == null)
+        if (request.OrderId != null)
+        {
+            order = await _unitOfWork.GetRepository<Order>().SingleOrDefaultAsync(
+                predicate: o => o.Id.Equals(request.OrderId)
+            );
+
+            if (order == null)
+            {
+                return new ApiResponse
+                {
+                    data = string.Empty,
+                    message = "Order not found",
+                    status = StatusCodes.Status404NotFound.ToString(),
+                };
+            }
+        }
+
+        if (request.BookingId != null)
+        {
+            booking = await _unitOfWork.GetRepository<Booking>().SingleOrDefaultAsync(
+                predicate: b => b.Id.Equals(request.BookingId)
+            );
+
+            if (booking == null)
+            {
+                return new ApiResponse
+                {
+                    data = string.Empty,
+                    message = "Booking not found",
+                    status = StatusCodes.Status404NotFound.ToString(),
+                };
+            }
+        }
+
+        if (order == null && booking == null)
         {
             return new ApiResponse
             {
                 data = string.Empty,
-                message = "Order not found",
-                status = StatusCodes.Status404NotFound.ToString(),
+                message = "Invalid payment request",
+                status = StatusCodes.Status400BadRequest.ToString(),
             };
         }
-    }
 
-    if (request.BookingId != null)
-    {
-        booking = await _unitOfWork.GetRepository<Booking>().SingleOrDefaultAsync(
-            predicate: b => b.Id.Equals(request.BookingId)
-        );
+        decimal amountToPay = order?.TotalPrice ?? booking?.TotalPrice ?? 0;
 
-        if (booking == null)
+        if (amountToPay <= 0)
         {
             return new ApiResponse
             {
                 data = string.Empty,
-                message = "Booking not found",
-                status = StatusCodes.Status404NotFound.ToString(),
+                message = "No payment required",
+                status = StatusCodes.Status400BadRequest.ToString(),
             };
         }
-    }
 
-    if (order == null && booking == null)
-    {
-        return new ApiResponse
+        // Xử lý tạo Payment URL dựa vào phương thức thanh toán
+        string paymentUrl = string.Empty;
+        string paymentMethod = request.PaymentMethod;
+        long orderCode = DateTime.Now.Ticks % 1000000000000000L * 10 + new Random().Next(0, 1000);
+
+        if (paymentMethod == PaymenMethodEnum.PayOs.GetDescriptionFromEnum())
         {
-            data = string.Empty,
-            message = "Invalid payment request",
-            status = StatusCodes.Status400BadRequest.ToString(),
-        };
-    }
+            var result = await _payOSService.CreatePaymentUrlRegisterCreator(request.OrderId, request.BookingId);
 
-    decimal amountToPay = order?.TotalPrice ?? booking?.TotalPrice ?? 0;
-
-    if (amountToPay <= 0)
-    {
-        return new ApiResponse
-        {
-            data = string.Empty,
-            message = "No payment required",
-            status = StatusCodes.Status400BadRequest.ToString(),
-        };
-    }
-
-    // Xử lý tạo Payment URL dựa vào phương thức thanh toán
-    string paymentUrl = string.Empty;
-    string paymentMethod = request.PaymentMethod;
-    long orderCode = DateTime.Now.Ticks % 1000000000000000L * 10 + new Random().Next(0, 1000);
-
-    if (paymentMethod == PaymenMethodEnum.PayOs.GetDescriptionFromEnum())
-    {
-        var result = await _payOSService.CreatePaymentUrlRegisterCreator(request.OrderId, request.BookingId);
-
-        if (result.IsSuccess && result.Value != null)
-        {
-            paymentUrl = result.Value.checkoutUrl;
+            if (result.IsSuccess && result.Value != null)
+            {
+                paymentUrl = result.Value.checkoutUrl;
+            }
         }
-    }
-    else if (paymentMethod == PaymenMethodEnum.VnPay.GetDescriptionFromEnum())
-    {
-        paymentUrl = await _vnPayService.CreatePaymentUrl(request.OrderId, request.BookingId);
-    }
+        else if (paymentMethod == PaymenMethodEnum.VnPay.GetDescriptionFromEnum())
+        {
+            paymentUrl = await _vnPayService.CreatePaymentUrl(request.OrderId, request.BookingId);
+        }
 
-    if (string.IsNullOrEmpty(paymentUrl))
-    {
+        if (string.IsNullOrEmpty(paymentUrl))
+        {
+            return new ApiResponse
+            {
+                data = string.Empty,
+                message = "Failed to create payment URL",
+                status = StatusCodes.Status500InternalServerError.ToString(),
+            };
+        }
+
+        if (order == null && booking == null)
+        {
+            return new ApiResponse { message = "Order and Booking cannot be both null" };
+        }
+
+// Tạo mới Payment
+        var newPayment = new Payment
+        {
+            Id = Guid.NewGuid(),
+            OrderId = order?.Id,
+            BookingId = booking?.Id,
+            PaymentMethod = "PayOs",
+            AmountPaid = amountToPay, // Đảm bảo không bị null
+            PaymentDate = DateTime.Now,
+            PaymentStatus = PaymentStatusEnum.Processing.ToString(),
+            OrderCode = orderCode
+        };
+
+// Chèn vào database
+        await _unitOfWork.GetRepository<Payment>().InsertAsync(newPayment);
+        await _unitOfWork.CommitAsync();
+
+// 🔹 Lấy lại payment vừa lưu bằng OrderCode hoặc Id
+        var savedPayment = await _unitOfWork.GetRepository<Payment>().SingleOrDefaultAsync(
+            predicate: p => p.OrderCode == orderCode
+        );
+
+        if (savedPayment == null)
+        {
+            return new ApiResponse { message = "Failed to retrieve saved payment" };
+        }
+
+// Trả về thông tin payment vừa lưu
         return new ApiResponse
         {
-            data = string.Empty,
-            message = "Failed to create payment URL",
-            status = StatusCodes.Status500InternalServerError.ToString(),
+            status = StatusCodes.Status200OK.ToString(),
+            message = "Payment successful",
+            data = new Dictionary<string, object>
+            {
+                ["PaymentId"] = savedPayment.Id,
+                ["PaymentURL"] = paymentUrl,  // Đảm bảo luôn có key này
+                ["Amount"] = savedPayment.AmountPaid
+            }
         };
     }
 
-    var newPayment = new Payment
-    {
-        Id = Guid.NewGuid(),
-        OrderId = order.Id,
-        BookingId = booking?.Id,
-        PaymentMethod = paymentMethod,
-        AmountPaid = amountToPay,
-        PaymentDate = DateTime.Now,
-        PaymentStatus = PaymentStatusEnum.Processing.ToString(),
-        OrderCode = orderCode
-    };
-
-    await _unitOfWork.GetRepository<Payment>().InsertAsync(newPayment);
-    await _unitOfWork.CommitAsync();
-
-    return new ApiResponse
-    {
-        data = new
-        {
-            PaymentId = newPayment.Id,
-            PaymentURL = paymentUrl,
-            Amount = newPayment.AmountPaid
-        },
-        message = "Payment created successfully",
-        status = StatusCodes.Status200OK.ToString(),
-    };
-}
-
-public async Task<ApiResponse> UpdatePaymentStatus(Guid PaymentId, string newStatus)
+    public async Task<ApiResponse> UpdatePaymentStatus(Guid PaymentId, string newStatus)
 {
     var payment = await _unitOfWork.GetRepository<Payment>().SingleOrDefaultAsync(predicate: o => o.Id == PaymentId);
     if (payment == null)

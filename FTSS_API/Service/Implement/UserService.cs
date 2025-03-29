@@ -86,7 +86,9 @@ public class UserService : BaseService<UserService>, IUserService
         Status = UserStatusEnum.Unavailable.GetDescriptionFromEnum(),
         Address = createNewAccountRequest.Address,
         PhoneNumber = createNewAccountRequest.PhoneNumber,
-        Gender = createNewAccountRequest.Gender.GetDescriptionFromEnum()
+        Gender = createNewAccountRequest.Gender.GetDescriptionFromEnum(),
+        CityId = createNewAccountRequest.CityId,
+        DistrictId = createNewAccountRequest.DistrictId,
     };
 
     try
@@ -307,7 +309,9 @@ public class UserService : BaseService<UserService>, IUserService
                 Gender = u.Gender,
                 Role = u.Role,
                 Address = u.Address,
-                IsDeleted = u.IsDelete
+                IsDeleted = u.IsDelete,
+                CityId = u.CityId,
+                DistrictId = u.DistrictId,
             },
             predicate: u => u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()),
             page: page,
@@ -357,7 +361,9 @@ public class UserService : BaseService<UserService>, IUserService
                 Gender = u.Gender,
                 Role = u.Role,
                 Address = u.Address,
-                IsDeleted = u.IsDelete
+                IsDeleted = u.IsDelete,
+                CityId = u.CityId,
+                DistrictId = u.DistrictId
             },
             predicate: u => u.Id.Equals(userId.Value) && u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()));
 
@@ -392,7 +398,9 @@ public class UserService : BaseService<UserService>, IUserService
                 Gender = u.Gender,
                 Role = u.Role,
                 Address = u.Address,
-                IsDeleted = u.IsDelete
+                IsDeleted = u.IsDelete,
+                CityId = u.CityId,
+                DistrictId = u.DistrictId
             },
             predicate: u => u.Id.Equals(id) && u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()));
 
