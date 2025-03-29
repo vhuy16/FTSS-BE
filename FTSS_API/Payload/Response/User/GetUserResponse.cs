@@ -11,4 +11,6 @@ public class GetUserResponse
     public string? Gender { get; set; }
     public string? Role {  get; set; }
     public bool? IsDeleted { get; set; }
+    public string? CityId  {get; set; }
+    public string? DistrictId {get; set; }
 }

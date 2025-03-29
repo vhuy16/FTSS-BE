@@ -574,10 +574,30 @@ public class OrderService : BaseService<OrderService>, IOrderService
             PaymentMethod = createOrderRequest.PaymentMethod,
         };
         var paymentResponse = await _paymentService.Value.CreatePayment(createPaymentRequest);
-        CreatePaymentResponse payment = null;
+
+// Xử lý payment response mới - không cần cast
+        string paymentUrl = string.Empty;
+        string paymentDescription = string.Empty;
+
         if (paymentResponse != null && paymentResponse.status.Equals(StatusCodes.Status200OK.ToString()))
         {
-            payment = paymentResponse.data as CreatePaymentResponse;
+            // Cách 1: Dùng dynamic access
+            try
+            {
+                dynamic paymentData = paymentResponse.data;
+                paymentUrl = paymentData?.PaymentURL ?? paymentData?.paymentUrl; // Xử lý cả camelCase và PascalCase
+                paymentDescription = paymentData?.Description ?? paymentData?.description;
+            }
+            catch
+            {
+                // Cách 2: Dùng dictionary nếu dynamic không work
+                if (paymentResponse.data is Dictionary<string, object> dict)
+                {
+                    paymentUrl = dict.TryGetValue("PaymentURL", out var url) ? url.ToString() 
+                        : dict.TryGetValue("paymentUrl", out var url2) ? url2.ToString() : "";
+                    paymentDescription = dict.TryGetValue("Description", out var desc) ? desc.ToString() : "";
+                }
+            }
         }
 
         // Prepare order details for response
@@ -644,8 +664,8 @@ public class OrderService : BaseService<OrderService>, IOrderService
                 Email = order.User.Email,
                 PhoneNumber = order.User.PhoneNumber
             },
-            CheckoutUrl = payment?.PaymentURL,
-            Description = payment?.Description
+            CheckoutUrl = paymentUrl,
+            Description = paymentDescription
         };
 
         return new ApiResponse

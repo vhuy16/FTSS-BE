@@ -25,11 +25,15 @@ public partial class Booking
 
     public string? FullName { get; set; }
 
+    public string? BookingCode { get; set; }
+
     public virtual ICollection<BookingDetail> BookingDetails { get; set; } = new List<BookingDetail>();
 
     public virtual ICollection<Mission> Missions { get; set; } = new List<Mission>();
 
     public virtual Order? Order { get; set; }
+
+    public virtual ICollection<Payment> Payments { get; set; } = new List<Payment>();
 
     public virtual User? User { get; set; }
 }

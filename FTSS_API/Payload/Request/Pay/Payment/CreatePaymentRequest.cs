@@ -2,7 +2,8 @@
 
 public class CreatePaymentRequest
 {
-    public string? PaymentMethod { get; set; }
-   
-    public Guid OrderId { get; set; }
+    public Guid? OrderId { get; set; }  // Nếu thanh toán cho Order
+    public Guid? BookingId { get; set; } // Nếu thanh toán cho Booking
+    public string? PaymentMethod { get; set; }  // Ví dụ: "CreditCard", "BankTransfer"
+    public decimal AmountPaid { get; set; } // Tổng số tiền thanh toán
 }

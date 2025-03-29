@@ -20,5 +20,7 @@
         public string? FullName { get; set; } = null!;
 
         public Guid? OrderId { get; set; }
+        public string Url { get; set; } = null!;
+        public string BookingCode { get; set; } = null!;
     }
 }

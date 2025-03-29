@@ -80,6 +80,10 @@ public partial class MyDbContext : DbContext
             entity.Property(e => e.Address)
                 .HasMaxLength(255)
                 .HasColumnName("address");
+            entity.Property(e => e.BookingCode)
+                .HasMaxLength(10)
+                .IsUnicode(false)
+                .HasColumnName("bookingCode");
             entity.Property(e => e.FullName)
                 .HasMaxLength(255)
                 .HasColumnName("fullName");
@@ -509,6 +513,7 @@ public partial class MyDbContext : DbContext
                 .IsUnicode(false)
                 .HasColumnName("bankName");
             entity.Property(e => e.BankNumber).HasColumnName("bankNumber");
+            entity.Property(e => e.BookingId).HasColumnName("bookingId");
             entity.Property(e => e.OrderCode).HasColumnName("orderCode");
             entity.Property(e => e.OrderId).HasColumnName("orderId");
             entity.Property(e => e.PaymentDate)
@@ -526,9 +531,12 @@ public partial class MyDbContext : DbContext
                 .IsUnicode(false)
                 .HasColumnName("status");
 
+            entity.HasOne(d => d.Booking).WithMany(p => p.Payments)
+                .HasForeignKey(d => d.BookingId)
+                .HasConstraintName("FK_Payment_Booking");
+
             entity.HasOne(d => d.Order).WithMany(p => p.Payments)
                 .HasForeignKey(d => d.OrderId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK__Payment__orderId__17036CC0");
         });
 
@@ -762,10 +770,16 @@ public partial class MyDbContext : DbContext
             entity.Property(e => e.Address)
                 .HasMaxLength(255)
                 .HasColumnName("address");
+            entity.Property(e => e.CityId)
+                .HasMaxLength(50)
+                .HasColumnName("cityId");
             entity.Property(e => e.CreateDate)
                 .HasDefaultValueSql("(getdate())")
                 .HasColumnType("datetime")
                 .HasColumnName("createDate");
+            entity.Property(e => e.DistrictId)
+                .HasMaxLength(50)
+                .HasColumnName("districtId");
             entity.Property(e => e.Email)
                 .HasMaxLength(255)
                 .IsUnicode(false)

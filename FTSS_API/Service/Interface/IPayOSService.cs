@@ -8,7 +8,7 @@ namespace FTSS_API.Service.Implement;
 public interface IPayOSService
 {
     Task<ExtendedPaymentInfo> GetPaymentInfo(string paymentLinkId);
-    Task<Result<PayOsService.PaymentLinkResponse>> CreatePaymentUrlRegisterCreator(Guid orderId);
+    Task<Result<PayOsService.PaymentLinkResponse>> CreatePaymentUrlRegisterCreator(Guid? orderId, Guid? bookingId);
     Task<ApiResponse> HandlePaymentCallback(string paymentLinkId, long orderCode);
     Task<Result> HandlePayOsWebhook(WebhookType webhookBody);
     Task<ApiResponse> ConfirmWebhook(string webhookUrl);
