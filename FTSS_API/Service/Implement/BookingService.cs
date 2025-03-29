@@ -982,7 +982,9 @@ namespace FTSS_API.Service.Implement
                 var missions = await _unitOfWork.GetRepository<Mission>().GetPagingListAsync(
                     predicate: filter,
                     orderBy: orderBy,
-                    include: m => m.Include(x => x.User),
+                    include: m => m.Include(x => x.User)
+                                   .Include(x => x.Order)
+                                   .Include(x => x.Booking),
                     page: pageNumber,
                     size: pageSize
                 );
@@ -999,7 +1001,9 @@ namespace FTSS_API.Service.Implement
                     BookingId = m.BookingId,
                     OrderId = m.OrderId,
                     TechnicianId = m.Userid,
-                    TechnicianName = m.User?.FullName ?? "Không xác định"
+                    TechnicianName = m.User?.FullName ?? "Không xác định",
+                    OrderCode = m.Order?.OrderCode ?? "Không có", 
+                    BookingCode = m.Booking?.BookingCode ?? "Không có"
                 }).ToList();
 
                 return new ApiResponse
