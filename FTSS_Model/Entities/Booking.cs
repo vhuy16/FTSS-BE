@@ -25,6 +25,8 @@ public partial class Booking
 
     public string? FullName { get; set; }
 
+    public string? BookingCode { get; set; }
+
     public virtual ICollection<BookingDetail> BookingDetails { get; set; } = new List<BookingDetail>();
 
     public virtual ICollection<Mission> Missions { get; set; } = new List<Mission>();

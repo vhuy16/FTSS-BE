@@ -531,6 +531,7 @@ namespace FTSS_API.Service.Implement
                     PhoneNumber = request.PhoneNumber,
                     FullName = request.FullName,
                     TotalPrice = totalPrice,
+                    BookingCode =  GenerateBookingCode(),
                     UserId = userId,
                     OrderId = request.OrderId,
                     IsAssigned = false
@@ -607,7 +608,8 @@ namespace FTSS_API.Service.Implement
                         UserName = user.UserName,
                         FullName = newBooking.FullName,
                         OrderId = request.OrderId,
-                        Url = paymentUrl
+                        Url = paymentUrl,
+                        BookingCode = newBooking.BookingCode,
                     };
 
                     return new ApiResponse
@@ -630,7 +632,8 @@ namespace FTSS_API.Service.Implement
                         UserId = user.Id,
                         UserName = user.UserName,
                         FullName = newBooking.FullName,
-                        OrderId = request.OrderId
+                        OrderId = request.OrderId,
+                        BookingCode =  newBooking.BookingCode,
                     };
 
                     return new ApiResponse
@@ -686,6 +689,66 @@ namespace FTSS_API.Service.Implement
                     Address = booking.Address,
                     PhoneNumber = booking.PhoneNumber,
                     TotalPrice = booking.TotalPrice,
+                    OrderId = booking.OrderId,
+                    IsAssigned = booking.IsAssigned,
+                    Services = booking.BookingDetails.Select(bd => new ServicePackageResponse
+                    {
+                        Id = bd.ServicePackage.Id,
+                        ServiceName = bd.ServicePackage.ServiceName,
+                        Price = bd.ServicePackage.Price
+                    }).ToList()
+                };
+
+                return new ApiResponse
+                {
+                    status = StatusCodes.Status200OK.ToString(),
+                    message = "Thành công",
+                    data = response
+                };
+            }
+            catch (Exception ex)
+            {
+                return new ApiResponse
+                {
+                    status = StatusCodes.Status500InternalServerError.ToString(),
+                    message = $"Đã xảy ra lỗi: {ex.Message}",
+                    data = null
+                };
+            }
+        }
+ public async Task<ApiResponse> GetBookingById(string bookingCode)
+        {
+            try
+            {
+                var booking = await _unitOfWork.GetRepository<Booking>().SingleOrDefaultAsync(
+                    predicate: b => b.BookingCode == bookingCode,
+                    include: b => b.Include(x => x.User)
+                                   .Include(x => x.BookingDetails)
+                                   .ThenInclude(bd => bd.ServicePackage)
+                );
+
+                if (booking == null)
+                {
+                    return new ApiResponse
+                    {
+                        status = StatusCodes.Status404NotFound.ToString(),
+                        message = "Không tìm thấy booking.",
+                        data = null
+                    };
+                }
+
+                var response = new GetBookingById
+                {
+                    Id = booking.Id,
+                    ScheduleDate = booking.ScheduleDate,
+                    Status = booking.Status,
+                    UserId = booking.UserId,
+                    UserName = booking.User?.UserName ?? "Không xác định",
+                    FullName = booking.User?.FullName ?? "Không xác định",
+                    Address = booking.Address,
+                    PhoneNumber = booking.PhoneNumber,
+                    TotalPrice = booking.TotalPrice,
+                    bookingCode = booking.BookingCode,
                     OrderId = booking.OrderId,
                     IsAssigned = booking.IsAssigned,
                     Services = booking.BookingDetails.Select(bd => new ServicePackageResponse
@@ -791,6 +854,8 @@ namespace FTSS_API.Service.Implement
                     Status = b.Status,
                     Address = b.Address,
                     PhoneNumber = b.PhoneNumber,
+                    
+                    bookingCode = b.BookingCode,
                     TotalPrice = b.TotalPrice,
                     UserId = b.User?.Id,
                     UserName = b.User?.UserName ?? "Không xác định",
@@ -856,6 +921,7 @@ namespace FTSS_API.Service.Implement
                     Status = b.Status,
                     Address = b.Address,
                     PhoneNumber = b.PhoneNumber,
+                    BookingCode = b.BookingCode,
                     TotalPrice = b.TotalPrice,
                     OrderId = b.OrderId,
                     IsAssigned = b.IsAssigned,
@@ -1324,6 +1390,23 @@ namespace FTSS_API.Service.Implement
                     data = ex.Message
                 };
             }
+        }
+        private string GenerateBookingCode()
+        {
+            var now = DateTime.UtcNow; // Lấy thời gian hiện tại theo UTC để tránh trùng lặp
+            string timestamp = now.ToString("yyyyMMddHHmmssfff"); // VD: 20250322153045999
+            string randomLetters = GenerateRandomLetters(7).Trim(); // Loại bỏ khoảng trắng
+            string lastThreeDigits = timestamp[^3..]; // Lấy 3 số cuối của timestamp
+
+            return $"{randomLetters}{lastThreeDigits}"; // VD: ABC999
+        }
+        private string GenerateRandomLetters(int length)
+        {
+            const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+            var random = new Random();
+            return new string(Enumerable.Range(0, length)
+                .Select(_ => chars[random.Next(chars.Length)])
+                .ToArray());
         }
     }
 }
