@@ -16,5 +16,6 @@
         public Guid? OrderId { get; set; }
 
         public bool? IsAssigned { get; set; }
+        public List<ServicePackageResponse> Services { get; set; } = new();
     }
 }

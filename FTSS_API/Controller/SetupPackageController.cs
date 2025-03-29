@@ -130,50 +130,6 @@ namespace FTSS_API.Controller
 
             return Ok(response);
         }
-        // /// <summary>
-        // /// API cập nhật SetupPackage cho customer.
-        // /// </summary>
-        // [HttpPut(ApiEndPointConstant.SetupPackage.UpdateSetupPackage)]
-        // [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
-        // [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
-        // [ProducesErrorResponseType(typeof(ProblemDetails))]
-        // public async Task<IActionResult> UpdateSetupPackage(
-        //     [FromForm] UpdateSetupPackageRequest request,
-        //     [FromRoute] Guid setupPackageId,
-        //     [FromServices] Supabase.Client client)
-        // {
-        //     List<ProductSetupItem> productIds = new List<ProductSetupItem>();
-        //
-        //     // Kiểm tra nếu request.ProductItemsJson không rỗng thì mới parse JSON
-        //     if (!string.IsNullOrWhiteSpace(request.ProductItemsJson))
-        //     {
-        //         try
-        //         {
-        //             productIds = JsonConvert.DeserializeObject<List<ProductSetupItem>>(request.ProductItemsJson) ?? new List<ProductSetupItem>();
-        //         }
-        //         catch (JsonException)
-        //         {
-        //             return BadRequest(new ApiResponse { status = "400", message = "Định dạng danh sách sản phẩm không hợp lệ" });
-        //         }
-        //     }
-        //
-        //     // Nếu không có sản phẩm nào sau khi parse, vẫn cho phép tiếp tục xử lý
-        //     var response = await _setupPackageService.UpdateSetupPackage(setupPackageId,productIds, , client);
-        //
-        //     if (response.status == StatusCodes.Status200OK.ToString())
-        //     {
-        //         return Ok(response);
-        //     }
-        //     if (response.status == StatusCodes.Status401Unauthorized.ToString())
-        //     {
-        //         return Unauthorized(response);
-        //     }
-        //     if (response.status == StatusCodes.Status404NotFound.ToString())
-        //     {
-        //         return NotFound(response);
-        //     }
-        //     return StatusCode(StatusCodes.Status500InternalServerError, response);
-        // }
         /// <summary>
         /// API cập nhật thông tin SetupPackage cho manager, customer.
         /// </summary>
