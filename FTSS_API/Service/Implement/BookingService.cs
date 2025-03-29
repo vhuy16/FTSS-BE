@@ -15,13 +15,16 @@ using FTSS_Repository.Interface;
 using Microsoft.EntityFrameworkCore;
 using System.Linq.Expressions;
 using System.Text.RegularExpressions;
+using FTSS_API.Payload.Request.Pay;
 
 namespace FTSS_API.Service.Implement
 {
     public class BookingService : BaseService<BookingService>, IBookingService
     {
-        public BookingService(IUnitOfWork<MyDbContext> unitOfWork, ILogger<BookingService> logger, IMapper mapper, IHttpContextAccessor httpContextAccessor) : base(unitOfWork, logger, mapper, httpContextAccessor)
+        public IPaymentService _paymentService { get; set; }
+        public BookingService(IUnitOfWork<MyDbContext> unitOfWork, ILogger<BookingService> logger, IMapper mapper, IHttpContextAccessor httpContextAccessor, IPaymentService paymentService) : base(unitOfWork, logger, mapper, httpContextAccessor)
         {
+            _paymentService = paymentService;
         }
         public async Task<ApiResponse> AssigningTechnician(AssigningTechnicianRequest request)
         {
@@ -455,8 +458,8 @@ namespace FTSS_API.Service.Implement
 
                 // Kiểm tra xem đã có booking nào cùng ngày với order chưa
                 var existingBooking = await _unitOfWork.GetRepository<Booking>().GetListAsync(
-                        predicate: b => b.OrderId.Equals(request.OrderId) &&
-                                        b.ScheduleDate.Value.Date == request.ScheduleDate.Value.Date);
+                    predicate: b => b.OrderId.Equals(request.OrderId) &&
+                                    b.ScheduleDate.Value.Date == request.ScheduleDate.Value.Date);
 
                 bool hasBookingSameDate = existingBooking.Any();
 
@@ -474,7 +477,9 @@ namespace FTSS_API.Service.Implement
                 bool isEligibleForFreeBooking = order.IsEligible == true;
 
                 // Xác định trạng thái booking
-                string bookingStatus = isEligibleForFreeBooking ? BookingStatusEnum.FREE.ToString() : BookingStatusEnum.NOTPAID.ToString();
+                string bookingStatus = isEligibleForFreeBooking
+                    ? BookingStatusEnum.FREE.ToString()
+                    : BookingStatusEnum.NOTPAID.ToString();
 
                 // Tính TotalPrice nếu không miễn phí
                 decimal totalPrice = 0;
@@ -492,6 +497,7 @@ namespace FTSS_API.Service.Implement
                 }
                 else if (serviceIds.Any())
                 {
+
                     // Nếu không FREE, chỉ lấy các ServicePackage theo danh sách serviceIds
                     selectedServices = (List<ServicePackage>)await _unitOfWork.GetRepository<ServicePackage>().GetListAsync(
                         predicate: sp => serviceIds.Contains(sp.Id) &&
@@ -552,28 +558,73 @@ namespace FTSS_API.Service.Implement
                 }
 
                 await _unitOfWork.CommitAsync();
-
-                // Chuẩn bị response
-                var response = new BookingScheduleResponse
+                if (!isEligibleForFreeBooking)
                 {
-                    Id = newBooking.Id,
-                    ScheduleDate = newBooking.ScheduleDate,
-                    Status = newBooking.Status,
-                    Address = newBooking.Address,
-                    PhoneNumber = newBooking.PhoneNumber,
-                    TotalPrice = newBooking.TotalPrice,
-                    UserId = user.Id,
-                    UserName = user.UserName,
-                    FullName = newBooking.FullName,
-                    OrderId = request.OrderId
-                };
+                    var paymentRequest = new CreatePaymentRequest
+                    {
+                        BookingId = newBooking.Id,
+                        PaymentMethod = request.PaymentMethod // Cần nhận PaymentMethod từ request
+                    };
 
-                return new ApiResponse
-                {
-                    status = StatusCodes.Status201Created.ToString(),
-                    message = "Đặt lịch booking thành công.",
-                    data = response
-                };
+                    var paymentResponse = await _paymentService.CreatePayment(paymentRequest);
+
+
+                    if (paymentResponse.status != StatusCodes.Status200OK.ToString())
+                    {
+                        return new ApiResponse
+                        {
+                            status = StatusCodes.Status500InternalServerError.ToString(),
+                            message = "Đặt lịch thành công nhưng lỗi thanh toán",
+                            data = paymentResponse.data
+                        };
+                    }
+
+                    // Chuẩn bị response
+                    var response = new BookingScheduleResponse
+                    {
+                        Id = newBooking.Id,
+                        ScheduleDate = newBooking.ScheduleDate,
+                        Status = newBooking.Status,
+                        Address = newBooking.Address,
+                        PhoneNumber = newBooking.PhoneNumber,
+                        TotalPrice = newBooking.TotalPrice,
+                        UserId = user.Id,
+                        UserName = user.UserName,
+                        FullName = newBooking.FullName,
+                        OrderId = request.OrderId
+                    };
+
+                    return new ApiResponse
+                    {
+                        status = StatusCodes.Status201Created.ToString(),
+                        message = "Đặt lịch booking thành công.",
+                        data = response
+                    };
+                }
+                
+                    // Trả về response cho booking FREE
+                    var freeBookingResponse = new BookingScheduleResponse
+                    {
+                        Id = newBooking.Id,
+                        ScheduleDate = newBooking.ScheduleDate,
+                        Status = newBooking.Status,
+                        Address = newBooking.Address,
+                        PhoneNumber = newBooking.PhoneNumber,
+                        TotalPrice = newBooking.TotalPrice,
+                        UserId = user.Id,
+                        UserName = user.UserName,
+                        FullName = newBooking.FullName,
+                        OrderId = request.OrderId
+                    };
+
+                    return new ApiResponse
+                    {
+                        status = StatusCodes.Status201Created.ToString(),
+                        message = "Đặt lịch booking thành công.",
+                        data = freeBookingResponse
+                    };
+                
+
             }
             catch (Exception ex)
             {
@@ -584,6 +635,7 @@ namespace FTSS_API.Service.Implement
                     data = ex.Message
                 };
             }
+           
         }
 
         public async Task<ApiResponse> GetBookingById(Guid bookingId)

@@ -31,6 +31,10 @@ public partial class User
 
     public bool? IsDelete { get; set; }
 
+    public string? CityId { get; set; }
+
+    public string? DistrictId { get; set; }
+
     public virtual ICollection<Booking> Bookings { get; set; } = new List<Booking>();
 
     public virtual ICollection<Cart> Carts { get; set; } = new List<Cart>();

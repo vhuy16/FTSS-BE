@@ -31,5 +31,7 @@ public partial class Booking
 
     public virtual Order? Order { get; set; }
 
+    public virtual ICollection<Payment> Payments { get; set; } = new List<Payment>();
+
     public virtual User? User { get; set; }
 }

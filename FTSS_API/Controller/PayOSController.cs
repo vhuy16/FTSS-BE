@@ -19,17 +19,17 @@ namespace FTSS_API.Controller;
          _payOsService = payOsService;
      }
 
-     // Endpoint to create a payment URL
-     // Endpoint to create a payment URL
-     [HttpPost(ApiEndPointConstant.PaymentOS.CreatePaymentUrl)]
-     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
-     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
-     [ProducesErrorResponseType(typeof(ProblemDetails))]
-     public async Task<IActionResult> CreatePaymentUrl([FromBody] Guid orderID)
-     {
-         var result = await _payOsService.CreatePaymentUrlRegisterCreator(orderID);
-         return StatusCode(int.Parse(result.GetDescriptionFromEnum()), result);
-     }
+     // // Endpoint to create a payment URL
+     // // Endpoint to create a payment URL
+     // [HttpPost(ApiEndPointConstant.PaymentOS.CreatePaymentUrl)]
+     // [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
+     // [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
+     // [ProducesErrorResponseType(typeof(ProblemDetails))]
+     // public async Task<IActionResult> CreatePaymentUrl([FromBody] Guid orderID)
+     // {
+     //     var result = await _payOsService.CreatePaymentUrlRegisterCreator(orderID);
+     //     return StatusCode(int.Parse(result.GetDescriptionFromEnum()), result);
+     // }
 
      // Endpoint to get payment details
      [HttpGet(ApiEndPointConstant.PaymentOS.GetPaymentInfo)]
