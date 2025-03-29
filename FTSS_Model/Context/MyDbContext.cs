@@ -80,6 +80,10 @@ public partial class MyDbContext : DbContext
             entity.Property(e => e.Address)
                 .HasMaxLength(255)
                 .HasColumnName("address");
+            entity.Property(e => e.BookingCode)
+                .HasMaxLength(10)
+                .IsUnicode(false)
+                .HasColumnName("bookingCode");
             entity.Property(e => e.FullName)
                 .HasMaxLength(255)
                 .HasColumnName("fullName");
