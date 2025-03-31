@@ -20,8 +20,10 @@ namespace FTSS_API.Payload.Response.Book
         public string? PhoneNumber { get; set; }
 
         public decimal? TotalPrice { get; set; }
+        
+        public string? BookingCode { get; set; }
         public Guid? OrderId { get; set; }
-        public string? bookingCode { get; set; }
+     
         public bool? IsAssigned { get; set; }
         public List<ServicePackageResponse> Services { get; set; } = new();
     }
