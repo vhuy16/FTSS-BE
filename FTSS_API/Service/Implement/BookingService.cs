@@ -749,7 +749,7 @@ namespace FTSS_API.Service.Implement
                     Address = booking.Address,
                     PhoneNumber = booking.PhoneNumber,
                     TotalPrice = booking.TotalPrice,
-                    bookingCode = booking.BookingCode,
+                    BookingCode = booking.BookingCode,
                     OrderId = booking.OrderId,
                     IsAssigned = booking.IsAssigned,
                     Services = booking.BookingDetails.Select(bd => new ServicePackageResponse
