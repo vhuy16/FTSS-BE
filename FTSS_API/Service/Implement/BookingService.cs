@@ -687,6 +687,7 @@ namespace FTSS_API.Service.Implement
                     UserName = booking.User?.UserName ?? "Không xác định",
                     FullName = booking.User?.FullName ?? "Không xác định",
                     Address = booking.Address,
+                    BookingCode = booking.BookingCode,
                     PhoneNumber = booking.PhoneNumber,
                     TotalPrice = booking.TotalPrice,
                     OrderId = booking.OrderId,
@@ -748,7 +749,7 @@ namespace FTSS_API.Service.Implement
                     Address = booking.Address,
                     PhoneNumber = booking.PhoneNumber,
                     TotalPrice = booking.TotalPrice,
-                    bookingCode = booking.BookingCode,
+                    BookingCode = booking.BookingCode,
                     OrderId = booking.OrderId,
                     IsAssigned = booking.IsAssigned,
                     Services = booking.BookingDetails.Select(bd => new ServicePackageResponse
