@@ -52,7 +52,7 @@ namespace FTSS_API.Controller
         [HttpGet(ApiEndPointConstant.Voucher.GetListVoucher)]
         [ProducesResponseType(typeof(IPaginate<ApiResponse>), StatusCodes.Status200OK)]
         [ProducesErrorResponseType(typeof(ProblemDetails))]
-        public async Task<IActionResult> GetListVoucher([FromRoute] 
+        public async Task<IActionResult> GetListVoucher(
             [FromQuery] int? page,
             [FromQuery] int? size,
             [FromQuery] bool? isAscending = null)
@@ -70,12 +70,12 @@ namespace FTSS_API.Controller
         }
         
         /// <summary>
-        /// API lấy danh sách Voucher cho admin.
+        /// API lấy danh sách Voucher cho manager.
         /// </summary>
         [HttpGet(ApiEndPointConstant.Voucher.GetAllVoucher)]
         [ProducesResponseType(typeof(IPaginate<ApiResponse>), StatusCodes.Status200OK)]
         [ProducesErrorResponseType(typeof(ProblemDetails))]
-        public async Task<IActionResult> GetAllVoucher([FromRoute]
+        public async Task<IActionResult> GetAllVoucher(
             [FromQuery] int? page,
             [FromQuery] int? size,
             [FromQuery] bool? isAscending = null,
@@ -101,22 +101,22 @@ namespace FTSS_API.Controller
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
         [ProducesErrorResponseType(typeof(ProblemDetails))]
-        public async Task<IActionResult> UpdateVoucher([FromRoute] Guid id,[FromForm] VoucherRequest voucherRequest)
+        public async Task<IActionResult> UpdateVoucher([FromRoute] Guid id,[FromBody] VoucherRequest voucherRequest)
         {
             var response = await _voucherService.UpdateVoucher(id, voucherRequest);
             return StatusCode(int.Parse(response.status), response);
         }
 
         /// <summary>
-        /// API delete voucher.
+        /// API update status voucher.
         /// </summary>
-        [HttpDelete(ApiEndPointConstant.Voucher.DeleteVoucher)]
+        [HttpPut(ApiEndPointConstant.Voucher.UpdateStatusVoucher)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
-        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
         [ProducesErrorResponseType(typeof(ProblemDetails))]
-        public async Task<IActionResult> DeleteVoucher([FromRoute] Guid id)
+        public async Task<IActionResult> UpdateStatusVoucher([FromRoute] Guid id, [FromBody] string? status = null)
         {
-            var response = await _voucherService.DeleteVoucher(id);
+            var response = await _voucherService.UpdateStatusVoucher(id, status);
             return StatusCode(int.Parse(response.status), response);
         }
     }

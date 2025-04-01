@@ -133,7 +133,7 @@ public static class ApiEndPointConstant
         public const string GetListVoucher = VoucherEndPoint;
         public const string GetAllVoucher = VoucherEndPoint + "/get-all-voucher";
         public const string UpdateVoucher = VoucherEndPoint + "{id}";
-        public const string DeleteVoucher = VoucherEndPoint + "{id}";
+        public const string UpdateStatusVoucher = VoucherEndPoint + "/update-status-voucher/{id}";
     }
     public static class SetupPackage
     {
