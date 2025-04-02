@@ -17,6 +17,7 @@ namespace FTSS_API.Service.Interface
         Task<ApiResponse> GetListMissionForManager(int pageNumber, int pageSize, string? status, bool? isAscending);
         Task<ApiResponse> GetListTaskTech(int pageNumber, int pageSize, string? status, bool? isAscending);
         Task<ApiResponse> GetListTech(GetListTechRequest request);
+        Task<ApiResponse> GetMissionById(Guid missionid);
         Task<ApiResponse> GetServicePackage(int pageNumber, int pageSize, bool? isAscending);
         Task<ApiResponse> UpdateMission(Guid missionid, UpdateMissionRequest request);
         Task<ApiResponse> UpdateStatusMission(Guid id, string status);
