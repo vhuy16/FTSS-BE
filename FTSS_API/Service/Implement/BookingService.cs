@@ -1366,29 +1366,12 @@ namespace FTSS_API.Service.Implement
             }
         }
 
-        public async Task<ApiResponse> UpdateStatusMission(Guid id, string status)
+        public async Task<ApiResponse> UpdateStatusMission(Guid missionId, string status)
         {
             try
             {
-                Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
-                var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
-                    predicate: u => u.Id.Equals(userId) &&
-                                    u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) &&
-                                    u.IsDelete == false &&
-                                    u.Role.Equals(RoleEnum.Technician.GetDescriptionFromEnum()));
-
-                if (user == null)
-                {
-                    return new ApiResponse
-                    {
-                        status = StatusCodes.Status403Forbidden.ToString(),
-                        message = "Bạn không có quyền cập nhật nhiệm vụ này.",
-                        data = null
-                    };
-                }
-
                 var mission = await _unitOfWork.GetRepository<Mission>().SingleOrDefaultAsync(
-                    predicate: m => m.Id.Equals(id) && m.IsDelete == false);
+                    predicate: m => m.Id.Equals(missionId) && m.IsDelete == false);
 
                 if (mission == null)
                 {
@@ -1400,24 +1383,52 @@ namespace FTSS_API.Service.Implement
                     };
                 }
 
-                if (!Enum.TryParse(status, true, out MissionStatusEnum validStatus))
+                if (!Enum.TryParse(status, out MissionStatusEnum missionStatus))
                 {
                     return new ApiResponse
                     {
                         status = StatusCodes.Status400BadRequest.ToString(),
-                        message = "Trạng thái không hợp lệ. Giá trị cho phép: Done, Cancel, Processing, NotStarted.",
+                        message = "Trạng thái không hợp lệ.",
                         data = null
                     };
                 }
 
-                mission.Status = validStatus.ToString();
+                // Cập nhật trạng thái của nhiệm vụ
+                mission.Status = missionStatus.ToString();
+
+                // Chỉ cập nhật Order nếu Mission có OrderId và không có BookingId
+                if (mission.OrderId.HasValue && mission.BookingId == null)
+                {
+                    string? orderStatus = missionStatus switch
+                    {
+                        MissionStatusEnum.Processing => OrderStatus.PENDING_DELIVERY.ToString(),
+                        MissionStatusEnum.Done => OrderStatus.COMPLETED.ToString(),
+                        MissionStatusEnum.Cancel => OrderStatus.CANCELLED.ToString(),
+                        _ => null
+                    };
+
+                    if (orderStatus != null)
+                    {
+                        var order = await _unitOfWork.GetRepository<Order>().SingleOrDefaultAsync(
+                            predicate: o => o.Id == mission.OrderId.Value && o.IsDelete == false);
+
+                        if (order != null)
+                        {
+                            order.Status = orderStatus;
+                            order.ModifyDate = DateTime.UtcNow;
+                            _unitOfWork.GetRepository<Order>().UpdateAsync(order);
+                        }
+                    }
+                }
+
+                _unitOfWork.GetRepository<Mission>().UpdateAsync(mission);
                 await _unitOfWork.CommitAsync();
 
                 return new ApiResponse
                 {
                     status = StatusCodes.Status200OK.ToString(),
                     message = "Cập nhật trạng thái nhiệm vụ thành công.",
-                    data = new { mission.Id, mission.Status }
+                    data = null
                 };
             }
             catch (Exception ex)
@@ -1430,6 +1441,8 @@ namespace FTSS_API.Service.Implement
                 };
             }
         }
+
+
         private string GenerateBookingCode()
         {
             var now = DateTime.UtcNow; // Lấy thời gian hiện tại theo UTC để tránh trùng lặp
