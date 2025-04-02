@@ -983,7 +983,9 @@ namespace FTSS_API.Service.Implement
                 var missions = await _unitOfWork.GetRepository<Mission>().GetPagingListAsync(
                     predicate: filter,
                     orderBy: orderBy,
-                    include: m => m.Include(x => x.User),
+                    include: m => m.Include(x => x.User)
+                                   .Include(x => x.Order)
+                                   .Include(x => x.Booking),
                     page: pageNumber,
                     size: pageSize
                 );
@@ -1000,7 +1002,9 @@ namespace FTSS_API.Service.Implement
                     BookingId = m.BookingId,
                     OrderId = m.OrderId,
                     TechnicianId = m.Userid,
-                    TechnicianName = m.User?.FullName ?? "Không xác định"
+                    TechnicianName = m.User?.FullName ?? "Không xác định",
+                    OrderCode = m.Order?.OrderCode ?? "Không có", 
+                    BookingCode = m.Booking?.BookingCode ?? "Không có"
                 }).ToList();
 
                 return new ApiResponse
@@ -1024,6 +1028,8 @@ namespace FTSS_API.Service.Implement
         public async Task<ApiResponse> GetListTaskTech(int pageNumber, int pageSize, string? status, bool? isAscending)
         {
             Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
+
+            // Kiểm tra quyền truy cập
             var userr = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
                 predicate: u => u.Id.Equals(userId) &&
                                 u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) &&
@@ -1047,6 +1053,8 @@ namespace FTSS_API.Service.Implement
                                                      (string.IsNullOrEmpty(status) || t.Status == status) &&
                                                      t.IsDelete == false,
                                      include: t => t.Include(x => x.User)
+                                                    .Include(x => x.Booking)
+                                                    .Include(x => x.Order)
                                  );
 
             var taskList = await query;
@@ -1060,18 +1068,48 @@ namespace FTSS_API.Service.Implement
                 .Take(pageSize)
                 .ToList();
 
-            var response = paginatedList.Select(t => new GetListTaskTechResponse
+            // Lấy FullName theo điều kiện
+            var response = new List<GetListTaskTechResponse>();
+
+            foreach (var t in paginatedList)
             {
-                Id = t.Id,
-                MissionName = t.MissionName,
-                MissionDescription = t.MissionDescription,
-                Status = t.Status,
-                IsDelete = t.IsDelete,
-                MissionSchedule = t.MissionSchedule,
-                FullName = t.User?.FullName ?? "Không xác định",
-                Address = t.Address,
-                PhoneNumber = t.PhoneNumber
-            }).ToList();
+                string fullName = "Không xác định";
+
+                if (t.BookingId.HasValue && !t.OrderId.HasValue)
+                {
+                    // Nếu BookingId có giá trị và OrderId là null, lấy User từ Booking
+                    var bookingUser = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
+                        predicate: u => u.Id == t.Booking!.UserId
+                    );
+                    fullName = bookingUser?.FullName ?? fullName;
+                }
+                else if (t.OrderId.HasValue && !t.BookingId.HasValue)
+                {
+                    // Nếu OrderId có giá trị và BookingId là null, lấy User từ Order
+                    var orderUser = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
+                        predicate: u => u.Id == t.Order!.UserId
+                    );
+                    fullName = orderUser?.FullName ?? fullName;
+                }
+                else if (t.User != null)
+                {
+                    // Nếu không thuộc hai trường hợp trên, lấy FullName từ Mission.User
+                    fullName = t.User.FullName;
+                }
+
+                response.Add(new GetListTaskTechResponse
+                {
+                    Id = t.Id,
+                    MissionName = t.MissionName,
+                    MissionDescription = t.MissionDescription,
+                    Status = t.Status,
+                    IsDelete = t.IsDelete,
+                    MissionSchedule = t.MissionSchedule,
+                    FullName = fullName,
+                    Address = t.Address,
+                    PhoneNumber = t.PhoneNumber
+                });
+            }
 
             return new ApiResponse
             {
@@ -1408,6 +1446,82 @@ namespace FTSS_API.Service.Implement
             return new string(Enumerable.Range(0, length)
                 .Select(_ => chars[random.Next(chars.Length)])
                 .ToArray());
+        }
+
+        public async Task<ApiResponse> GetMissionById(Guid missionid)
+        {
+            try
+            {
+                // Tìm mission theo ID, include Booking và Order để truy vấn nhanh hơn
+                var mission = await _unitOfWork.GetRepository<Mission>().SingleOrDefaultAsync(
+                    predicate: m => m.Id == missionid && (m.IsDelete == false || m.IsDelete == null),
+                    include: m => m.Include(x => x.Booking).Include(x => x.Order)
+                );
+
+                if (mission == null)
+                {
+                    return new ApiResponse
+                    {
+                        status = StatusCodes.Status404NotFound.ToString(),
+                        message = "Không tìm thấy nhiệm vụ.",
+                        data = null
+                    };
+                }
+
+                string fullName = "Không xác định";
+
+                if (mission.BookingId.HasValue && !mission.OrderId.HasValue)
+                {
+                    // Nếu BookingId có giá trị và OrderId là null, lấy User từ Booking
+                    var bookingUser = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
+                        predicate: u => u.Id == mission.Booking!.UserId
+                    );
+                    fullName = bookingUser?.FullName ?? fullName;
+                }
+                else if (mission.OrderId.HasValue && !mission.BookingId.HasValue)
+                {
+                    // Nếu OrderId có giá trị và BookingId là null, lấy User từ Order
+                    var orderUser = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
+                        predicate: u => u.Id == mission.Order!.UserId
+                    );
+                    fullName = orderUser?.FullName ?? fullName;
+                }
+                else if (mission.User != null)
+                {
+                    // Nếu không thuộc hai trường hợp trên, lấy FullName từ Mission.User
+                    fullName = mission.User.FullName;
+                }
+
+                // Tạo response
+                var response = new GetListTaskTechResponse
+                {
+                    Id = mission.Id,
+                    MissionName = mission.MissionName,
+                    MissionDescription = mission.MissionDescription,
+                    Status = mission.Status,
+                    IsDelete = mission.IsDelete,
+                    MissionSchedule = mission.MissionSchedule,
+                    FullName = fullName, // Giá trị FullName theo logic trên
+                    Address = mission.Address,
+                    PhoneNumber = mission.PhoneNumber
+                };
+
+                return new ApiResponse
+                {
+                    status = StatusCodes.Status200OK.ToString(),
+                    message = "Lấy thông tin nhiệm vụ thành công.",
+                    data = response
+                };
+            }
+            catch (Exception ex)
+            {
+                return new ApiResponse
+                {
+                    status = StatusCodes.Status500InternalServerError.ToString(),
+                    message = "Đã xảy ra lỗi khi lấy thông tin nhiệm vụ.",
+                    data = ex.Message
+                };
+            }
         }
     }
 }

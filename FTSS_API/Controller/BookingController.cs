@@ -203,5 +203,16 @@ namespace FTSS_API.Controller
             var response = await _bookingService.UpdateMission(missionid, request);
             return StatusCode(int.Parse(response.status), response);
         }
+        /// <summary>
+        /// API lấy mission detail.
+        /// </summary>
+        [HttpGet(ApiEndPointConstant.Booking.GetMissionById)]
+        [ProducesResponseType(typeof(IPaginate<ApiResponse>), StatusCodes.Status200OK)]
+        [ProducesErrorResponseType(typeof(ProblemDetails))]
+        public async Task<IActionResult> GetMissionById(Guid missionid)
+        {
+            var response = await _bookingService.GetMissionById(missionid);
+            return StatusCode(int.Parse(response.status), response);
+        }
     }
 }
