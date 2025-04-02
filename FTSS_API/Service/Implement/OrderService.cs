@@ -566,7 +566,7 @@ public class OrderService : BaseService<OrderService>, IOrderService
                 data = null
             };
         }
-
+        
         // Create payment
         var createPaymentRequest = new CreatePaymentRequest
         {
@@ -702,7 +702,9 @@ public async Task<ApiResponse> UpdateOrder(Guid orderId, UpdateOrderRequest upda
     {
         var order = await _unitOfWork.GetRepository<Order>().SingleOrDefaultAsync(
             predicate: o => o.Id == orderId,
-            include: query => query.Include(o => o.User).Include(o => o.OrderDetails)
+            include: query => query.Include(o => o.User)
+                                                  .Include(o => o.OrderDetails)
+                                                  .Include(O => O.Payments)
         );
 
         if (order == null)
@@ -717,10 +719,10 @@ public async Task<ApiResponse> UpdateOrder(Guid orderId, UpdateOrderRequest upda
 
         // Cập nhật trạng thái đơn hàng nếu có
         if (!string.IsNullOrEmpty(updateOrderRequest.Status))
-        {
+        { var payment = await _unitOfWork.GetRepository<Payment>().SingleOrDefaultAsync(predicate: p => p.OrderId == orderId);
             if (updateOrderRequest.Status == OrderStatus.CANCELLED.ToString() && order.Status == OrderStatus.PAID.ToString())
             {
-                var payment = await _unitOfWork.GetRepository<Payment>().SingleOrDefaultAsync(predicate: p => p.OrderId == orderId);
+               
                 if (payment != null)
                 {
                     payment.Status = PaymentStatusEnum.Refunding.ToString();
@@ -728,8 +730,15 @@ public async Task<ApiResponse> UpdateOrder(Guid orderId, UpdateOrderRequest upda
                 }
             }
 
+            if (updateOrderRequest.Status == OrderStatus.COMPLETED.ToString() &&
+                payment.PaymentMethod == PaymenMethodEnum.COD.GetDescriptionFromEnum())
+            {
+                payment.Status = PaymentStatusEnum.Completed.ToString();
+                _unitOfWork.GetRepository<Payment>().UpdateAsync(payment);
+            }
             order.Status = updateOrderRequest.Status;
         }
+        
         order.ModifyDate = DateTime.Now;
         _unitOfWork.GetRepository<Order>().UpdateAsync(order);
         

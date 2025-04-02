@@ -105,15 +105,7 @@ public class PaymentService : BaseService<PaymentService>, IPaymentService
             paymentUrl = await _vnPayService.CreatePaymentUrl(request.OrderId, request.BookingId);
         }
 
-        if (string.IsNullOrEmpty(paymentUrl))
-        {
-            return new ApiResponse
-            {
-                data = string.Empty,
-                message = "Failed to create payment URL",
-                status = StatusCodes.Status500InternalServerError.ToString(),
-            };
-        }
+  
 
         if (order == null && booking == null)
         {
