@@ -503,24 +503,18 @@ public class OrderService : BaseService<OrderService>, IOrderService
                 };
             }
 
-            if (totalProductPrice < voucher.MaximumOrderValue)
-            {
-                return new ApiResponse
-                {
-                    status = StatusCodes.Status400BadRequest.ToString(),
-                    message = "Your order value is less than the minimum for this voucher.",
-                    data = null
-                };
-            }
+         
 
             // Apply the discount logic
             if (voucher.DiscountType.Equals(VoucherTypeEnum.Percentage.GetDescriptionFromEnum()))
             {
                 discountAmount = totalProductPrice * (voucher.Discount / 100);
+                discountAmount = Math.Min(discountAmount, (decimal)voucher.MaximumOrderValue);
             }
-            else if (voucher.DiscountType.Equals(VoucherTypeEnum.Fixed.GetDescriptionFromEnum()))
+            else if (voucher.DiscountType.Trim().Equals(VoucherTypeEnum.Fixed.GetDescriptionFromEnum()))
             {
                 discountAmount = voucher.Discount;
+                discountAmount = Math.Min(discountAmount, (decimal)voucher.MaximumOrderValue);
             }
 
             // Update voucher usage
