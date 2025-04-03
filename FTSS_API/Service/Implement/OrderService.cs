@@ -728,7 +728,7 @@ public class OrderService : BaseService<OrderService>, IOrderService
                 {
                     if (payment != null)
                     {
-                        payment.Status = PaymentStatusEnum.Refunding.ToString();
+                        payment.PaymentStatus = PaymentStatusEnum.Refunding.ToString();
                         _unitOfWork.GetRepository<Payment>().UpdateAsync(payment);
                     }
                 }
@@ -737,14 +737,14 @@ public class OrderService : BaseService<OrderService>, IOrderService
                 if (updateOrderRequest.Status == OrderStatus.CANCELLED.ToString() &&
                     payment.PaymentMethod == PaymenMethodEnum.COD.GetDescriptionFromEnum())
                 {
-                    payment.Status = PaymentStatusEnum.Processing.ToString();
+                    payment.PaymentStatus = PaymentStatusEnum.Processing.ToString();
                 }
 
                 // Đơn hàng hoàn thành và dùng COD
                 if (updateOrderRequest.Status == OrderStatus.COMPLETED.ToString() &&
                     payment.PaymentMethod == PaymenMethodEnum.COD.GetDescriptionFromEnum())
                 {
-                    payment.Status = PaymentStatusEnum.Completed.ToString();
+                    payment.PaymentStatus = PaymentStatusEnum.Completed.ToString();
                     _unitOfWork.GetRepository<Payment>().UpdateAsync(payment);
                 }
 
@@ -753,13 +753,13 @@ public class OrderService : BaseService<OrderService>, IOrderService
                 {
                     if (order.Status == OrderStatus.DELIVERED.ToString())
                     {
-                        if (payment.Status == PaymentStatusEnum.Completed.ToString())
+                        if (payment.PaymentStatus == PaymentStatusEnum.Completed.ToString())
                         {
-                            payment.Status = PaymentStatusEnum.Refunding.ToString();
+                            payment.PaymentStatus = PaymentStatusEnum.Refunding.ToString();
                         }
                         else
                         {
-                            payment.Status = PaymentStatusEnum.Pending.ToString();
+                            payment.PaymentStatus = PaymentStatusEnum.Pending.ToString();
                         }
                     }
                 }
@@ -767,9 +767,9 @@ public class OrderService : BaseService<OrderService>, IOrderService
                 // Khi đơn hàng chưa xử lý nhưng người dùng đã thanh toán và gửi yêu cầu hoàn tiền
                 if (updateOrderRequest.Status == OrderStatus.CANCELLED.ToString() &&
                     order.Status == OrderStatus.PROCESSING.ToString() &&
-                    payment.Status == PaymentStatusEnum.Completed.ToString())
+                    payment.PaymentStatus == PaymentStatusEnum.Completed.ToString())
                 {
-                    payment.Status = PaymentStatusEnum.Refunding.ToString();
+                    payment.PaymentStatus = PaymentStatusEnum.Refunding.ToString();
                 }
 
                 order.Status = updateOrderRequest.Status;

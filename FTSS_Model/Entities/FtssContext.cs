@@ -508,7 +508,7 @@ public partial class FtssContext : DbContext
                 .HasMaxLength(50)
                 .IsUnicode(false)
                 .HasColumnName("paymentStatus");
-            entity.Property(e => e.Status)
+            entity.Property(e => e.PaymentStatus)
                 .HasMaxLength(50)
                 .IsUnicode(false)
                 .HasColumnName("status");
