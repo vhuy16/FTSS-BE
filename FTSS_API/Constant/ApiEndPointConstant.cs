@@ -28,6 +28,16 @@ public static class ApiEndPointConstant
         public const string ChangePassword = UserEndPoint + "/change-password";
         
     }
+    public static class Issue
+    {
+        public const string IssueEndPoint = ApiEndpoint + "/issue";
+        public const string CreateIssue = IssueEndPoint;
+        public const string GetAllIssues = IssueEndPoint;
+        public const string GetIssueById = IssueEndPoint + "/{id}";
+        public const string UpdateIssue = IssueEndPoint + "/{id}";
+        public const string DeleteIssue = IssueEndPoint + "/{id}";
+    }
+
     public static class PaymentOS
     {
         public const string CreatePaymentUrl = "api/payment/create-url";
