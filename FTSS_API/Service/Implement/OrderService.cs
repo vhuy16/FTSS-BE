@@ -283,6 +283,7 @@ public class OrderService : BaseService<OrderService>, IOrderService
                 Shipcost = createOrderRequest.ShipCost,
                 PhoneNumber = createOrderRequest.PhoneNumber,
                 RecipientName = createOrderRequest.RecipientName,
+                VoucherId = createOrderRequest.VoucherId ?? Guid.Empty,
                 SetupPackageId = createOrderRequest.SetupPackageId,
                 IsEligible = false,
                 IsAssigned = false,
@@ -1020,82 +1021,106 @@ public class OrderService : BaseService<OrderService>, IOrderService
             }
 
             // Chuyển đổi dữ liệu sang response
-            var orderResponses = orders.Select(order => new GetOrderResponse
+         var orderResponses = orders.Select(order =>
+{
+    decimal discountAmount = 0;
+
+    if (order.Voucher != null)
+    {
+        if (order.Voucher.DiscountType.Equals(VoucherTypeEnum.Percentage.GetDescriptionFromEnum()))
+        {
+            // Giảm theo phần trăm, nhưng không vượt quá MaximumOrderValue
+            discountAmount = order.TotalPrice * (order.Voucher.Discount / 100);
+            discountAmount = Math.Min(discountAmount, (decimal)order.Voucher.MaximumOrderValue);
+        }
+        else if (order.Voucher.DiscountType.Trim().Equals(VoucherTypeEnum.Fixed.GetDescriptionFromEnum()))
+        {
+            // Giảm giá cố định, nhưng không vượt quá MaximumOrderValue
+            discountAmount = order.Voucher.Discount;
+            discountAmount = Math.Min(discountAmount, (decimal)order.Voucher.MaximumOrderValue);
+        }
+    }
+
+    return new GetOrderResponse
+    {
+        Id = order.Id,
+        TotalPrice = order.TotalPrice,
+        Status = order.Status,
+        ShipCost = order.Shipcost,
+        Address = order.Address,
+        CreateDate = order.CreateDate,
+        IsAssigned = order.IsAssigned,
+        IsEligible = order.IsEligible,
+        OderCode = order.OrderCode,
+        ModifyDate = order.ModifyDate,
+        PhoneNumber = order.PhoneNumber,
+        BuyerName = order.RecipientName,
+
+        // Gán số tiền đã giảm sau khi tính toán
+        Discount = discountAmount,
+
+        SetupPackage = order.SetupPackage != null
+            ? new SetupPackageResponse()
             {
-                Id = order.Id,
-                TotalPrice = order.TotalPrice,
-                Status = order.Status,
-                ShipCost = order.Shipcost,
-                Address = order.Address,
-                CreateDate = order.CreateDate,
-                IsAssigned = order.IsAssigned,
-                IsEligible = order.IsEligible,
-                OderCode = order.OrderCode,
+                SetupPackageId = order.SetupPackageId,
+                SetupName = order.SetupPackage?.SetupName,
                 ModifyDate = order.ModifyDate,
-                PhoneNumber = order.PhoneNumber,
-                BuyerName = order.RecipientName,
-                Discount = order.Voucher?.Discount ?? 0,
-
-                SetupPackage = order.SetupPackage != null
-                    ? new SetupPackageResponse()
-                    {
-                        SetupPackageId = order.SetupPackageId,
-                        SetupName = order.SetupPackage?.SetupName,
-                        ModifyDate = order.ModifyDate,
-                        Size = order.SetupPackage?.SetupPackageDetails?
-                            .Where(spd => spd.Product?.SubCategory?.Category?.CategoryName == "Bể")
-                            .Select(spd => spd.Product?.Size)
-                            .FirstOrDefault(),
-                        CreateDate = order.CreateDate,
-                        TotalPrice = order.SetupPackage?.Price ?? 0,
-                        Description = order.SetupPackage?.Description ?? "N/A",
-                        IsDelete = order.SetupPackage?.IsDelete ?? false,
-                        Products = order.SetupPackage?.SetupPackageDetails?.Select(spd => new ProductResponse
-                        {
-                            Id = spd.Product?.Id ?? Guid.Empty,
-                            ProductName = spd.Product?.ProductName ?? "Unknown",
-                            Quantity = spd.Quantity,
-                            Price = spd.Product?.Price ?? 0,
-                            InventoryQuantity = spd.Product?.Quantity ?? 0,
-                            Status = spd.Product != null ? spd.Product.Status : "false",
-                            IsDelete = order.SetupPackage?.IsDelete ?? false,
-                            CategoryName = spd.Product?.SubCategory?.Category?.CategoryName ?? "Unknown",
-                            images = spd.Product?.Images?
-                                .Where(img => img.IsDelete == false)
-                                .OrderBy(img => img.CreateDate)
-                                .Select(img => img.LinkImage)
-                                .FirstOrDefault() ?? "NoImageAvailable"
-                        }).ToList() ?? new List<ProductResponse>()
-                    }
-                    : null,
-
-                Payment = order.Payments != null && order.Payments.Any()
-                    ? new GetOrderResponse.PaymentResponse
-                    {
-                        PaymentMethod = order.Payments.FirstOrDefault()?.PaymentMethod ?? "Unknown",
-                        PaymentStatus = order.Payments.FirstOrDefault()?.PaymentStatus ?? "Unknown"
-                    }
-                    : null,
-
-                userResponse = order.User != null
-                    ? new GetOrderResponse.UserResponse
-                    {
-                        Name = order.User.UserName ?? "Unknown",
-                        Email = order.User.Email ?? "Unknown",
-                        PhoneNumber = order.User.PhoneNumber ?? "Unknown"
-                    }
-                    : null,
-
-                OrderDetails = order.OrderDetails?.Select(od => new GetOrderResponse.OrderDetailCreateResponse
+                Size = order.SetupPackage?.SetupPackageDetails?
+                    .Where(spd => spd.Product?.SubCategory?.Category?.CategoryName == "Bể")
+                    .Select(spd => spd.Product?.Size)
+                    .FirstOrDefault(),
+                CreateDate = order.CreateDate,
+                TotalPrice = order.SetupPackage?.Price ?? 0,
+                Description = order.SetupPackage?.Description ?? "N/A",
+                IsDelete = order.SetupPackage?.IsDelete ?? false,
+                Products = order.SetupPackage?.SetupPackageDetails?.Select(spd => new ProductResponse
                 {
-                    ProductName = od.Product?.ProductName ?? "Unknown",
-                    Price = od.Price,
-                    Quantity = od.Quantity,
-                    LinkImage = od.Product?.Images?.FirstOrDefault()?.LinkImage ?? "NoImageAvailable",
-                    SubCategoryName = od.Product?.SubCategory?.SubCategoryName ?? "NoSubCategory",
-                    CategoryName = od.Product?.SubCategory?.Category?.CategoryName ?? "NoCategory"
-                }).ToList() ?? new List<GetOrderResponse.OrderDetailCreateResponse>()
-            }).ToList();
+                    Id = spd.Product?.Id ?? Guid.Empty,
+                    ProductName = spd.Product?.ProductName ?? "Unknown",
+                    Quantity = spd.Quantity,
+                    Price = spd.Product?.Price ?? 0,
+                    InventoryQuantity = spd.Product?.Quantity ?? 0,
+                    Status = spd.Product != null ? spd.Product.Status : "false",
+                    IsDelete = order.SetupPackage?.IsDelete ?? false,
+                    CategoryName = spd.Product?.SubCategory?.Category?.CategoryName ?? "Unknown",
+                    images = spd.Product?.Images?
+                        .Where(img => img.IsDelete == false)
+                        .OrderBy(img => img.CreateDate)
+                        .Select(img => img.LinkImage)
+                        .FirstOrDefault() ?? "NoImageAvailable"
+                }).ToList() ?? new List<ProductResponse>()
+            }
+            : null,
+
+        Payment = order.Payments != null && order.Payments.Any()
+            ? new GetOrderResponse.PaymentResponse
+            {
+                PaymentMethod = order.Payments.FirstOrDefault()?.PaymentMethod ?? "Unknown",
+                PaymentStatus = order.Payments.FirstOrDefault()?.PaymentStatus ?? "Unknown"
+            }
+            : null,
+
+        userResponse = order.User != null
+            ? new GetOrderResponse.UserResponse
+            {
+                Name = order.User.UserName ?? "Unknown",
+                Email = order.User.Email ?? "Unknown",
+                PhoneNumber = order.User.PhoneNumber ?? "Unknown"
+            }
+            : null,
+
+        OrderDetails = order.OrderDetails?.Select(od => new GetOrderResponse.OrderDetailCreateResponse
+        {
+            ProductName = od.Product?.ProductName ?? "Unknown",
+            Price = od.Price,
+            Quantity = od.Quantity,
+            LinkImage = od.Product?.Images?.FirstOrDefault()?.LinkImage ?? "NoImageAvailable",
+            SubCategoryName = od.Product?.SubCategory?.SubCategoryName ?? "NoSubCategory",
+            CategoryName = od.Product?.SubCategory?.Category?.CategoryName ?? "NoCategory"
+        }).ToList() ?? new List<GetOrderResponse.OrderDetailCreateResponse>()
+    };
+}).ToList();
+
 
             // Tạo response kết quả
             return new ApiResponse
@@ -1160,6 +1185,23 @@ public class OrderService : BaseService<OrderService>, IOrderService
                     data = null
                 };
             }
+            decimal discountAmount = 0;
+
+            if (order.Voucher != null)
+            {
+                if (order.Voucher.DiscountType.Equals(VoucherTypeEnum.Percentage.GetDescriptionFromEnum()))
+                {
+                    // Giảm theo phần trăm, nhưng không vượt quá MaximumOrderValue
+                    discountAmount = order.TotalPrice * (order.Voucher.Discount / 100);
+                    discountAmount = Math.Min(discountAmount, (decimal)order.Voucher.MaximumOrderValue);
+                }
+                else if (order.Voucher.DiscountType.Trim().Equals(VoucherTypeEnum.Fixed.GetDescriptionFromEnum()))
+                {
+                    // Giảm giá cố định, nhưng không vượt quá MaximumOrderValue
+                    discountAmount = order.Voucher.Discount;
+                    discountAmount = Math.Min(discountAmount, (decimal)order.Voucher.MaximumOrderValue);
+                }
+            }
 
             // Chuyển đổi dữ liệu sang response
             var orderResponse = new GetOrderResponse
@@ -1176,7 +1218,7 @@ public class OrderService : BaseService<OrderService>, IOrderService
                 ModifyDate = order.ModifyDate,
                 PhoneNumber = order.PhoneNumber,
                 BuyerName = order.RecipientName,
-                Discount = order.Voucher?.Discount ?? 0,
+                Discount = discountAmount,
                 SetupPackage = order.SetupPackage != null
                     ? new SetupPackageResponse()
                     {
