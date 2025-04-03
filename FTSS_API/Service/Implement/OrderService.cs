@@ -283,7 +283,7 @@ public class OrderService : BaseService<OrderService>, IOrderService
                 Shipcost = createOrderRequest.ShipCost,
                 PhoneNumber = createOrderRequest.PhoneNumber,
                 RecipientName = createOrderRequest.RecipientName,
-                VoucherId = createOrderRequest.VoucherId ?? Guid.Empty,
+                VoucherId = createOrderRequest.VoucherId,
                 SetupPackageId = createOrderRequest.SetupPackageId,
                 IsEligible = false,
                 IsAssigned = false,
