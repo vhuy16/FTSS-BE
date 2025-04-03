@@ -154,6 +154,40 @@ public class PaymentService : BaseService<PaymentService>, IPaymentService
             }
         };
     }
+    public async Task<ApiResponse> GetPaymentsByStatus(string status, int page, int size)
+    {
+        var payments = await _unitOfWork.GetRepository<Payment>().GetPagingListAsync(
+            predicate: p => p.PaymentStatus == status,
+            selector: s => new CreatePaymentResponse()
+            {
+                Id = s.Id,
+                OrderId = s.OrderId,
+                PaymentMethod = s.PaymentMethod.ToString(),
+                AmoundPaid = s.AmountPaid,
+                PaymentStatus = s.PaymentStatus.ToString(),
+                PaymentDate = s.PaymentDate,
+            },
+            page: page,
+            size: size
+        );
+
+        int totalItems = payments.Total;
+        int totalPages = (int)Math.Ceiling((double)totalItems / size);
+
+        return new ApiResponse
+        {
+            status = StatusCodes.Status200OK.ToString(),
+            message = payments.Items.Any() ? "Payments retrieved successfully." : "No payments found.",
+            data = new Paginate<CreatePaymentResponse>
+            {
+                Page = page,
+                Size = size,
+                Total = totalItems,
+                TotalPages = totalPages,
+                Items = payments.Items
+            }
+        };
+    }
 
     public async Task<ApiResponse> UpdatePaymentStatus(Guid PaymentId, string newStatus)
     {

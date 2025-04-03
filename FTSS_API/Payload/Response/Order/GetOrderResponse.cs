@@ -18,6 +18,7 @@ namespace FTSS_API.Payload.Response.Order
         public string? BuyerName { get; set; }
         
         public decimal Discount { get; set; }
+        public decimal MaximumDiscount { get; set; }
         public UserResponse userResponse { get; set; } // Fixed property declaration and removed invalid initialization
         public List<OrderDetailCreateResponse> OrderDetails { get; set; } = new List<OrderDetailCreateResponse>();
         public PaymentResponse Payment { get; set; } = new PaymentResponse();

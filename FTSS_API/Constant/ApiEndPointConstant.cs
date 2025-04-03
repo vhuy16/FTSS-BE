@@ -66,6 +66,7 @@ public static class ApiEndPointConstant
         public const string GetPayments = PaymentEndPoint;
         public const string UpdatePaymentStatus = "api/payments/update-status";
         public const string UpdateBankInfor = PaymentEndPoint + "/update-bank-infor";
+        public const string GetPaymentByStatus = PaymentEndPoint + "/payment-by-status";
     }
     public static class Category
     {

@@ -1023,23 +1023,7 @@ public class OrderService : BaseService<OrderService>, IOrderService
             // Chuyển đổi dữ liệu sang response
          var orderResponses = orders.Select(order =>
 {
-    decimal discountAmount = 0;
-
-    if (order.Voucher != null)
-    {
-        if (order.Voucher.DiscountType.Equals(VoucherTypeEnum.Percentage.GetDescriptionFromEnum()))
-        {
-            // Giảm theo phần trăm, nhưng không vượt quá MaximumOrderValue
-            discountAmount = order.TotalPrice * (order.Voucher.Discount / 100);
-            discountAmount = Math.Min(discountAmount, (decimal)order.Voucher.MaximumOrderValue);
-        }
-        else if (order.Voucher.DiscountType.Trim().Equals(VoucherTypeEnum.Fixed.GetDescriptionFromEnum()))
-        {
-            // Giảm giá cố định, nhưng không vượt quá MaximumOrderValue
-            discountAmount = order.Voucher.Discount;
-            discountAmount = Math.Min(discountAmount, (decimal)order.Voucher.MaximumOrderValue);
-        }
-    }
+   
 
     return new GetOrderResponse
     {
@@ -1057,7 +1041,8 @@ public class OrderService : BaseService<OrderService>, IOrderService
         BuyerName = order.RecipientName,
 
         // Gán số tiền đã giảm sau khi tính toán
-        Discount = discountAmount,
+        Discount = order.Voucher.Discount,
+        
 
         SetupPackage = order.SetupPackage != null
             ? new SetupPackageResponse()
