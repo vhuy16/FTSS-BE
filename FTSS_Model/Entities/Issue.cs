@@ -23,7 +23,5 @@ public partial class Issue
 
     public virtual IssueCategory? IssueCategory { get; set; }
 
-    public virtual ICollection<IssueProduct> IssueProducts { get; set; } = new List<IssueProduct>();
-
     public virtual ICollection<Solution> Solutions { get; set; } = new List<Solution>();
 }

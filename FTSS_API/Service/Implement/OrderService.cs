@@ -522,9 +522,13 @@ public class OrderService : BaseService<OrderService>, IOrderService
                     discountAmount = Math.Min(discountAmount, (decimal)voucher.MaximumOrderValue);
                 }
 
-                // Update voucher usage
+// Đảm bảo giảm giá không vượt quá tổng giá sản phẩm
+                discountAmount = Math.Min(discountAmount, totalProductPrice);
+
+// Update voucher usage
                 voucher.Quantity -= 1;
-                _unitOfWork.GetRepository<Voucher>().UpdateAsync(voucher);
+                 _unitOfWork.GetRepository<Voucher>().UpdateAsync(voucher);
+
             }
 
             // Calculate final price
@@ -944,7 +948,8 @@ public class OrderService : BaseService<OrderService>, IOrderService
                 {
                     VoucherCode = order.Voucher?.VoucherCode,
                     DiscountType = order.Voucher?.DiscountType,
-                    Discount = discountAmount,
+                    Discount = order.Voucher?.Discount,
+                    MaximumOrderValue = order.Voucher?.MaximumOrderValue,
                 } : null,
 
                 OrderDetails = order.OrderDetails?.Select(od => new GetOrderResponse.OrderDetailCreateResponse
@@ -957,7 +962,7 @@ public class OrderService : BaseService<OrderService>, IOrderService
                     CategoryName = od.Product?.SubCategory?.Category?.CategoryName ?? "NoCategory"
                 }).ToList() ?? new List<GetOrderResponse.OrderDetailCreateResponse>()
             };
-        }).ToList();
+        }).ToList();    
 
             // Tạo response kết quả
             return new ApiResponse
@@ -1143,7 +1148,8 @@ public class OrderService : BaseService<OrderService>, IOrderService
                     
                     VoucherCode = order.Voucher?.VoucherCode,
                     DiscountType = order.Voucher?.DiscountType,
-                    Discount = discountAmount,
+                    Discount = order.Voucher?.Discount,
+                    MaximumOrderValue = order.Voucher?.MaximumOrderValue,
                 } : null,
                 OrderDetails = order.OrderDetails?.Select(od => new GetOrderResponse.OrderDetailCreateResponse
                 {
@@ -1257,6 +1263,7 @@ public class OrderService : BaseService<OrderService>, IOrderService
                     Discount = discountAmount,
                     VoucherCode = order.Voucher?.VoucherCode,
                     DiscountType = order.Voucher?.DiscountType,
+                    MaximumOrderValue = order.Voucher?.MaximumOrderValue,
                 } : null,
                 SetupPackage = order.SetupPackage != null
                     ? new SetupPackageResponse()
