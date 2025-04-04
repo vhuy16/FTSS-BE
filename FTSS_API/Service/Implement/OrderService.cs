@@ -944,7 +944,7 @@ public class OrderService : BaseService<OrderService>, IOrderService
                 {
                     VoucherCode = order.Voucher?.VoucherCode,
                     DiscountType = order.Voucher?.DiscountType,
-                    Discount = discountAmount,
+                    Discount = order.Voucher?.Discount,
                 } : null,
 
                 OrderDetails = order.OrderDetails?.Select(od => new GetOrderResponse.OrderDetailCreateResponse
@@ -957,7 +957,7 @@ public class OrderService : BaseService<OrderService>, IOrderService
                     CategoryName = od.Product?.SubCategory?.Category?.CategoryName ?? "NoCategory"
                 }).ToList() ?? new List<GetOrderResponse.OrderDetailCreateResponse>()
             };
-        }).ToList();
+        }).ToList();    
 
             // Tạo response kết quả
             return new ApiResponse

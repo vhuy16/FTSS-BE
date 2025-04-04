@@ -6,7 +6,7 @@ namespace FTSS_API.Service.Interface;
 public interface IIssueService
 {
     Task<ApiResponse> CreateIssue(AddUpdateIssueRequest request);
-    Task<ApiResponse> GetAllIssues();
+    Task<ApiResponse> GetAllIssues(int page, int size, bool? isAscending, Guid? issueCategoryId = null);
     Task<ApiResponse> GetIssue(Guid id);
     Task<ApiResponse> UpdateIssue(Guid id, AddUpdateIssueRequest request);
     Task<ApiResponse> DeleteIssue(Guid id);
