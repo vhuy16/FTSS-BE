@@ -39,6 +39,7 @@ namespace FTSS_API.Payload.Response.Order
             public string VoucherCode { get; set; } = null!;
             public string DiscountType { get; set; } = null!;
             public decimal? Discount { get; set; }
+            public decimal? MaximumOrderValue  {get; set;}
         }
 
         public class UserResponse
