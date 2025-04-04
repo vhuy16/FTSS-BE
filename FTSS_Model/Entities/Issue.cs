@@ -14,7 +14,8 @@ public partial class Issue
     public string? Description { get; set; }
 
     public DateTime? CreateDate { get; set; }
-    public DateTime? ModifiedDate {get; set;}
+
+    public DateTime? ModifiedDate { get; set; }
 
     public bool? IsDelete { get; set; }
 
