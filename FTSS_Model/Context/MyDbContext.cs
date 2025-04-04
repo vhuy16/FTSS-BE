@@ -266,7 +266,7 @@ public partial class MyDbContext : DbContext
 
         modelBuilder.Entity<Issue>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__Issue__3213E83F71FEC19D");
+            entity.HasKey(e => e.Id).HasName("PK__tmp_ms_x__3213E83F8331A313");
 
             entity.ToTable("Issue");
 
@@ -284,6 +284,7 @@ public partial class MyDbContext : DbContext
             entity.Property(e => e.IssueName)
                 .HasMaxLength(255)
                 .HasColumnName("issueName");
+            entity.Property(e => e.ModifiedDate).HasColumnName("modifiedDate");
             entity.Property(e => e.Title)
                 .HasMaxLength(255)
                 .HasColumnName("title");
@@ -339,7 +340,7 @@ public partial class MyDbContext : DbContext
             entity.HasOne(d => d.Issue).WithMany(p => p.IssueProducts)
                 .HasForeignKey(d => d.IssueId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK__IssueProd__issue__2180FB33");
+                .HasConstraintName("FK__IssueProd__issue__6CA31EA0");
 
             entity.HasOne(d => d.Product).WithMany(p => p.IssueProducts)
                 .HasForeignKey(d => d.ProductId)
@@ -721,7 +722,7 @@ public partial class MyDbContext : DbContext
             entity.HasOne(d => d.Issue).WithMany(p => p.Solutions)
                 .HasForeignKey(d => d.IssueId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK__Solution__issueI__31B762FC");
+                .HasConstraintName("FK__Solution__issueI__6BAEFA67");
         });
 
         modelBuilder.Entity<SubCategory>(entity =>
