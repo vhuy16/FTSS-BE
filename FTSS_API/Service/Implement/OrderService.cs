@@ -1260,7 +1260,7 @@ public class OrderService : BaseService<OrderService>, IOrderService
               
                 Voucher = order.Voucher != null ? new GetOrderResponse.VoucherResponse()
                 {
-                    Discount = discountAmount,
+                    Discount = order.Voucher?.Discount,
                     VoucherCode = order.Voucher?.VoucherCode,
                     DiscountType = order.Voucher?.DiscountType,
                     MaximumOrderValue = order.Voucher?.MaximumOrderValue,
