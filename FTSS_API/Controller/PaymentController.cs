@@ -104,5 +104,10 @@ public class PaymentController : BaseController<PaymentController>
         var result = await _paymentService.GetPayments(page, size);
         return Ok(result);
     }
-    
+    [HttpGet(ApiEndPointConstant.Payment.GetPaymentByStatus)]
+    public async Task<IActionResult> GetPaymentsByStatus([FromQuery] string paymentStatus , [FromQuery] int page = 1, [FromQuery] int size = 10)
+    {
+        var result = await _paymentService.GetPaymentsByStatus(paymentStatus, page, size);
+        return Ok(result);
+    }
 }
