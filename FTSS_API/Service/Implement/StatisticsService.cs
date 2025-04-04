@@ -140,13 +140,14 @@ public class StatisticsService : BaseService<StatisticsService>, IStatisticsServ
         var orders = await _unitOfWork.GetRepository<Order>().GetListAsync(
             include: o => o.Include(o => o.OrderDetails)
                 .ThenInclude(od => od.Product)
-                .ThenInclude(p => p.SubCategory),
+                .ThenInclude(p => p.SubCategory)
+                .ThenInclude(p => p.Category),
             predicate: o => o.CreateDate >= startDay && o.CreateDate <= endDay 
                                                      && o.Status.Equals(OrderStatus.COMPLETED.GetDescriptionFromEnum()));
 
         var salesData = orders
             .SelectMany(o => o.OrderDetails)
-            .GroupBy(od => od.Product.SubCategory.SubCategoryName) // Giả sử mỗi sản phẩm có một Category
+            .GroupBy(od => od.Product.SubCategory.Category.CategoryName) // Giả sử mỗi sản phẩm có một Category
             .Select(g => new CategorySalesResponse
             {
                 Category = g.Key,
