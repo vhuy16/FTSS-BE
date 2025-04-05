@@ -88,26 +88,26 @@ namespace FTSS_API.Controller;
      //         return Redirect("https://www.mrc.vn/payment/callback?status=failed");
      //     }
      // }
-     // [HttpPost("webhook-url")]
-     // public async Task<IActionResult> HandlePayOsWebhook([FromBody] WebhookType payload)
-     // {
-     //     try
-     //     {
-     //         var signatureFromPayOs = payload.signature; // Lấy signature từ body
-     //         var requestBody = JsonConvert.SerializeObject(payload);
-     //         var result = await _payOsService.HandlePayOsWebhook(payload);
-     //         if (result.IsSuccess)
-     //         {
-     //             return Ok();
-     //         }
-     //         return BadRequest(result.ErrorMessage);
-     //     }
-     //     catch (Exception ex)
-     //     {
-     //         _logger.LogError(ex, "An error occurred while handling webhook in controller.");
-     //         return StatusCode(StatusCodes.Status500InternalServerError, "An error occurred while processing the webhook.");
-     //     }
-     // }
+     [HttpPost("webhook-url")]
+     public async Task<IActionResult> HandlePayOsWebhook([FromBody] WebhookType payload)
+     {
+         try
+         {
+             var signatureFromPayOs = payload.signature; // Lấy signature từ body
+             var requestBody = JsonConvert.SerializeObject(payload);
+             var result = await _payOsService.HandlePayOsWebhook(payload);
+             if (result.IsSuccess)
+             {
+                 return Ok();
+             }
+             return BadRequest(result.ErrorMessage);
+         }
+         catch (Exception ex)
+         {
+             _logger.LogError(ex, "An error occurred while handling webhook in controller.");
+             return StatusCode(StatusCodes.Status500InternalServerError, "An error occurred while processing the webhook.");
+         }
+     }
 
      [HttpPost("cancleUrl")]
      public async Task<IActionResult> handleCanclePayment()
