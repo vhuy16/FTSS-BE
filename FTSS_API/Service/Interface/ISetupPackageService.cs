@@ -11,7 +11,7 @@ namespace FTSS_API.Service.Interface
         Task<ApiResponse> AddSetupPackage(List<ProductSetupItem> productids, AddSetupPackageRequest request, Supabase.Client client);
         Task<ApiResponse> GetListSetupPackage(int pageNumber, int pageSize, bool? isAscending);
         Task<ApiResponse> GetListSetupPackageAllUser(int pageNumber, int pageSize, bool? isAscending);
-        Task<ApiResponse> GetListSetupPackageAllShop(int pageNumber, int pageSize, bool? isAscending);
+        Task<ApiResponse> GetListSetupPackageAllShop(int pageNumber, int pageSize, bool? isAscending, double? minPrice, double? maxPrice);
         Task<ApiResponse> GetSetUpById(Guid id);
         Task<ApiResponse> RemoveSetupPackage(Guid id);
         Task<ApiResponse> CopySetupPackage(Guid setupPackageId);
