@@ -10,6 +10,7 @@ using FTSS_Model.Enum;
 using FTSS_Model.Paginate;
 using FTSS_Repository.Interface;
 using Microsoft.EntityFrameworkCore;
+using Org.BouncyCastle.Utilities;
 using Supabase.Gotrue;
 
 namespace FTSS_API.Service.Implement;
@@ -18,8 +19,10 @@ public class PaymentService : BaseService<PaymentService>, IPaymentService
 {
     private readonly IPayOSService _payOSService;
     private readonly IVnPayService _vnPayService;
-        
-    public PaymentService(IUnitOfWork<MyDbContext> unitOfWork, ILogger<PaymentService> logger, IMapper mapper, IHttpContextAccessor httpContextAccessor, IPayOSService payOsService, IVnPayService vnPayService) : base(unitOfWork, logger, mapper, httpContextAccessor)
+
+    public PaymentService(IUnitOfWork<MyDbContext> unitOfWork, ILogger<PaymentService> logger, IMapper mapper,
+        IHttpContextAccessor httpContextAccessor, IPayOSService payOsService, IVnPayService vnPayService) : base(
+        unitOfWork, logger, mapper, httpContextAccessor)
     {
         _payOSService = payOsService;
         _vnPayService = vnPayService;
@@ -105,15 +108,6 @@ public class PaymentService : BaseService<PaymentService>, IPaymentService
             paymentUrl = await _vnPayService.CreatePaymentUrl(request.OrderId, request.BookingId);
         }
 
-        if (string.IsNullOrEmpty(paymentUrl))
-        {
-            return new ApiResponse
-            {
-                data = string.Empty,
-                message = "Failed to create payment URL",
-                status = StatusCodes.Status500InternalServerError.ToString(),
-            };
-        }
 
         if (order == null && booking == null)
         {
@@ -155,126 +149,186 @@ public class PaymentService : BaseService<PaymentService>, IPaymentService
             data = new Dictionary<string, object>
             {
                 ["PaymentId"] = savedPayment.Id,
-                ["PaymentURL"] = paymentUrl,  // Đảm bảo luôn có key này
+                ["PaymentURL"] = paymentUrl, // Đảm bảo luôn có key này
                 ["Amount"] = savedPayment.AmountPaid
             }
         };
     }
-
-    public async Task<ApiResponse> UpdatePaymentStatus(Guid PaymentId, string newStatus)
-{
-    var payment = await _unitOfWork.GetRepository<Payment>().SingleOrDefaultAsync(predicate: o => o.Id == PaymentId);
-    if (payment == null)
+    public async Task<ApiResponse> GetPaymentsByStatus(string status, int page, int size)
     {
-        return new ApiResponse
-        {
-            status = StatusCodes.Status404NotFound.ToString(),
-            message = "Order not found",
-            data = null
-        };
-    }
+        var payments = await _unitOfWork.GetRepository<Payment>().GetPagingListAsync(
+            predicate: p => p.PaymentStatus == status,
+            selector: s => new CreatePaymentResponse()
+            {
+                Id = s.Id,
+                OrderId = s.OrderId,
+                PaymentMethod = s.PaymentMethod.ToString(),
+                AmoundPaid = s.AmountPaid,
+                PaymentStatus = s.PaymentStatus.ToString(),
+                PaymentDate = s.PaymentDate,
+            },
+            page: page,
+            size: size
+        );
 
-    payment.Status = newStatus;
-    _unitOfWork.GetRepository<Payment>().UpdateAsync(payment);
-    await _unitOfWork.CommitAsync();
+        int totalItems = payments.Total;
+        int totalPages = (int)Math.Ceiling((double)totalItems / size);
 
-    return new ApiResponse
-    {
-        status = StatusCodes.Status200OK.ToString(),
-        message = "Order status updated successfully",
-        data = payment
-    };
-}
-
-public async Task<ApiResponse> GetPaymentById(Guid paymentId)
-{
-    var payment = await _unitOfWork.GetRepository<Payment>().SingleOrDefaultAsync(
-       
-        predicate: o => o.Id.Equals(paymentId)
-      
-    );
-   
-    if (payment == null)
-    {
-        return new ApiResponse
-        {
-            status = StatusCodes.Status404NotFound.ToString(),
-            message = "Payment not found",
-            data = null
-
-        };
-    }
-
-    return new ApiResponse()
-    {
-        status = StatusCodes.Status200OK.ToString(),
-        data = payment,
-        message = "Payment retrieved successfully",
-    };
-}
-
-public async Task<ApiResponse> GetPaymentByOrderId(Guid orderId)
-{
-    var payment = await _unitOfWork.GetRepository<Payment>().SingleOrDefaultAsync(
-        predicate: o => o.Id.Equals(orderId)
-    );
-    if (payment == null)
-    {
-        return new ApiResponse
-        {
-            status = StatusCodes.Status404NotFound.ToString(),
-            message = "Payment not found",
-            data = null
-
-        };
-    }
-
-    return new ApiResponse()
-    {
-        status = StatusCodes.Status200OK.ToString(),
-        data = payment,
-        message = "Payment retrieved successfully",
-    };
-}
-
-public async Task<ApiResponse> GetPayments(int page, int size)
-{
-    var payments = await _unitOfWork.GetRepository<Payment>().GetPagingListAsync(
-        selector: s => new CreatePaymentResponse()
-        {
-            Id = s.Id,
-            OrderId = s.OrderId,
-            PaymentMethod = s.PaymentMethod.ToString(),
-            AmoundPaid = s.AmountPaid,
-            PaymentStatus = s.PaymentStatus.ToString(),
-            PaymentDate = s.PaymentDate,
-        },
-        page: page,
-        size: size
-    );
-    int totalItems = payments.Total;
-    int totalPages = (int)Math.Ceiling((double)totalItems / size);
-    if (payments == null || payments.Items.Count == 0)
-    {
         return new ApiResponse
         {
             status = StatusCodes.Status200OK.ToString(),
-            message = "Products retrieved successfully.",
-            data = new Paginate<Payment>()
+            message = payments.Items.Any() ? "Payments retrieved successfully." : "No payments found.",
+            data = new Paginate<CreatePaymentResponse>
             {
                 Page = page,
                 Size = size,
                 Total = totalItems,
                 TotalPages = totalPages,
-                Items = new List<Payment>()
+                Items = payments.Items
             }
         };
     }
-    return new ApiResponse
+
+    public async Task<ApiResponse> UpdatePaymentStatus(Guid PaymentId, string newStatus)
     {
-        status = StatusCodes.Status200OK.ToString(),
-        message = "Products retrieved successfully.",
-        data = payments
-    };
-}
+        var payment = await _unitOfWork.GetRepository<Payment>()
+            .SingleOrDefaultAsync(predicate: o => o.Id == PaymentId);
+        if (payment == null)
+        {
+            return new ApiResponse
+            {
+                status = StatusCodes.Status404NotFound.ToString(),
+                message = "Order not found",
+                data = null
+            };
+        }
+
+        payment.PaymentStatus = newStatus;
+        _unitOfWork.GetRepository<Payment>().UpdateAsync(payment);
+        await _unitOfWork.CommitAsync();
+
+        return new ApiResponse
+        {
+            status = StatusCodes.Status200OK.ToString(),
+            message = "Order status updated successfully",
+            data = payment
+        };
+    }
+
+    public async Task<ApiResponse> UpdateBankInfor(Guid paymentId, long? bankNumber, string bankName, string bankHolder)
+    {
+        var payment = await _unitOfWork.GetRepository<Payment>()
+            .SingleOrDefaultAsync(predicate: p => p.Id == paymentId);
+        if (payment == null)
+        {
+            return new ApiResponse
+            {
+                status = StatusCodes.Status404NotFound.ToString(),
+                message = "Payment not found",
+                data = null
+            };
+        }
+
+        payment.BankNumber = bankNumber;
+        payment.BankName = bankName;
+        payment.BankHolder = bankHolder;
+        _unitOfWork.GetRepository<Payment>().UpdateAsync(payment);
+        await _unitOfWork.CommitAsync();
+
+        return new ApiResponse
+        {
+            status = StatusCodes.Status200OK.ToString(),
+            message = "Bank information updated successfully",
+            data = payment
+        };
+    }
+
+    public async Task<ApiResponse> GetPaymentById(Guid paymentId)
+    {
+        var payment = await _unitOfWork.GetRepository<Payment>().SingleOrDefaultAsync(
+            predicate: o => o.Id.Equals(paymentId)
+        );
+
+        if (payment == null)
+        {
+            return new ApiResponse
+            {
+                status = StatusCodes.Status404NotFound.ToString(),
+                message = "Payment not found",
+                data = null
+            };
+        }
+
+        return new ApiResponse()
+        {
+            status = StatusCodes.Status200OK.ToString(),
+            data = payment,
+            message = "Payment retrieved successfully",
+        };
+    }
+
+    public async Task<ApiResponse> GetPaymentByOrderId(Guid orderId)
+    {
+        var payment = await _unitOfWork.GetRepository<Payment>().SingleOrDefaultAsync(
+            predicate: o => o.Id.Equals(orderId)
+        );
+        if (payment == null)
+        {
+            return new ApiResponse
+            {
+                status = StatusCodes.Status404NotFound.ToString(),
+                message = "Payment not found",
+                data = null
+            };
+        }
+
+        return new ApiResponse()
+        {
+            status = StatusCodes.Status200OK.ToString(),
+            data = payment,
+            message = "Payment retrieved successfully",
+        };
+    }
+
+    public async Task<ApiResponse> GetPayments(int page, int size)
+    {
+        var payments = await _unitOfWork.GetRepository<Payment>().GetPagingListAsync(
+            selector: s => new CreatePaymentResponse()
+            {
+                Id = s.Id,
+                OrderId = s.OrderId,
+                PaymentMethod = s.PaymentMethod.ToString(),
+                AmoundPaid = s.AmountPaid,
+                PaymentStatus = s.PaymentStatus.ToString(),
+                PaymentDate = s.PaymentDate,
+            },
+            page: page,
+            size: size
+        );
+        int totalItems = payments.Total;
+        int totalPages = (int)Math.Ceiling((double)totalItems / size);
+        if (payments == null || payments.Items.Count == 0)
+        {
+            return new ApiResponse
+            {
+                status = StatusCodes.Status200OK.ToString(),
+                message = "Products retrieved successfully.",
+                data = new Paginate<Payment>()
+                {
+                    Page = page,
+                    Size = size,
+                    Total = totalItems,
+                    TotalPages = totalPages,
+                    Items = new List<Payment>()
+                }
+            };
+        }
+
+        return new ApiResponse
+        {
+            status = StatusCodes.Status200OK.ToString(),
+            message = "Products retrieved successfully.",
+            data = payments
+        };
+    }
 }

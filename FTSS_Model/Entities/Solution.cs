@@ -20,4 +20,6 @@ public partial class Solution
     public Guid IssueId { get; set; }
 
     public virtual Issue Issue { get; set; } = null!;
+
+    public virtual ICollection<SolutionProduct> SolutionProducts { get; set; } = new List<SolutionProduct>();
 }

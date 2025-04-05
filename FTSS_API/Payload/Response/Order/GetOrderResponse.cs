@@ -17,10 +17,11 @@ namespace FTSS_API.Payload.Response.Order
         public string? PhoneNumber { get; set; }
         public string? BuyerName { get; set; }
         
-        public decimal Discount { get; set; }
+  
         public UserResponse userResponse { get; set; } // Fixed property declaration and removed invalid initialization
         public List<OrderDetailCreateResponse> OrderDetails { get; set; } = new List<OrderDetailCreateResponse>();
         public PaymentResponse Payment { get; set; } = new PaymentResponse();
+        public VoucherResponse Voucher { get; set; } = new VoucherResponse();
         public SetupPackageResponse? SetupPackage { get; set; } = new SetupPackageResponse();
         public class OrderDetailCreateResponse
         {
@@ -31,6 +32,14 @@ namespace FTSS_API.Payload.Response.Order
             public decimal? Price { get; set; }
             public int? Quantity { get; set; }
             public string LinkImage { get; set; } = null!;
+        }
+
+        public class VoucherResponse
+        {
+            public string VoucherCode { get; set; } = null!;
+            public string DiscountType { get; set; } = null!;
+            public decimal? Discount { get; set; }
+            public decimal? MaximumOrderValue  {get; set;}
         }
 
         public class UserResponse

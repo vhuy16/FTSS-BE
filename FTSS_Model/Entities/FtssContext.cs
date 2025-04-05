@@ -31,7 +31,6 @@ public partial class FtssContext : DbContext
 
     public virtual DbSet<IssueCategory> IssueCategories { get; set; }
 
-    public virtual DbSet<IssueProduct> IssueProducts { get; set; }
 
     public virtual DbSet<Mission> Missions { get; set; }
 
@@ -288,60 +287,6 @@ public partial class FtssContext : DbContext
                 .HasConstraintName("FK_Issue_IssueCategory");
         });
 
-        modelBuilder.Entity<IssueCategory>(entity =>
-        {
-            entity.HasKey(e => e.Id).HasName("PK__IssueCat__3213E83F148E615E");
-
-            entity.ToTable("IssueCategory");
-
-            entity.Property(e => e.Id)
-                .HasDefaultValueSql("(newid())")
-                .HasColumnName("id");
-            entity.Property(e => e.CreateDate)
-                .HasColumnType("datetime")
-                .HasColumnName("createDate");
-            entity.Property(e => e.Description).HasColumnName("description");
-            entity.Property(e => e.IsDelete)
-                .HasDefaultValue(false)
-                .HasColumnName("isDelete");
-            entity.Property(e => e.IssueCategoryName)
-                .HasMaxLength(255)
-                .HasColumnName("issueCategoryName");
-            entity.Property(e => e.ModifyDate)
-                .HasColumnType("datetime")
-                .HasColumnName("modifyDate");
-        });
-
-        modelBuilder.Entity<IssueProduct>(entity =>
-        {
-            entity.HasKey(e => e.Id).HasName("PK__IssuePro__3213E83FC41E020F");
-
-            entity.ToTable("IssueProduct");
-
-            entity.Property(e => e.Id)
-                .HasDefaultValueSql("(newid())")
-                .HasColumnName("id");
-            entity.Property(e => e.CreateDate)
-                .HasColumnType("datetime")
-                .HasColumnName("createDate");
-            entity.Property(e => e.Description).HasColumnName("description");
-            entity.Property(e => e.IssueId).HasColumnName("issueId");
-            entity.Property(e => e.ModifyDate)
-                .HasColumnType("datetime")
-                .HasColumnName("modifyDate");
-            entity.Property(e => e.ProductId).HasColumnName("productId");
-
-            entity.HasOne(d => d.Issue).WithMany(p => p.IssueProducts)
-                .HasForeignKey(d => d.IssueId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK__IssueProd__issue__2180FB33");
-
-            entity.HasOne(d => d.Product).WithMany(p => p.IssueProducts)
-                .HasForeignKey(d => d.ProductId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK__IssueProd__produ__0F624AF8");
-        });
-
         modelBuilder.Entity<Mission>(entity =>
         {
             entity.HasKey(e => e.Id).HasName("PK__Maintena__3213E83F3561400D");
@@ -508,7 +453,7 @@ public partial class FtssContext : DbContext
                 .HasMaxLength(50)
                 .IsUnicode(false)
                 .HasColumnName("paymentStatus");
-            entity.Property(e => e.Status)
+            entity.Property(e => e.PaymentStatus)
                 .HasMaxLength(50)
                 .IsUnicode(false)
                 .HasColumnName("status");

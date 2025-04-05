@@ -11,6 +11,7 @@ using FTSS_Model.Context;
 using FTSS_Model.Entities;
 using FTSS_Model.Enum;
 using FTSS_Repository.Interface;
+using Microsoft.AspNetCore.Mvc;
 using StackExchange.Redis;
 
 namespace FTSS_API.Service.Implement.Implement;
@@ -665,54 +666,70 @@ public class UserService : BaseService<UserService>, IUserService
             };
         }
     }
-    public async Task<ApiResponse> ResendOtp(string email)
+    public async Task<ApiResponse> ResendOtp([FromBody]string email)
     {
-        string emailPattern = @"^[^@\s]+@[^@\s]+\.[^@\s]+$";
-        if (!Regex.IsMatch(email, emailPattern))
+        
+        _logger.LogInformation($"Resending OTP for email: {email}");
+
+        // Check if the email exists
+        var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(predicate:u => u.Email == email);
+        if (user == null)
         {
-            return new ApiResponse()
+            return new ApiResponse
             {
                 status = StatusCodes.Status400BadRequest.ToString(),
-                message = "Email không đúng định dạng",
-                data = false
-            };
-        }
-
-        var account = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
-            predicate: u => u.Email.Equals(email));
-        if (account == null)
-        {
-            return new ApiResponse()
-            {
-                status = StatusCodes.Status404NotFound.ToString(),
-                message = "Email không tồn tại trong hệ thống",
+                message = "Email not found.",
                 data = null
             };
         }
 
-        var redisDb = _redis.GetDatabase();
-        if (redisDb == null)
-            throw new RedisServerException("Không thể kết nối tới Redis");
+        // Retrieve the latest OTP record for the user
+        var existingOtp = await _unitOfWork.GetRepository<Otp>()
+            .SingleOrDefaultAsync(predicate:o => o.UserId == user.Id && o.IsValid, orderBy: o => o.OrderByDescending(x => x.CreateDate));
 
-        var key = "emailOtp:" + email;
+        string otp;
+        if (existingOtp != null && existingOtp.ExpiresAt > TimeUtils.GetCurrentSEATime())
+        {
+            // OTP still valid, resend it
+            otp = existingOtp.OtpCode;
+        }
+        else
+        {
+            // Generate a new OTP
+            otp = OtpUltil.GenerateOtp();
 
-        await redisDb.KeyDeleteAsync(key);
+            // Invalidate the previous OTP
+            if (existingOtp != null)
+            {
+                existingOtp.IsValid = false;
+                _unitOfWork.GetRepository<Otp>().UpdateAsync(existingOtp);
+            }
 
-        
+            // Create a new OTP record
+            var newOtp = new Otp
+            {
+                Id = Guid.NewGuid(),
+                UserId = user.Id,
+                OtpCode = otp,
+                CreateDate = TimeUtils.GetCurrentSEATime(),
+                ExpiresAt = TimeUtils.GetCurrentSEATime().AddMinutes(10),
+                IsValid = true
+            };
 
-        string otp = OtpUltil.GenerateOtp();
+            await _unitOfWork.GetRepository<Otp>().InsertAsync(newOtp);
+        }
 
-        await _emailService.SendVerificationEmailAsync(email, otp);
+        await _unitOfWork.CommitAsync();
 
-        await redisDb.StringSetAsync(key, otp, TimeSpan.FromMinutes(5));
+        // Send the OTP email
+        await _emailService.SendVerificationEmailAsync(user.Email, otp);
 
-        return new ApiResponse()
+        return new ApiResponse
         {
             status = StatusCodes.Status200OK.ToString(),
-            message = "Gửi lại OTP thành công",
-            data = true
+            message = "OTP has been resent successfully.",
+            data = null
         };
-
 
     }
     public async Task<ApiResponse> ForgotPassword(ForgotPasswordRequest request)

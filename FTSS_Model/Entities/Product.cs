@@ -31,11 +31,11 @@ public partial class Product
 
     public virtual ICollection<Image> Images { get; set; } = new List<Image>();
 
-    public virtual ICollection<IssueProduct> IssueProducts { get; set; } = new List<IssueProduct>();
-
     public virtual ICollection<OrderDetail> OrderDetails { get; set; } = new List<OrderDetail>();
 
     public virtual ICollection<SetupPackageDetail> SetupPackageDetails { get; set; } = new List<SetupPackageDetail>();
+
+    public virtual ICollection<SolutionProduct> SolutionProducts { get; set; } = new List<SolutionProduct>();
 
     public virtual SubCategory? SubCategory { get; set; }
 }
