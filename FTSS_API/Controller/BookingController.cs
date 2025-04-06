@@ -214,5 +214,18 @@ namespace FTSS_API.Controller
             var response = await _bookingService.GetMissionById(missionid);
             return StatusCode(int.Parse(response.status), response);
         }
+        /// <summary>
+        /// API cập nhật thông tin mission cho user.
+        /// </summary>
+        [HttpPut(ApiEndPointConstant.Booking.UpdateBooking)]
+        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
+        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
+        [ProducesErrorResponseType(typeof(ProblemDetails))]
+        public async Task<IActionResult> UpdateBooking(Guid bookingid, [FromForm] UpdateBookingRequest request)
+        {
+            var response = await _bookingService.UpdateBooking(bookingid, request);
+            return StatusCode(int.Parse(response.status), response);
+        }
     }
 }

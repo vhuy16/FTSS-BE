@@ -165,5 +165,6 @@ public static class ApiEndPointConstant
         public const string GetBookingById = BookingEndPoint + "/{bookingid}";
         public const string UpdateMission = BookingEndPoint + "/update-mission/{missionid}";
         public const string GetMissionById = BookingEndPoint + "/get-mission-by-id/{missionid}";
+        public const string UpdateBooking = BookingEndPoint + "/update-booking/{bookingid}";
     }
 }
