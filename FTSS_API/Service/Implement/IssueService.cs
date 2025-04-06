@@ -15,71 +15,94 @@ public class IssueService : BaseService<IssueService>, IIssueService
     public IssueService(IUnitOfWork<MyDbContext> unitOfWork, ILogger<IssueService> logger, IMapper mapper, IHttpContextAccessor httpContextAccessor)
         : base(unitOfWork, logger, mapper, httpContextAccessor) {}
 
-    public async Task<ApiResponse> CreateIssue(AddUpdateIssueRequest request)
+public async Task<ApiResponse> CreateIssue(AddUpdateIssueRequest request)
+{
+    // Create the Issue without including Solutions in the mapping
+    var issue = new Issue
     {
-        var issue = _mapper.Map<Issue>(request);
-        issue.Id = Guid.NewGuid();
-        issue.CreateDate = DateTime.UtcNow;
-        issue.IsDelete = false;
+        Id = Guid.NewGuid(),
+        Title = request.Title,
+        Description = request.Description,
+        IssueCategoryId = request.IssueCategoryId,
+        CreateDate = DateTime.UtcNow,
+        IsDelete = false
+        // Don't map Solutions here
+    };
 
-        // Thêm Issue vào Database
-        await _unitOfWork.GetRepository<Issue>().InsertAsync(issue);
+    // Add Issue to Database
+    await _unitOfWork.GetRepository<Issue>().InsertAsync(issue);
 
-        // Xử lý danh sách solutions và products
-        if (request.Solutions != null && request.Solutions.Any())
+    // Process solutions and products list
+    if (request.Solutions != null && request.Solutions.Any())
+    {
+        var solutions = new List<Solution>();
+        var solutionProducts = new List<SolutionProduct>();
+
+        foreach (var solutionRequest in request.Solutions)
         {
-            var solutions = new List<Solution>();
-            var solutionProducts = new List<SolutionProduct>();
-
-            foreach (var solutionRequest in request.Solutions)
+            // Create new solution
+            var solution = new Solution
             {
-                // Tạo solution mới
-                var solution = new Solution
-                {
-                    Id = Guid.NewGuid(),
-                    SolutionName = solutionRequest.SolutionName,
-                    Description = solutionRequest.Description,
-                    IssueId = issue.Id,
-                    CreateDate = DateTime.UtcNow,
-                    IsDelete = false
-                };
-                solutions.Add(solution);
+                Id = Guid.NewGuid(),
+                SolutionName = solutionRequest.SolutionName,
+                Description = solutionRequest.Description,
+                IssueId = issue.Id,
+                CreateDate = DateTime.UtcNow,
+                IsDelete = false
+            };
+            solutions.Add(solution);
 
-                // Thêm các sản phẩm liên quan đến solution
-                if (solutionRequest.ProductIds != null && solutionRequest.ProductIds.Any())
+            // Add related products
+            if (solutionRequest.ProductIds != null && solutionRequest.ProductIds.Any())
+            {
+                foreach (var productId in solutionRequest.ProductIds)
                 {
-                    foreach (var productId in solutionRequest.ProductIds)
+                    solutionProducts.Add(new SolutionProduct
                     {
-                        solutionProducts.Add(new SolutionProduct
-                        {
-                            Id = Guid.NewGuid(),
-                            SolutionId = solution.Id,
-                            ProductId = productId,
-                            CreateDate = DateTime.UtcNow
-                        });
-                    }
+                        Id = Guid.NewGuid(),
+                        SolutionId = solution.Id,
+                        ProductId = productId,
+                        CreateDate = DateTime.UtcNow
+                    });
                 }
-            }
-
-            // Thêm solutions và solutionProducts vào database
-            await _unitOfWork.GetRepository<Solution>().InsertRangeAsync(solutions);
-            if (solutionProducts.Any())
-            {
-                await _unitOfWork.GetRepository<SolutionProduct>().InsertRangeAsync(solutionProducts);
             }
         }
 
-        // Commit transaction
-        bool isSuccessful = await _unitOfWork.CommitAsync() > 0;
-
-        return new ApiResponse
+        // Add solutions and solutionProducts to database
+        await _unitOfWork.GetRepository<Solution>().InsertRangeAsync(solutions);
+        if (solutionProducts.Any())
         {
-            status = isSuccessful ? StatusCodes.Status201Created.ToString() : StatusCodes.Status500InternalServerError.ToString(),
-            message = isSuccessful ? "Issue created successfully with solutions and related products." : "Failed to create Issue.",
-            data = _mapper.Map<IssueResponse>(issue)
-        };
+            await _unitOfWork.GetRepository<SolutionProduct>().InsertRangeAsync(solutionProducts);
+        }
     }
 
+    // Commit transaction
+    bool isSuccessful = await _unitOfWork.CommitAsync() > 0;
+
+    Issue createdIssue = null;
+    if (isSuccessful)
+    {
+        createdIssue = await _unitOfWork.GetRepository<Issue>()
+            .SingleOrDefaultAsync(
+                predicate: i => i.Id == issue.Id,
+                include: source => source
+                    .Include(i => i.IssueCategory)
+                    .Include(i => i.Solutions)
+                    .ThenInclude(s => s.SolutionProducts)
+                    .ThenInclude(sp => sp.Product)
+                    .ThenInclude(s => s.Images)
+                
+            );
+    }
+    
+    // Return the response
+    return new ApiResponse
+    {
+        status = StatusCodes.Status200OK.ToString(),
+        message = "Issue created successfully with solutions and related products.",
+        data = _mapper.Map<IssueResponse>(createdIssue)
+    };
+}
     public async Task<ApiResponse> GetAllIssues(int page, int size, bool? isAscending, Guid? issueCategoryId = null)
     {
         var issues = await _unitOfWork.GetRepository<Issue>().GetPagingListAsync(
@@ -111,10 +134,12 @@ public class IssueService : BaseService<IssueService>, IIssueService
                 : q.OrderByDescending(i => i.CreateDate),
             size: size,
             page: page,
-            include: i => i.Include(i => i.Solutions)
-                          .ThenInclude(s => s.SolutionProducts)
-                          .ThenInclude(sp => sp.Product)
-                          .Include(i => i.IssueCategory)
+            include: i => i.Include(i => i.IssueCategory)
+                .Include(i => i.Solutions)
+                .ThenInclude(s => s.SolutionProducts)
+                .ThenInclude(sp => sp.Product)
+                .ThenInclude(s => s.Images)
+            
         );
 
         int totalItems = issues.Total;
@@ -140,10 +165,11 @@ public class IssueService : BaseService<IssueService>, IIssueService
         var issue = await _unitOfWork.GetRepository<Issue>()
             .SingleOrDefaultAsync(
                 predicate: c => c.Id == id && c.IsDelete == false, 
-                include: i => i.Include(i => i.Solutions)
-                              .ThenInclude(s => s.SolutionProducts)
-                              .ThenInclude(sp => sp.Product)
-                              .Include(i => i.IssueCategory));
+                include: i => i.Include(i => i.IssueCategory)
+                    .Include(i => i.Solutions)
+                    .ThenInclude(s => s.SolutionProducts)
+                    .ThenInclude(sp => sp.Product)
+                    .ThenInclude(s => s.Images));
 
         if (issue == null)
         {
