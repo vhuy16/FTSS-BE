@@ -225,15 +225,17 @@ namespace FTSS_API.Service.Implement
             }
         }
 
-        public async Task<ApiResponse> GetListSetupPackageAllShop(int pageNumber, int pageSize, bool? isAscending)
+        public async Task<ApiResponse> GetListSetupPackageAllShop(int pageNumber, int pageSize, bool? isAscending, double? minPrice, double? maxPrice)
         {
             try
             {
-                // Lấy danh sách SetupPackage của User có Role là Manager
+                // Lấy danh sách SetupPackage của User có Role là Manager và chưa bị xóa
                 var setupPackagesQuery = await _unitOfWork.GetRepository<SetupPackage>().GetListAsync(
                     predicate: sp => sp.User != null &&
-                                     sp.User.Role == RoleEnum.Manager.GetDescriptionFromEnum(),
-                    // sp.IsDelete == false,
+                                     sp.User.Role == RoleEnum.Manager.GetDescriptionFromEnum() &&
+                                     sp.IsDelete == false &&
+                                     (!minPrice.HasValue || sp.Price >= (decimal)minPrice.Value) &&
+                                     (!maxPrice.HasValue || sp.Price <= (decimal)maxPrice.Value),
                     orderBy: sp => isAscending == true
                         ? sp.OrderBy(sp => sp.CreateDate)
                         : sp.OrderByDescending(sp => sp.CreateDate),
@@ -248,6 +250,9 @@ namespace FTSS_API.Service.Implement
 
                 // Tổng số bản ghi
                 var totalRecords = setupPackagesQuery.Count;
+
+                // Tính tổng số trang
+                var totalPages = (int)Math.Ceiling((double)totalRecords / pageSize);
 
                 // Phân trang
                 var pagedSetupPackages = setupPackagesQuery
@@ -278,7 +283,7 @@ namespace FTSS_API.Service.Implement
                         InventoryQuantity = spd.Product.Quantity,
                         Price = spd.Product.Price,
                         Status = spd.Product.Status,
-                        IsDelete = sp.IsDelete,
+                        IsDelete = spd.Product.IsDelete,
                         CategoryName = spd.Product.SubCategory?.Category?.CategoryName,
                         images = spd.Product.Images
                             .Where(img => img.IsDelete == false)
@@ -295,6 +300,7 @@ namespace FTSS_API.Service.Implement
                     data = new
                     {
                         TotalRecords = totalRecords,
+                        TotalPages = totalPages,
                         PageNumber = pageNumber,
                         PageSize = pageSize,
                         SetupPackages = responseList

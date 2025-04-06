@@ -94,11 +94,13 @@ namespace FTSS_API.Controller
         public async Task<IActionResult> GetListSetupPackageAllShop(
             [FromQuery] int? page = 1,
             [FromQuery] int? size = 10,
-            [FromQuery] bool? isAscending = null)
+            [FromQuery] bool? isAscending = null,
+            [FromQuery] double? minPrice = null,
+            [FromQuery] double? maxPrice = null)
         {
             int pageNumber = page ?? 1;
             int pageSize = size ?? 10;
-            var response = await _setupPackageService.GetListSetupPackageAllShop(pageNumber, pageSize, isAscending);
+            var response = await _setupPackageService.GetListSetupPackageAllShop(pageNumber, pageSize, isAscending, minPrice, maxPrice);
             if (response == null || response.data == null)
             {
                 return Problem(detail: MessageConstant.SetUpPackageMessage.SetUpPackageIsEmpty,
