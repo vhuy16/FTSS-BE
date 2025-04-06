@@ -64,7 +64,7 @@ namespace FTSS_API.Controller
         [ProducesErrorResponseType(typeof(ProblemDetails))]
         public async Task<IActionResult> GetIssue([FromRoute] Guid id)
         {
-            var response = await _issueService.GetIssue(id);
+            var response = await _issueService.GetIssueById(id);
             return StatusCode(int.Parse(response.status), response);
         }
 
