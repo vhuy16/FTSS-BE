@@ -40,6 +40,13 @@ namespace FTSS_API.Controller
                 return StatusCode(500, "Internal server error.");
             }
         }
+        [HttpGet("category-sales")]
+        public async Task<IActionResult> GetProductSalesByCategory([FromQuery] DateTime startDay, [FromQuery] DateTime endDay)
+        {
+            var result = await _statisticsService.GetProductSalesByCategory(startDay, endDay);
+            return Ok(result);
+        }
+
         [HttpGet("revenue")]
         [ProducesResponseType(typeof(MonthlyStatisticsResponse), StatusCodes.Status200OK)]
         [ProducesErrorResponseType(typeof(ProblemDetails))]

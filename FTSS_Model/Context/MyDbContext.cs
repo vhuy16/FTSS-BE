@@ -32,8 +32,6 @@ public partial class MyDbContext : DbContext
 
     public virtual DbSet<IssueCategory> IssueCategories { get; set; }
 
-    public virtual DbSet<IssueProduct> IssueProducts { get; set; }
-
     public virtual DbSet<Mission> Missions { get; set; }
 
     public virtual DbSet<Order> Orders { get; set; }
@@ -55,6 +53,8 @@ public partial class MyDbContext : DbContext
     public virtual DbSet<Shipment> Shipments { get; set; }
 
     public virtual DbSet<Solution> Solutions { get; set; }
+
+    public virtual DbSet<SolutionProduct> SolutionProducts { get; set; }
 
     public virtual DbSet<SubCategory> SubCategories { get; set; }
 
@@ -266,7 +266,7 @@ public partial class MyDbContext : DbContext
 
         modelBuilder.Entity<Issue>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__Issue__3213E83F71FEC19D");
+            entity.HasKey(e => e.Id).HasName("PK__tmp_ms_x__3213E83F8331A313");
 
             entity.ToTable("Issue");
 
@@ -284,6 +284,7 @@ public partial class MyDbContext : DbContext
             entity.Property(e => e.IssueName)
                 .HasMaxLength(255)
                 .HasColumnName("issueName");
+            entity.Property(e => e.ModifiedDate).HasColumnName("modifiedDate");
             entity.Property(e => e.Title)
                 .HasMaxLength(255)
                 .HasColumnName("title");
@@ -315,36 +316,6 @@ public partial class MyDbContext : DbContext
             entity.Property(e => e.ModifyDate)
                 .HasColumnType("datetime")
                 .HasColumnName("modifyDate");
-        });
-
-        modelBuilder.Entity<IssueProduct>(entity =>
-        {
-            entity.HasKey(e => e.Id).HasName("PK__IssuePro__3213E83FC41E020F");
-
-            entity.ToTable("IssueProduct");
-
-            entity.Property(e => e.Id)
-                .HasDefaultValueSql("(newid())")
-                .HasColumnName("id");
-            entity.Property(e => e.CreateDate)
-                .HasColumnType("datetime")
-                .HasColumnName("createDate");
-            entity.Property(e => e.Description).HasColumnName("description");
-            entity.Property(e => e.IssueId).HasColumnName("issueId");
-            entity.Property(e => e.ModifyDate)
-                .HasColumnType("datetime")
-                .HasColumnName("modifyDate");
-            entity.Property(e => e.ProductId).HasColumnName("productId");
-
-            entity.HasOne(d => d.Issue).WithMany(p => p.IssueProducts)
-                .HasForeignKey(d => d.IssueId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK__IssueProd__issue__2180FB33");
-
-            entity.HasOne(d => d.Product).WithMany(p => p.IssueProducts)
-                .HasForeignKey(d => d.ProductId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK__IssueProd__produ__0F624AF8");
         });
 
         modelBuilder.Entity<Mission>(entity =>
@@ -526,10 +497,6 @@ public partial class MyDbContext : DbContext
                 .HasMaxLength(50)
                 .IsUnicode(false)
                 .HasColumnName("paymentStatus");
-            entity.Property(e => e.Status)
-                .HasMaxLength(50)
-                .IsUnicode(false)
-                .HasColumnName("status");
 
             entity.HasOne(d => d.Booking).WithMany(p => p.Payments)
                 .HasForeignKey(d => d.BookingId)
@@ -725,7 +692,28 @@ public partial class MyDbContext : DbContext
             entity.HasOne(d => d.Issue).WithMany(p => p.Solutions)
                 .HasForeignKey(d => d.IssueId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK__Solution__issueI__31B762FC");
+                .HasConstraintName("FK__Solution__issueI__6BAEFA67");
+        });
+
+        modelBuilder.Entity<SolutionProduct>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PK__Solution__3214EC07976FE61E");
+
+            entity.ToTable("SolutionProduct");
+
+            entity.Property(e => e.Id).HasDefaultValueSql("(newid())");
+            entity.Property(e => e.CreateDate)
+                .HasDefaultValueSql("(getdate())")
+                .HasColumnType("datetime");
+            entity.Property(e => e.ModifyDate).HasColumnType("datetime");
+
+            entity.HasOne(d => d.Product).WithMany(p => p.SolutionProducts)
+                .HasForeignKey(d => d.ProductId)
+                .HasConstraintName("FK__SolutionP__Produ__7DCDAAA2");
+
+            entity.HasOne(d => d.Solution).WithMany(p => p.SolutionProducts)
+                .HasForeignKey(d => d.SolutionId)
+                .HasConstraintName("FK__SolutionP__Solut__7CD98669");
         });
 
         modelBuilder.Entity<SubCategory>(entity =>

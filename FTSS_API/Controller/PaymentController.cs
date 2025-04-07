@@ -61,6 +61,16 @@ public class PaymentController : BaseController<PaymentController>
 
         return result.status == StatusCodes.Status200OK.ToString() ? Ok(result) : BadRequest(result);
     }
+    [HttpPut(ApiEndPointConstant.Payment.UpdateBankInfor)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UpdateBankInfor(Guid paymentId, long? bankNumber, string bankName, string bankHolder)
+    {
+        var result = await _paymentService.UpdateBankInfor(paymentId, bankNumber, bankName, bankHolder);
+
+        return result.status == StatusCodes.Status200OK.ToString() ? Ok(result) : BadRequest(result);
+    }
 
     /// <summary>
     /// API lấy Payment theo id
@@ -94,5 +104,10 @@ public class PaymentController : BaseController<PaymentController>
         var result = await _paymentService.GetPayments(page, size);
         return Ok(result);
     }
-    
+    [HttpGet(ApiEndPointConstant.Payment.GetPaymentByStatus)]
+    public async Task<IActionResult> GetPaymentsByStatus([FromQuery] string paymentStatus , [FromQuery] int page = 1, [FromQuery] int size = 10)
+    {
+        var result = await _paymentService.GetPaymentsByStatus(paymentStatus, page, size);
+        return Ok(result);
+    }
 }

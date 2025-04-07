@@ -135,4 +135,27 @@ public class StatisticsService : BaseService<StatisticsService>, IStatisticsServ
 
         return result;
     }
+    public async Task<List<CategorySalesResponse>> GetProductSalesByCategory(DateTime startDay, DateTime endDay)
+    {
+        var orders = await _unitOfWork.GetRepository<Order>().GetListAsync(
+            include: o => o.Include(o => o.OrderDetails)
+                .ThenInclude(od => od.Product)
+                .ThenInclude(p => p.SubCategory)
+                .ThenInclude(p => p.Category),
+            predicate: o => o.CreateDate >= startDay && o.CreateDate <= endDay 
+                                                     && o.Status.Equals(OrderStatus.COMPLETED.GetDescriptionFromEnum()));
+
+        var salesData = orders
+            .SelectMany(o => o.OrderDetails)
+            .GroupBy(od => od.Product.SubCategory.Category.CategoryName) // Giả sử mỗi sản phẩm có một Category
+            .Select(g => new CategorySalesResponse
+            {
+                Category = g.Key,
+                ProductQuantity = g.Sum(od => od.Quantity)
+            })
+            .ToList();
+
+        return salesData;
+    }
+
 }

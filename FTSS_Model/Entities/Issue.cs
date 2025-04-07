@@ -15,13 +15,13 @@ public partial class Issue
 
     public DateTime? CreateDate { get; set; }
 
+    public DateTime? ModifiedDate { get; set; }
+
     public bool? IsDelete { get; set; }
 
     public Guid? IssueCategoryId { get; set; }
 
     public virtual IssueCategory? IssueCategory { get; set; }
-
-    public virtual ICollection<IssueProduct> IssueProducts { get; set; } = new List<IssueProduct>();
 
     public virtual ICollection<Solution> Solutions { get; set; } = new List<Solution>();
 }
