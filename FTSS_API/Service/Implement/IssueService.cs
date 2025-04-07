@@ -109,37 +109,49 @@ public class IssueService : BaseService<IssueService>, IIssueService
         };
     }
 
-    public async Task<ApiResponse> GetAllIssues(int page, int size, bool? isAscending, Guid? issueCategoryId = null)
+    public async Task<ApiResponse> GetAllIssues(int page, int size, bool? isAscending, Guid? issueCategoryId = null, string issueTitle = null)
     {
-        // Bắt đầu với predicate cơ bản
-        Expression<Func<Issue, bool>> predicate = i => (bool)!i.IsDelete;
+        Expression<Func<Issue, bool>> predicate = i => i.IsDelete == false;
 
-        // Nếu có lọc theo category
         if (issueCategoryId.HasValue)
         {
-            // Gộp predicate lại bằng cách dùng ExpressionExtension (LinqKit hoặc thủ công)
             predicate = predicate.And(i => i.IssueCategoryId == issueCategoryId.Value);
         }
 
-        // Order by
+        // Lọc theo tên của IssueCategory
+        if (!string.IsNullOrEmpty(issueTitle))
+        {
+            predicate = predicate.And(i => i.Title.Contains(issueTitle));
+        }
+
         Func<IQueryable<Issue>, IOrderedQueryable<Issue>> orderBy = null;
         if (isAscending.HasValue)
         {
-            if (isAscending.Value)
-                orderBy = q => q.OrderBy(i => i.CreateDate);
-            else
-                orderBy = q => q.OrderByDescending(i => i.CreateDate);
+            orderBy = isAscending.Value
+                ? q => q.OrderBy(i => i.CreateDate)
+                : q => q.OrderByDescending(i => i.CreateDate);
         }
 
-        // Gọi lại hàm GetPagingListAsync
         var issues = await _unitOfWork.GetRepository<Issue>()
-            .GetPagingListAsync(predicate, orderBy, null, page, size);
+            .GetPagingListAsync(
+                predicate,
+                orderBy,
+                include: i => i
+                    .Include(i => i.IssueCategory) // ✅ Cần include để filter theo Name
+                    .Include(i => i.Solutions.Where(s => s.IsDelete == false))
+                    .ThenInclude(s => s.SolutionProducts)
+                    .ThenInclude(sp => sp.Product)
+                    .ThenInclude(p => p.Images),
+                page,
+                size);
+
+        var mapped = _mapper.Map<List<IssueResponse>>(issues.Items);
 
         return new ApiResponse
         {
             status = StatusCodes.Status200OK.ToString(),
             message = "Lấy danh sách vấn đề thành công",
-            data = issues
+            data = mapped
         };
     }
 
@@ -150,7 +162,7 @@ public class IssueService : BaseService<IssueService>, IIssueService
                 predicate: i => i.Id == id && i.IsDelete == false,
                 include: source => source
                     .Include(i => i.IssueCategory)
-                    .Include(i => i.Solutions.Where(s => i.IsDelete == false))
+                    .Include(i => i.Solutions.Where(s => s.IsDelete == false))
                     .ThenInclude(s => s.SolutionProducts)
                     .ThenInclude(sp => sp.Product)
                     .ThenInclude(p => p.Images)
@@ -174,7 +186,6 @@ public class IssueService : BaseService<IssueService>, IIssueService
             data = mappedIssue
         };
     }
-
 
  public async Task<ApiResponse> UpdateIssue(Guid id, AddUpdateIssueRequest request)
 {
