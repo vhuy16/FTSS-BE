@@ -4,5 +4,7 @@ public enum BookingStatusEnum
 {
     NOTPAID,
     PAID,
-    FREE
+    FREE,
+    REFUNDING,
+    REFUNDED
 }

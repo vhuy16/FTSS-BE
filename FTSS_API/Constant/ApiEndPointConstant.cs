@@ -178,5 +178,7 @@ public static class ApiEndPointConstant
         public const string UpdateMission = BookingEndPoint + "/update-mission/{missionid}";
         public const string GetMissionById = BookingEndPoint + "/get-mission-by-id/{missionid}";
         public const string UpdateBooking = BookingEndPoint + "/update-booking/{bookingid}";
+        public const string CancelBooking = BookingEndPoint + "/cancel-booking/{bookingid}";
+        public const string UpdateBookingStatus = BookingEndPoint + "/update-booking-status/{bookingid}";
     }
 }

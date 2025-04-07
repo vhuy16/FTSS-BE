@@ -7,7 +7,7 @@
         public DateTime? ScheduleDate { get; set; }
 
         public string? Status { get; set; }
-
+        public string? MissionStatus { get; set; }
         public string? Address { get; set; }
         public string? BookingCode { get; set; }
 
