@@ -14,5 +14,5 @@ public interface IPayOSService
     Task<Result> HandlePayOsWebhook(WebhookType webhookBody);
     Task<ApiResponse> ConfirmWebhook(string webhookUrl);
     Task<ApiResponse> HandleFailedPayment(Guid orderCode);
-    Task<ApiResponse> HandleSuccessfulPayment(Guid orderCode);
+    Task<ApiResponse> HandleSuccessfulPayment(string orderCode);
 }

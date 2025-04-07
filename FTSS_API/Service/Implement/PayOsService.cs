@@ -284,10 +284,10 @@ public class PayOsService : BaseService<PayOsService>, IPayOSService
         };
     }
 
-    public async Task<ApiResponse> HandleSuccessfulPayment(Guid orderCode)
+    public async Task<ApiResponse> HandleSuccessfulPayment(string orderCode)
     {
         var payment = await _unitOfWork.GetRepository<Payment>()
-            .SingleOrDefaultAsync(predicate: p => p.Id.Equals(orderCode));
+            .SingleOrDefaultAsync(predicate: p => p.OrderCode.Equals(orderCode));
         if (payment == null)
         {
             return new ApiResponse()
