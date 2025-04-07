@@ -109,7 +109,7 @@ namespace FTSS_API.Controller;
          }
      }
 
-     [HttpPost("cancleUrl")]
+     [HttpGet("cancleUrl")]
      public async Task<IActionResult> handleCanclePayment()
      {
          string  status = Request.Query["status"].ToString();
@@ -122,7 +122,7 @@ namespace FTSS_API.Controller;
          }
          return Redirect("https://ftss.id.vn/api/v1/cancleUrl");
      }
-     [HttpPost("successUrl")]
+     [HttpGet("successUrl")]
      public async Task<IActionResult> handleSuccessPayment()
      {
          string  status = Request.Query["status"].ToString();
