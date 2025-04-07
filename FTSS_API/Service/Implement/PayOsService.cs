@@ -200,17 +200,17 @@ public class PayOsService : BaseService<PayOsService>, IPayOSService
                 return Result.Failure("Payment not found");
             }
 
-            if (webhookBody.data.code == "00" && webhookBody.success)
-            {
-                if (existingPayment.Order.Id != null)
-                {
-                    await HandleSuccessfulPayment(existingPayment);
-                }
-                else if (existingPayment.BookingId != null)
-                {
-                    await HandleSuccessfulBookingPayment(existingPayment);
-                }
-            }
+            // if (webhookBody.data.code == "00" && webhookBody.success)
+            // {
+            //     if (existingPayment.Order.Id != null)
+            //     {
+            //         await HandleSuccessfulPayment(existingPayment);
+            //     }
+            //     else if (existingPayment.BookingId != null)
+            //     {
+            //         await HandleSuccessfulBookingPayment(existingPayment);
+            //     }
+            // }
 
             await _unitOfWork.CommitAsync();
             _logger.LogInformation("Successfully processed webhook for orderCode: {OrderCode}",
@@ -284,8 +284,20 @@ public class PayOsService : BaseService<PayOsService>, IPayOSService
         };
     }
 
-    private async Task HandleSuccessfulPayment(Payment payment)
+    public async Task<ApiResponse> HandleSuccessfulPayment(Guid orderCode)
     {
+        var payment = await _unitOfWork.GetRepository<Payment>()
+            .SingleOrDefaultAsync(predicate: p => p.Id.Equals(orderCode));
+        if (payment == null)
+        {
+            return new ApiResponse()
+            {
+                data = null,
+                message = "Payment could not be found",
+                status = StatusCodes.Status404NotFound.ToString()
+            };
+        }
+
         payment.PaymentStatus = PaymentStatusEnum.Completed.ToString();
         payment.PaymentDate = DateTime.UtcNow;
 
@@ -331,9 +343,17 @@ public class PayOsService : BaseService<PayOsService>, IPayOSService
         _unitOfWork.GetRepository<Order>().UpdateAsync(order);
 
         _unitOfWork.GetRepository<Payment>().UpdateAsync(payment);
-    }
+        _unitOfWork.CommitAsync();
+        return new ApiResponse()
+        {
+            data = payment,
+            message = "Payment completed successfully",
+            status = StatusCodes.Status200OK.ToString()
+        };
+    
+}
 
-    public async Task<ApiResponse> HandleFailedPayment(Guid orderCode)
+public async Task<ApiResponse> HandleFailedPayment(Guid orderCode)
     {
         var payment = await _unitOfWork.GetRepository<Payment>()
             .SingleOrDefaultAsync(predicate: p => p.Id.Equals(orderCode));
