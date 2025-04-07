@@ -284,7 +284,7 @@ public class PayOsService : BaseService<PayOsService>, IPayOSService
         };
     }
 
-    public async Task<ApiResponse> HandleSuccessfulPayment(string orderCode)
+    public async Task<ApiResponse> HandleSuccessfulPayment(long orderCode)
     {
         var payment = await _unitOfWork.GetRepository<Payment>()
             .SingleOrDefaultAsync(predicate: p => p.OrderCode.Equals(orderCode));
