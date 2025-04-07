@@ -88,7 +88,7 @@ namespace FTSS_API.Controller;
      //         return Redirect("https://www.mrc.vn/payment/callback?status=failed");
      //     }
      // }
-     [HttpPost("webhook-url")]
+     [HttpPost("webhook-uri")]
      public async Task<IActionResult> HandlePayOsWebhook([FromBody] WebhookType payload)
      {
          try
