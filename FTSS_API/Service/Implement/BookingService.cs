@@ -1536,5 +1536,108 @@ namespace FTSS_API.Service.Implement
                 };
             }
         }
+        public async Task<ApiResponse> UpdateBooking(Guid bookingId, UpdateBookingRequest request)
+        {
+            try
+            {
+                // Lấy UserId từ HttpContext
+                Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
+                var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
+                    predicate: u => u.Id.Equals(userId) &&
+                                    u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) &&
+                                    u.IsDelete == false &&
+                                    u.Role.Equals(RoleEnum.Customer.GetDescriptionFromEnum()));
+
+                if (user == null)
+                {
+                    throw new BadHttpRequestException("Bạn không có quyền thực hiện thao tác này.");
+                }
+                var bookingRepo = _unitOfWork.GetRepository<Booking>();
+                var bookingDetailRepo = _unitOfWork.GetRepository<BookingDetail>();
+                var serviceRepo = _unitOfWork.GetRepository<ServicePackage>();
+
+                var booking = await bookingRepo.SingleOrDefaultAsync(
+                    predicate: b => b.Id == bookingId && b.IsAssigned == false);
+
+                if (booking == null)
+                {
+                    return new ApiResponse
+                    {
+                        status = StatusCodes.Status404NotFound.ToString(),
+                        message = "Không tìm thấy booking hoặc booking đã được phân công.",
+                        data = null
+                    };
+                }
+                if (booking.UserId != userId)
+                {
+                    return new ApiResponse
+                    {
+                        status = StatusCodes.Status403Forbidden.ToString(),
+                        message = "Bạn không có quyền cập nhật booking này.",
+                        data = null
+                    };
+                }
+
+                // Cập nhật các trường nếu được truyền
+                if (request.ScheduleDate.HasValue)
+                {
+                    if (request.ScheduleDate <= TimeUtils.GetCurrentSEATime())
+                    {
+                        return new ApiResponse
+                        {
+                            status = StatusCodes.Status400BadRequest.ToString(),
+                            message = "Ngày lịch trình phải sau thời gian hiện tại.",
+                            data = null
+                        };
+                    }
+                    booking.ScheduleDate = request.ScheduleDate;
+                }
+
+                if (!string.IsNullOrWhiteSpace(request.Address))
+                {
+                    booking.Address = request.Address;
+                }
+
+                if (!string.IsNullOrWhiteSpace(request.PhoneNumber))
+                {
+                    string phonePattern = @"^0\d{9}$";
+                    if (!Regex.IsMatch(request.PhoneNumber, phonePattern))
+                    {
+                        return new ApiResponse
+                        {
+                            status = StatusCodes.Status400BadRequest.ToString(),
+                            message = "Số điện thoại không hợp lệ.",
+                            data = null
+                        };
+                    }
+                    booking.PhoneNumber = request.PhoneNumber;
+                }
+
+                if (!string.IsNullOrWhiteSpace(request.FullName))
+                {
+                    booking.FullName = request.FullName;
+                }
+
+                bookingRepo.UpdateAsync(booking);
+                await _unitOfWork.CommitAsync();
+
+                return new ApiResponse
+                {
+                    status = StatusCodes.Status200OK.ToString(),
+                    message = "Cập nhật booking thành công.",
+                    data = null
+                };
+            }
+            catch (Exception ex)
+            {
+                return new ApiResponse
+                {
+                    status = StatusCodes.Status500InternalServerError.ToString(),
+                    message = "Đã xảy ra lỗi khi cập nhật booking.",
+                    data = ex.Message
+                };
+            }
+        }
+
     }
 }
