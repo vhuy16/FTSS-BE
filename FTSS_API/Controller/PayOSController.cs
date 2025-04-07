@@ -122,6 +122,19 @@ namespace FTSS_API.Controller;
          }
          return Redirect("https://ftss.id.vn/api/v1/cancleUrl");
      }
+     [HttpPost("successUrl")]
+     public async Task<IActionResult> handleSuccessPayment()
+     {
+         string  status = Request.Query["status"].ToString();
+         string id = Request.Query["id"].ToString();
+         string orderCode = Request.Query["orderCode"];
+         if (status == "PAID")
+         {
+             var response = await _payOsService.HandleSuccessfulPayment(Guid.Parse(orderCode));
+             return Redirect("https://ftss-fe.vercel.app/paymentSuccess");
+         }
+         return Redirect("https://ftss-fe.vercel.app/paymentSuccess");
+     }
      
      [HttpPost("confirm-webhook")]
      public async Task<IActionResult> ConfirmWebhook()
