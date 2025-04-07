@@ -11,6 +11,6 @@ public interface IIssueService
     Task<ApiResponse> GetAllIssues(int page, int size, bool? isAscending, Guid? issueCategoryId = null,
         string issueTitle = null);
     Task<ApiResponse> GetIssueById(Guid id);
-    Task<ApiResponse> UpdateIssue(Guid id, AddUpdateIssueRequest request);
+    Task<ApiResponse> UpdateIssue(Guid id, AddUpdateIssueRequest request, Client client);
     Task<ApiResponse> DeleteIssue(Guid id);
 }

@@ -8,6 +8,7 @@ public class IssueResponse
     public string Description { get; set; }
     public Guid? IssueCategoryId { get; set; }
     public string IssueCategoryName { get; set; }
+    public string IssueImage { get; set; }
     public DateTime? CreateDate { get; set; }
     public DateTime? ModifiedDate { get; set; }
     public List<SolutionResponse> Solutions { get; set; } = new List<SolutionResponse>();
