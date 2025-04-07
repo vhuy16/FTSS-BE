@@ -130,7 +130,7 @@ namespace FTSS_API.Controller;
          string orderCode = Request.Query["orderCode"];
          if (status == "PAID")
          {
-             var response = await _payOsService.HandleSuccessfulPayment(Guid.Parse(orderCode));
+             var response = await _payOsService.HandleSuccessfulPayment(orderCode);
              return Redirect("https://ftss-fe.vercel.app/paymentSuccess");
          }
          return Redirect("https://ftss-fe.vercel.app/paymentSuccess");

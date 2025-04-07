@@ -101,6 +101,7 @@ public class PaymentService : BaseService<PaymentService>, IPaymentService
             if (result.IsSuccess && result.Value != null)
             {
                 paymentUrl = result.Value.checkoutUrl;
+                orderCode = result.Value.orderCode;
             }
         }
         else if (paymentMethod == PaymenMethodEnum.VnPay.GetDescriptionFromEnum())
