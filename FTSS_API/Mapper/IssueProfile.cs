@@ -12,8 +12,9 @@ public class IssueProfile : Profile
             .ForMember(dest => dest.CreateDate, opt => opt.Ignore())
             .ForMember(dest => dest.ModifiedDate, opt => opt.Ignore())
             .ForMember(dest => dest.IsDelete, opt => opt.Ignore())
-            .ForMember(dest => dest.Solutions, opt => opt.Ignore()); // Bỏ qua Solutions để tránh tạo tự động
-
+            .ForMember(dest => dest.Solutions, opt => opt.Ignore())
+            .ForMember(dest => dest.IssueImage, opt => opt.Ignore());; // Bỏ qua Solutions để tránh tạo tự động
+            
         // Sửa ánh xạ SolutionRequest để không tạo thừa solution
         CreateMap<SolutionRequest, Solution>()
             .ForMember(dest => dest.Id, opt => opt.Ignore())

@@ -11,6 +11,8 @@ public class AddUpdateIssueRequest
 
     [Required]
     public Guid IssueCategoryId { get; set; }
+    
+    public IFormFile? IssueImage { get; set; }
 
     public List<SolutionRequest> Solutions { get; set; } = new List<SolutionRequest>();
 }
