@@ -46,12 +46,13 @@ namespace FTSS_API.Controller
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
         [ProducesErrorResponseType(typeof(ProblemDetails))]
         public async Task<IActionResult> GetAllIssues(
+            [FromQuery] string? issueTitle = null,
             [FromQuery] int page = 1,
             [FromQuery] int size = 10,
             [FromQuery] bool? isAscending = null,
             [FromQuery] Guid? issueCategoryId = null)
         {
-            var response = await _issueService.GetAllIssues(page, size, isAscending, issueCategoryId);
+            var response = await _issueService.GetAllIssues(page, size, isAscending, issueCategoryId, issueTitle);
             return Ok(response);
         }
 
@@ -64,7 +65,7 @@ namespace FTSS_API.Controller
         [ProducesErrorResponseType(typeof(ProblemDetails))]
         public async Task<IActionResult> GetIssue([FromRoute] Guid id)
         {
-            var response = await _issueService.GetIssue(id);
+            var response = await _issueService.GetIssueById(id);
             return StatusCode(int.Parse(response.status), response);
         }
 
