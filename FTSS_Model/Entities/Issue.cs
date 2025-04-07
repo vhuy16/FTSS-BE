@@ -21,6 +21,8 @@ public partial class Issue
 
     public Guid? IssueCategoryId { get; set; }
 
+    public string? IssueImage { get; set; }
+
     public virtual IssueCategory? IssueCategory { get; set; }
 
     public virtual ICollection<Solution> Solutions { get; set; } = new List<Solution>();

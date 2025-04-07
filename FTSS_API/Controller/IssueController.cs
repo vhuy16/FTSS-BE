@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging;
 using System;
 using System.Threading.Tasks;
 using FTSS_API.Payload.Request;
+using Supabase;
 
 namespace FTSS_API.Controller
 {
@@ -29,9 +30,9 @@ namespace FTSS_API.Controller
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status201Created)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
         [ProducesErrorResponseType(typeof(ProblemDetails))]
-        public async Task<IActionResult> CreateIssue([FromBody] AddUpdateIssueRequest request)
+        public async Task<IActionResult> CreateIssue([FromForm] AddUpdateIssueRequest request, Client client)
         {
-            var response = await _issueService.CreateIssue(request);
+            var response = await _issueService.CreateIssue(request, client);
             if (response.status == StatusCodes.Status400BadRequest.ToString())
             {
                 return BadRequest(response);

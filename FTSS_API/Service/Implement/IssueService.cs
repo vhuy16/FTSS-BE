@@ -6,23 +6,34 @@ using FTSS_API.Payload.Response.Issue;
 using FTSS_API.Payload.Response.SetupPackage;
 using FTSS_API.Service.Implement;
 using FTSS_API.Service.Interface;
+using FTSS_API.Utils;
 using FTSS_Model.Context;
 using FTSS_Model.Entities;
 using FTSS_Model.Paginate;
 using LinqKit;
 using FTSS_Repository.Interface;
 using Microsoft.EntityFrameworkCore;
+using Supabase.Storage;
+using Client = Supabase.Client;
 
 public class IssueService : BaseService<IssueService>, IIssueService
-{
-    public IssueService(IUnitOfWork<MyDbContext> unitOfWork, ILogger<IssueService> logger, IMapper mapper,
+{ 
+    private readonly SupabaseUltils _supabaseImageService;
+    public IssueService(IUnitOfWork<MyDbContext> unitOfWork, ILogger<IssueService> logger, IMapper mapper, SupabaseUltils supabaseImageService,
         IHttpContextAccessor httpContextAccessor)
         : base(unitOfWork, logger, mapper, httpContextAccessor)
     {
+        _supabaseImageService = supabaseImageService;
     }
 
-    public async Task<ApiResponse> CreateIssue(AddUpdateIssueRequest request)
-    {
+    public async Task<ApiResponse> CreateIssue(AddUpdateIssueRequest request, Client client)
+    {string issueImage = null;
+
+        if (request.IssueImage != null)
+        {
+            var imageUrls = await _supabaseImageService.SendImagesAsync(new List<IFormFile> { request.IssueImage }, client);
+            issueImage = imageUrls.FirstOrDefault(); // Vì chỉ có 1 ảnh
+        }
         // Create the Issue without including Solutions in the mapping
         var issue = new Issue
         {
@@ -31,7 +42,8 @@ public class IssueService : BaseService<IssueService>, IIssueService
             Description = request.Description,
             IssueCategoryId = request.IssueCategoryId,
             CreateDate = DateTime.UtcNow,
-            IsDelete = false
+            IsDelete = false,
+            IssueImage = issueImage,
             // Don't map Solutions here
         };
 
@@ -146,14 +158,28 @@ public class IssueService : BaseService<IssueService>, IIssueService
                 size);
 
         var mapped = _mapper.Map<List<IssueResponse>>(issues.Items);
+        
+        int totalItems = issues.Total;  // Total number of items without pagination
+        int totalPages = (int)Math.Ceiling((double)totalItems / size);  // Calculate total pages
+
+        // Paginate result
+        var paginatedResult = new Paginate<IssueResponse>
+        {
+            Page = page,
+            Size = size,
+            Total = totalItems,
+            TotalPages = totalPages,
+            Items = mapped
+        };
 
         return new ApiResponse
         {
             status = StatusCodes.Status200OK.ToString(),
-            message = "Lấy danh sách vấn đề thành công",
-            data = mapped
+            message = "Issues retrieved successfully.",
+            data = paginatedResult
         };
     }
+
 
     public async Task<ApiResponse> GetIssueById(Guid id)
     {
@@ -187,158 +213,183 @@ public class IssueService : BaseService<IssueService>, IIssueService
         };
     }
 
- public async Task<ApiResponse> UpdateIssue(Guid id, AddUpdateIssueRequest request)
+public async Task<ApiResponse> UpdateIssue(Guid id, AddUpdateIssueRequest request)
 {
-    // var existingIssue = await _unitOfWork.GetRepository<Issue>()
-    //     .Where(i => i.Id == id && i.IsDelete == false)
-    //     .Include(i => i.Solutions)
-    //         .ThenInclude(s => s.Products)  // Include Products for each Solution
-    //     .Include(i => i.Category) // Include Issue Category (for IssueCategoryName)
-    //     .FirstOrDefaultAsync();
-    var existingIssue = await _unitOfWork.GetRepository<Issue>()
-        .SingleOrDefaultAsync(
-            predicate: i => i.Id == id && i.IsDelete == false,
-            include: i => i.Include(i => i.Solutions)
-                .ThenInclude(s => s.SolutionProducts)
-                .Include(i => i.IssueCategory)
-        );
-
-    if (existingIssue == null)
-        return new ApiResponse { status = StatusCodes.Status404NotFound.ToString(), message = "Issue not found." };
-
-    // Update issue properties
-    _mapper.Map(request, existingIssue);
-    existingIssue.ModifiedDate = DateTime.UtcNow;
-
-    // Handle solutions update
-    if (request.Solutions != null)
+    try
     {
-        // Get existing solutions
-        var existingSolutions = existingIssue.Solutions?.ToList() ?? new List<Solution>();
+        // Get existing issue with all related data needed for the update
+        var existingIssue = await _unitOfWork.GetRepository<Issue>()
+            .SingleOrDefaultAsync(
+                predicate: i => i.Id == id && i.IsDelete == false,
+                include: i => i
+                    .Include(i => i.IssueCategory)
+                    .Include(i => i.Solutions.Where(s => s.IsDelete == false))
+                    .ThenInclude(s => s.SolutionProducts)
+                    .ThenInclude(sp => sp.Product)
+                    .ThenInclude(p => p.Images)
+            );
 
-        // Process solutions to add or update
-        foreach (var solutionRequest in request.Solutions)
+        if (existingIssue == null)
         {
-            var existingSolution = existingSolutions.FirstOrDefault(s => s.Id == solutionRequest.Id);
+            return new ApiResponse 
+            { 
+                status = StatusCodes.Status404NotFound.ToString(), 
+                message = "Issue not found." 
+            };
+        }
 
-            if (existingSolution != null)
+        // Update issue properties
+        existingIssue.Title = request.Title;
+        existingIssue.Description = request.Description;
+        existingIssue.IssueCategoryId = request.IssueCategoryId;
+        existingIssue.ModifiedDate = DateTime.UtcNow;
+
+         _unitOfWork.GetRepository<Issue>().UpdateAsync(existingIssue);
+
+        // Handle solutions update
+        if (request.Solutions != null)
+        {
+            var existingSolutions = existingIssue.Solutions?.ToList() ?? new List<Solution>();
+            var solutionIdsToKeep = request.Solutions
+                .Where(s => s.Id.HasValue)
+                .Select(s => s.Id.Value)
+                .ToList();
+
+            // Process existing solutions to update or soft delete
+            foreach (var existingSolution in existingSolutions)
             {
-                // Update existing solution
-                _mapper.Map(solutionRequest, existingSolution);
-                existingSolution.ModifiedDate = DateTime.UtcNow;
-                _unitOfWork.GetRepository<Solution>().UpdateAsync(existingSolution);
+                var solutionRequest = request.Solutions
+                    .FirstOrDefault(s => s.Id.HasValue && s.Id.Value == existingSolution.Id);
 
-                // Handle solution products update
-                await UpdateSolutionProducts(existingSolution.Id, solutionRequest.ProductIds);
+                if (solutionRequest != null)
+                {
+                    // Update existing solution
+                    existingSolution.SolutionName = solutionRequest.SolutionName;
+                    existingSolution.Description = solutionRequest.Description;
+                    existingSolution.ModifiedDate = DateTime.UtcNow;
+                    
+                     _unitOfWork.GetRepository<Solution>().UpdateAsync(existingSolution);
+
+                    // Update solution products
+                    await UpdateSolutionProducts(existingSolution.Id, solutionRequest.ProductIds);
+                }
+                else
+                {
+                    // Soft delete solution not included in request
+                    existingSolution.IsDelete = true;
+                    existingSolution.ModifiedDate = DateTime.UtcNow;
+                    
+                     _unitOfWork.GetRepository<Solution>().UpdateAsync(existingSolution);
+                }
             }
-            else
+
+            // Add new solutions
+            var newSolutions = request.Solutions
+                .Where(s => !s.Id.HasValue || !existingSolutions.Any(es => es.Id == s.Id.Value))
+                .ToList();
+
+            foreach (var newSolutionRequest in newSolutions)
             {
-                // Add new solution
-                var newSolution = _mapper.Map<Solution>(solutionRequest);
-                newSolution.Id = Guid.NewGuid();
-                newSolution.IssueId = existingIssue.Id;
-                newSolution.CreateDate = DateTime.UtcNow;
-                newSolution.IsDelete = false;
+                var newSolutionId = Guid.NewGuid();
+                var newSolution = new Solution
+                {
+                    Id = newSolutionId,
+                    SolutionName = newSolutionRequest.SolutionName,
+                    Description = newSolutionRequest.Description,
+                    IssueId = existingIssue.Id,
+                    CreateDate = DateTime.UtcNow,
+                    IsDelete = false
+                };
 
                 await _unitOfWork.GetRepository<Solution>().InsertAsync(newSolution);
 
                 // Add solution products
-                if (solutionRequest.ProductIds != null && solutionRequest.ProductIds.Any())
+                if (newSolutionRequest.ProductIds != null && newSolutionRequest.ProductIds.Any())
                 {
-                    var solutionProducts = solutionRequest.ProductIds.Select(productId => new SolutionProduct
-                    {
-                        Id = Guid.NewGuid(),
-                        SolutionId = newSolution.Id,
-                        ProductId = productId,
-                        CreateDate = DateTime.UtcNow
-                    }).ToList();
-
-                    await _unitOfWork.GetRepository<SolutionProduct>().InsertRangeAsync(solutionProducts);
+                    await AddSolutionProducts(newSolutionId, newSolutionRequest.ProductIds);
                 }
             }
         }
 
-        // Handle solutions to delete (soft delete)
-        var solutionIdsToKeep = request.Solutions.Where(s => s.Id.HasValue).Select(s => s.Id.Value).ToList();
-        var solutionsToDelete = existingSolutions.Where(s => !solutionIdsToKeep.Contains(s.Id)).ToList();
+        // Commit all changes at once
+        bool isSuccessful = await _unitOfWork.CommitAsync() > 0;
 
-        foreach (var solutionToDelete in solutionsToDelete)
+        if (!isSuccessful)
         {
-            solutionToDelete.IsDelete = true;
-            solutionToDelete.ModifiedDate = DateTime.UtcNow;
-            _unitOfWork.GetRepository<Solution>().UpdateAsync(solutionToDelete);
-        }
-    }
-
-    bool isSuccessful = await _unitOfWork.CommitAsync() > 0;
-
-    // Create the response
-    var issueResponse = _mapper.Map<IssueResponse>(existingIssue);
-
-    // Add IssueCategoryName
-    issueResponse.IssueCategoryName = existingIssue.IssueCategory?.IssueCategoryName;
-
-    // Add Products for each Solution
-    foreach (var solution in issueResponse.Solutions)
-    {
-        solution.Products = existingIssue.Solutions
-            .FirstOrDefault(s => s.Id == solution.Id)?
-            .SolutionProducts?.Select(p => new IssueProductResponse() // Changed from ProductResponse to IssueProductResponse
+            return new ApiResponse
             {
-                ProductId = p.ProductId,
-                ProductName = p.Product?.ProductName,
-                ProductImageUrl = p.Product.Images.FirstOrDefault()?.LinkImage,
-            }).ToList();
-    }
+                status = StatusCodes.Status500InternalServerError.ToString(),
+                message = "Failed to update Issue."
+            };
+        }
 
-    return new ApiResponse
+        // Get the updated issue with all related data for response
+        var updatedIssue = await _unitOfWork.GetRepository<Issue>()
+            .SingleOrDefaultAsync(
+                predicate: i => i.Id == id,
+                include: source => source
+                    .Include(i => i.IssueCategory)
+                    .Include(i => i.Solutions.Where(s => s.IsDelete == false))
+                    .ThenInclude(s => s.SolutionProducts)
+                    .ThenInclude(sp => sp.Product)
+                    .ThenInclude(p => p.Images)
+            );
+
+        // Map to response using AutoMapper
+        var issueResponse = _mapper.Map<IssueResponse>(updatedIssue);
+
+        return new ApiResponse
+        {
+            status = StatusCodes.Status200OK.ToString(),
+            message = "Issue updated successfully with solutions and products.",
+            data = issueResponse
+        };
+    }
+    catch (Exception ex)
     {
-        status = isSuccessful
-            ? StatusCodes.Status200OK.ToString()
-            : StatusCodes.Status500InternalServerError.ToString(),
-        message = isSuccessful
-            ? "Issue updated successfully with solutions and products."
-            : "Failed to update Issue.",
-        data = issueResponse
-    };
+        // Log the exception
+        _logger.LogError(ex, "Error updating issue with ID {IssueId}", id);
+        
+        return new ApiResponse
+        {
+            status = StatusCodes.Status500InternalServerError.ToString(),
+            message = "An unexpected error occurred while updating the issue.",
+            data = ex.Message
+        };
+    }
 }
 
-    private async Task UpdateSolutionProducts(Guid solutionId, List<Guid>? newProductIds)
+private async Task AddSolutionProducts(Guid solutionId, List<Guid> productIds)
+{
+    var solutionProducts = productIds
+        .Select(productId => new SolutionProduct
+        {
+            Id = Guid.NewGuid(),
+            SolutionId = solutionId,
+            ProductId = productId,
+            CreateDate = DateTime.UtcNow
+        })
+        .ToList();
+
+    await _unitOfWork.GetRepository<SolutionProduct>().InsertRangeAsync(solutionProducts);
+}
+
+private async Task UpdateSolutionProducts(Guid solutionId, List<Guid>? newProductIds)
+{
+    var repository = _unitOfWork.GetRepository<SolutionProduct>();
+    
+    // Always remove all existing and add new ones (cleaner approach)
+    var existingProducts = await repository.GetListAsync(predicate: sp => sp.SolutionId == solutionId);
+    if (existingProducts != null)
     {
-        if (newProductIds == null) return;
-
-        var existingSolutionProducts = await _unitOfWork.GetRepository<SolutionProduct>()
-            .GetListAsync(predicate: sp => sp.SolutionId == solutionId);
-
-        // Get existing product IDs
-        var existingProductIds = existingSolutionProducts.Select(sp => sp.ProductId).ToList();
-
-        // Products to add
-        var productsToAdd = newProductIds.Except(existingProductIds)
-            .Select(productId => new SolutionProduct
-            {
-                Id = Guid.NewGuid(),
-                SolutionId = solutionId,
-                ProductId = productId,
-                CreateDate = DateTime.UtcNow
-            }).ToList();
-
-        if (productsToAdd.Any())
-        {
-            await _unitOfWork.GetRepository<SolutionProduct>().InsertRangeAsync(productsToAdd);
-        }
-
-        // Products to remove
-        var productsToRemove = existingSolutionProducts
-            .Where(sp => !newProductIds.Contains(sp.ProductId))
-            .ToList();
-
-        if (productsToRemove.Any())
-        {
-            _unitOfWork.GetRepository<SolutionProduct>().DeleteRangeAsync(productsToRemove);
-        }
+       repository.DeleteRangeAsync(existingProducts);
     }
 
+    if (newProductIds != null && newProductIds.Any())
+    {
+        await AddSolutionProducts(solutionId, newProductIds);
+    }
+}
     public async Task<ApiResponse> DeleteIssue(Guid id)
     {
         var issue = await _unitOfWork.GetRepository<Issue>()

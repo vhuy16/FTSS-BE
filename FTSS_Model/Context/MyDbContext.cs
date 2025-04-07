@@ -281,6 +281,10 @@ public partial class MyDbContext : DbContext
                 .HasDefaultValue(false)
                 .HasColumnName("isDelete");
             entity.Property(e => e.IssueCategoryId).HasColumnName("issueCategoryId");
+            entity.Property(e => e.IssueImage)
+                .HasMaxLength(255)
+                .IsUnicode(false)
+                .HasColumnName("issueImage");
             entity.Property(e => e.IssueName)
                 .HasMaxLength(255)
                 .HasColumnName("issueName");
