@@ -78,7 +78,7 @@ namespace FTSS_API.Controller
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
         [ProducesErrorResponseType(typeof(ProblemDetails))]
-        public async Task<IActionResult> UpdateIssue([FromRoute] Guid id, [FromBody] AddUpdateIssueRequest request)
+        public async Task<IActionResult> UpdateIssue([FromRoute] Guid id, [FromForm] AddUpdateIssueRequest request, Client client)
         {
             if (request == null)
             {
@@ -89,8 +89,8 @@ namespace FTSS_API.Controller
                     status = StatusCodes.Status400BadRequest.ToString(),
                 });
             }
-
-            var response = await _issueService.UpdateIssue(id, request);
+        
+            var response = await _issueService.UpdateIssue(id, request, client);
             return StatusCode(int.Parse(response.status), response);
         }
 
