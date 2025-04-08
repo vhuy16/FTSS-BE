@@ -2,38 +2,37 @@
 
 public class EmailTemplatesUtils
 {
-   
-        public static string VerificationEmailTemplate(string otp) => $@"
+    public static string VerificationEmailTemplate(string otp) => $@"
          <div style='font-family: Arial, sans-serif; color: #333;'>
-             <h2>Your OTP Code</h2>
-             <p>Dear User,</p>
-             <p>Thank you for using our service! To complete your verification process, please use the following OTP (One-Time Password) code:</p>
+             <h2>Mã OTP của bạn</h2>
+             <p>Kính gửi Quý khách,</p>
+             <p>Cảm ơn bạn đã sử dụng dịch vụ của chúng tôi! Để hoàn tất quá trình xác minh, vui lòng sử dụng mã OTP (Mật khẩu dùng một lần) sau đây:</p>
              <h1 style='color: #2E86C1;'>{otp}</h1>
-             <p>This code is valid for the next 10 minutes. Please do not share this code with anyone.</p>
-             <h3>What happens next?</h3>
-             <p>Once you've entered the OTP code, you'll be able to complete the verification process and access your account.</p>
-             <p>If you did not request this code, please disregard this message. If you keep receiving OTPs without making any requests, we recommend updating your account security.</p>
-             <p>Thank you for choosing our service!</p>
-             <p>Best regards,<br>Your Company Name Support Team</p>
-             <p style='font-size: 12px; color: #888;'>If you have any questions, feel free to <a href='mailto:support@yourcompany.com'>contact our support team</a>.</p>
+             <p>Mã này có hiệu lực trong 10 phút tới. Vui lòng không chia sẻ mã này với bất kỳ ai.</p>
+             <h3>Tiếp theo là gì?</h3>
+             <p>Sau khi nhập mã OTP, bạn sẽ hoàn tất quá trình xác minh và có thể truy cập tài khoản của mình.</p>
+             <p>Nếu bạn không yêu cầu mã này, vui lòng bỏ qua email này. Nếu bạn liên tục nhận được OTP mà không thực hiện yêu cầu, chúng tôi khuyên bạn nên cập nhật bảo mật tài khoản.</p>
+             <p>Cảm ơn bạn đã lựa chọn dịch vụ của chúng tôi!</p>
+             <p>Trân trọng,<br>Đội ngũ Hỗ trợ Công ty Tên Công Ty</p>
+             <p style='font-size: 12px; color: #888;'>Nếu bạn có bất kỳ câu hỏi nào, vui lòng <a href='mailto:support@yourcompany.com'>liên hệ với đội ngũ hỗ trợ của chúng tôi</a>.</p>
          </div>";
 
-        public static string RefundNotificationEmailTemplate(string orderId, bool isPaid) => $@"
+    public static string RefundNotificationEmailTemplate(string orderId, bool isPaid) => $@"
          <div style='font-family: Arial, sans-serif; color: #333;'>
-             <h2>Order Cancellation Notification</h2>
-             <p>Dear User,</p>
-             <p>We would like to inform you that your order (ID: <strong>{orderId}</strong>) has been cancelled.</p>
+             <h2>Thông báo Hủy Đơn hàng</h2>
+             <p>Kính gửi Quý khách,</p>
+             <p>Chúng tôi xin thông báo rằng đơn hàng của bạn (ID: <strong>{orderId}</strong>) đã bị hủy.</p>
              {(isPaid ? 
-                 "<h3 style='color: #2E86C1;'>Action Required</h3>" +
-                 "<p>Since your order was already paid, please visit our website to update your bank account details so we can process your refund.</p>" +
-                 "<p><a href='https://yourwebsite.com/account/settings' style='color: #2E86C1; text-decoration: none;'>Click here to update your bank details</a></p>" +
-                 "<h3>What happens next?</h3>" +
-                 "<p>Once we receive your updated bank account information, we will process your refund within 5-7 business days. You’ll receive a confirmation email once the refund is completed.</p>"
+                 "<h3 style='color: #2E86C1;'>Hành động cần thực hiện</h3>" +
+                 "<p>Vì đơn hàng của bạn đã được thanh toán, vui lòng truy cập trang web của chúng tôi để cập nhật thông tin tài khoản ngân hàng nhằm xử lý hoàn tiền.</p>" +
+                 "<p><a href='https://yourwebsite.com/account/settings' style='color: #2E86C1; text-decoration: none;'>Nhấn vào đây để cập nhật thông tin ngân hàng</a></p>" +
+                 "<h3>Tiếp theo là gì?</h3>" +
+                 "<p>Sau khi chúng tôi nhận được thông tin tài khoản ngân hàng cập nhật của bạn, chúng tôi sẽ xử lý hoàn tiền trong vòng 5-7 ngày làm việc. Bạn sẽ nhận được email xác nhận khi quá trình hoàn tiền hoàn tất.</p>"
                  :
-                 "<p>Since this order has not been paid, no further action is required from your side. This is just a notification to keep you informed.</p>")}
-             <p>If you did not cancel this order or believe this is an error, please contact us immediately.</p>
-             <p>We apologize for any inconvenience caused and thank you for your understanding.</p>
-             <p>Best regards,<br>Your Company Name Support Team</p>
-             <p style='font-size: 12px; color: #888;'>If you have any questions, feel free to <a href='mailto:support@yourcompany.com'>contact our support team</a>.</p>
+                 "<p>Vì đơn hàng này chưa được thanh toán, bạn không cần thực hiện thêm hành động nào. Đây chỉ là thông báo để bạn nắm thông tin.</p>")}
+             <p>Nếu bạn không hủy đơn hàng này hoặc cho rằng đây là lỗi, vui lòng liên hệ với chúng tôi ngay lập tức.</p>
+             <p>Chúng tôi xin lỗi vì bất kỳ sự bất tiện nào gây ra và cảm ơn sự thông cảm của bạn.</p>
+             <p>Trân trọng,<br>Đội ngũ Hỗ trợ Công ty Tên Công Ty</p>
+             <p style='font-size: 12px; color: #888;'>Nếu bạn có bất kỳ câu hỏi nào, vui lòng <a href='mailto:support@yourcompany.com'>liên hệ với đội ngũ hỗ trợ của chúng tôi</a>.</p>
          </div>";
 }

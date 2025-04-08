@@ -30,9 +30,11 @@ public class OrderService : BaseService<OrderService>, IOrderService
 
     public OrderService(IUnitOfWork<MyDbContext> unitOfWork, ILogger<OrderService> logger, IMapper mapper,
         Lazy<IPaymentService> paymentService,
+        IEmailSender emailSender,
         IHttpContextAccessor httpContextAccessor) : base(unitOfWork, logger, mapper, httpContextAccessor)
     {
         _paymentService = paymentService;
+        _emailSender = emailSender;
     }
 
     // public async Task<ApiResponse> CreateOrder(CreateOrderRequest createOrderRequest)
@@ -732,7 +734,8 @@ public class OrderService : BaseService<OrderService>, IOrderService
                     var payment = order.Payments?.FirstOrDefault();
                     bool isPaid = payment != null && payment.PaymentStatus == PaymentStatusEnum.Completed.ToString();
                     string emailBody = EmailTemplatesUtils.RefundNotificationEmailTemplate(orderId.ToString(), isPaid);
-                    await _emailSender.SendRefundNotificationEmailAsync(order.User.Email, emailBody);
+                    var email = order.User.Email;
+                    await _emailSender.SendRefundNotificationEmailAsync(email, emailBody);
                 }
 
                 order.Status = updateOrderRequest.Status;
