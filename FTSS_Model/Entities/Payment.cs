@@ -19,7 +19,7 @@ public partial class Payment
 
     public long? OrderCode { get; set; }
 
-    public long? BankNumber { get; set; }
+    public string? BankNumber { get; set; }
 
     public string? BankName { get; set; }
 

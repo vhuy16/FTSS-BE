@@ -107,11 +107,12 @@ public class OrderController : BaseController<OrderController>
         [FromQuery] int? page,
         [FromQuery] int? size,
         [FromQuery] string? status,
+        [FromQuery] string? ordercode,
         [FromQuery] bool? isAscending)
     {
         int pageNumber = page ?? 1;
         int pageSize = size ?? 10;
-        var response = await _orderService.GetAllOrder(pageNumber, pageSize, status, isAscending);
+        var response = await _orderService.GetAllOrder(pageNumber, pageSize, status, ordercode, isAscending);
         
         if (response.status == StatusCodes.Status200OK.ToString())
         {

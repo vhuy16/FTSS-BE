@@ -1,4 +1,5 @@
 ﻿using FTSS_API.Payload.Response.SetupPackage;
+using static FTSS_API.Payload.Response.Order.GetOrderResponse;
 
 namespace FTSS_API.Payload.Response.Book
 {
@@ -9,7 +10,6 @@ namespace FTSS_API.Payload.Response.Book
         public DateTime? ScheduleDate { get; set; }
 
         public string? Status { get; set; }
-        public string? MissionStatus { get; set; }
         public Guid? UserId { get; set; }
 
         public string UserName { get; set; } = null!;
@@ -27,11 +27,11 @@ namespace FTSS_API.Payload.Response.Book
      
         public bool? IsAssigned { get; set; }
         public List<ServicePackageResponse> Services { get; set; } = new();
+        public PaymentResponse Payment { get; set; } = new PaymentResponse();
     }
     public class ServicePackageResponse
     {
         public Guid Id { get; set; }
-
         public string ServiceName { get; set; } = null!;
         public decimal Price { get; set; }
     }

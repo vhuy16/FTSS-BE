@@ -31,7 +31,6 @@ public partial class FtssContext : DbContext
 
     public virtual DbSet<IssueCategory> IssueCategories { get; set; }
 
-
     public virtual DbSet<Mission> Missions { get; set; }
 
     public virtual DbSet<Order> Orders { get; set; }
@@ -53,6 +52,8 @@ public partial class FtssContext : DbContext
     public virtual DbSet<Shipment> Shipments { get; set; }
 
     public virtual DbSet<Solution> Solutions { get; set; }
+
+    public virtual DbSet<SolutionProduct> SolutionProducts { get; set; }
 
     public virtual DbSet<SubCategory> SubCategories { get; set; }
 
@@ -78,6 +79,10 @@ public partial class FtssContext : DbContext
             entity.Property(e => e.Address)
                 .HasMaxLength(255)
                 .HasColumnName("address");
+            entity.Property(e => e.BookingCode)
+                .HasMaxLength(10)
+                .IsUnicode(false)
+                .HasColumnName("bookingCode");
             entity.Property(e => e.FullName)
                 .HasMaxLength(255)
                 .HasColumnName("fullName");
@@ -260,7 +265,7 @@ public partial class FtssContext : DbContext
 
         modelBuilder.Entity<Issue>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__Issue__3213E83F71FEC19D");
+            entity.HasKey(e => e.Id).HasName("PK__tmp_ms_x__3213E83F8331A313");
 
             entity.ToTable("Issue");
 
@@ -275,9 +280,14 @@ public partial class FtssContext : DbContext
                 .HasDefaultValue(false)
                 .HasColumnName("isDelete");
             entity.Property(e => e.IssueCategoryId).HasColumnName("issueCategoryId");
+            entity.Property(e => e.IssueImage)
+                .HasMaxLength(255)
+                .IsUnicode(false)
+                .HasColumnName("issueImage");
             entity.Property(e => e.IssueName)
                 .HasMaxLength(255)
                 .HasColumnName("issueName");
+            entity.Property(e => e.ModifiedDate).HasColumnName("modifiedDate");
             entity.Property(e => e.Title)
                 .HasMaxLength(255)
                 .HasColumnName("title");
@@ -285,6 +295,30 @@ public partial class FtssContext : DbContext
             entity.HasOne(d => d.IssueCategory).WithMany(p => p.Issues)
                 .HasForeignKey(d => d.IssueCategoryId)
                 .HasConstraintName("FK_Issue_IssueCategory");
+        });
+
+        modelBuilder.Entity<IssueCategory>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PK__IssueCat__3213E83F148E615E");
+
+            entity.ToTable("IssueCategory");
+
+            entity.Property(e => e.Id)
+                .HasDefaultValueSql("(newid())")
+                .HasColumnName("id");
+            entity.Property(e => e.CreateDate)
+                .HasColumnType("datetime")
+                .HasColumnName("createDate");
+            entity.Property(e => e.Description).HasColumnName("description");
+            entity.Property(e => e.IsDelete)
+                .HasDefaultValue(false)
+                .HasColumnName("isDelete");
+            entity.Property(e => e.IssueCategoryName)
+                .HasMaxLength(255)
+                .HasColumnName("issueCategoryName");
+            entity.Property(e => e.ModifyDate)
+                .HasColumnType("datetime")
+                .HasColumnName("modifyDate");
         });
 
         modelBuilder.Entity<Mission>(entity =>
@@ -310,6 +344,7 @@ public partial class FtssContext : DbContext
             entity.Property(e => e.MissionSchedule)
                 .HasColumnType("datetime")
                 .HasColumnName("missionSchedule");
+            entity.Property(e => e.OrderId).HasColumnName("orderId");
             entity.Property(e => e.PhoneNumber)
                 .HasMaxLength(20)
                 .HasColumnName("phoneNumber");
@@ -322,6 +357,10 @@ public partial class FtssContext : DbContext
             entity.HasOne(d => d.Booking).WithMany(p => p.Missions)
                 .HasForeignKey(d => d.BookingId)
                 .HasConstraintName("FK_Mission_Booking");
+
+            entity.HasOne(d => d.Order).WithMany(p => p.Missions)
+                .HasForeignKey(d => d.OrderId)
+                .HasConstraintName("FK_Mission_Order");
 
             entity.HasOne(d => d.User).WithMany(p => p.Missions)
                 .HasForeignKey(d => d.Userid)
@@ -343,12 +382,19 @@ public partial class FtssContext : DbContext
             entity.Property(e => e.CreateDate)
                 .HasColumnType("datetime")
                 .HasColumnName("createDate");
+            entity.Property(e => e.IsAssigned).HasColumnName("isAssigned");
             entity.Property(e => e.IsDelete)
                 .HasDefaultValue(false)
                 .HasColumnName("isDelete");
+            entity.Property(e => e.IsEligible).HasColumnName("isEligible");
             entity.Property(e => e.ModifyDate)
                 .HasColumnType("datetime")
                 .HasColumnName("modifyDate");
+            entity.Property(e => e.OrderCode)
+                .HasMaxLength(10)
+                .IsUnicode(false)
+                .IsFixedLength()
+                .HasColumnName("orderCode");
             entity.Property(e => e.PhoneNumber)
                 .HasMaxLength(50)
                 .IsUnicode(false)
@@ -440,7 +486,11 @@ public partial class FtssContext : DbContext
                 .HasMaxLength(50)
                 .IsUnicode(false)
                 .HasColumnName("bankName");
-            entity.Property(e => e.BankNumber).HasColumnName("bankNumber");
+            entity.Property(e => e.BankNumber)
+                .HasMaxLength(50)
+                .IsUnicode(false)
+                .HasColumnName("bankNumber");
+            entity.Property(e => e.BookingId).HasColumnName("bookingId");
             entity.Property(e => e.OrderCode).HasColumnName("orderCode");
             entity.Property(e => e.OrderId).HasColumnName("orderId");
             entity.Property(e => e.PaymentDate)
@@ -453,14 +503,13 @@ public partial class FtssContext : DbContext
                 .HasMaxLength(50)
                 .IsUnicode(false)
                 .HasColumnName("paymentStatus");
-            entity.Property(e => e.PaymentStatus)
-                .HasMaxLength(50)
-                .IsUnicode(false)
-                .HasColumnName("status");
+
+            entity.HasOne(d => d.Booking).WithMany(p => p.Payments)
+                .HasForeignKey(d => d.BookingId)
+                .HasConstraintName("FK_Payment_Booking");
 
             entity.HasOne(d => d.Order).WithMany(p => p.Payments)
                 .HasForeignKey(d => d.OrderId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK__Payment__orderId__17036CC0");
         });
 
@@ -649,7 +698,28 @@ public partial class FtssContext : DbContext
             entity.HasOne(d => d.Issue).WithMany(p => p.Solutions)
                 .HasForeignKey(d => d.IssueId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK__Solution__issueI__31B762FC");
+                .HasConstraintName("FK__Solution__issueI__6BAEFA67");
+        });
+
+        modelBuilder.Entity<SolutionProduct>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PK__Solution__3214EC07976FE61E");
+
+            entity.ToTable("SolutionProduct");
+
+            entity.Property(e => e.Id).HasDefaultValueSql("(newid())");
+            entity.Property(e => e.CreateDate)
+                .HasDefaultValueSql("(getdate())")
+                .HasColumnType("datetime");
+            entity.Property(e => e.ModifyDate).HasColumnType("datetime");
+
+            entity.HasOne(d => d.Product).WithMany(p => p.SolutionProducts)
+                .HasForeignKey(d => d.ProductId)
+                .HasConstraintName("FK__SolutionP__Produ__7DCDAAA2");
+
+            entity.HasOne(d => d.Solution).WithMany(p => p.SolutionProducts)
+                .HasForeignKey(d => d.SolutionId)
+                .HasConstraintName("FK__SolutionP__Solut__7CD98669");
         });
 
         modelBuilder.Entity<SubCategory>(entity =>
@@ -694,10 +764,16 @@ public partial class FtssContext : DbContext
             entity.Property(e => e.Address)
                 .HasMaxLength(255)
                 .HasColumnName("address");
+            entity.Property(e => e.CityId)
+                .HasMaxLength(50)
+                .HasColumnName("cityId");
             entity.Property(e => e.CreateDate)
                 .HasDefaultValueSql("(getdate())")
                 .HasColumnType("datetime")
                 .HasColumnName("createDate");
+            entity.Property(e => e.DistrictId)
+                .HasMaxLength(50)
+                .HasColumnName("districtId");
             entity.Property(e => e.Email)
                 .HasMaxLength(255)
                 .IsUnicode(false)

@@ -205,18 +205,6 @@ namespace FTSS_API.Service.Implement;
         order.ModifyDate = DateTime.UtcNow;
         _unitOfWork.GetRepository<Order>().UpdateAsync(order);
     }
-    else if (payment.BookingId.HasValue)
-    {
-        var booking = await _unitOfWork.GetRepository<Booking>()
-            .SingleOrDefaultAsync(predicate: b => b.Id == payment.BookingId);
-
-        if (booking == null)
-            throw new InvalidOperationException("Booking not found.");
-
-        booking.Status = BookingStatusEnum.PAID.ToString();
-        
-        _unitOfWork.GetRepository<Booking>().UpdateAsync(booking);
-    }
 
     _unitOfWork.GetRepository<Payment>().UpdateAsync(payment);
 }
@@ -237,18 +225,6 @@ private async Task HandleFailedPayment(Payment payment)
             _unitOfWork.GetRepository<Order>().UpdateAsync(order);
         }
     }
-    else if (payment.BookingId.HasValue)
-    {
-        var booking = await _unitOfWork.GetRepository<Booking>()
-            .SingleOrDefaultAsync(predicate: b => b.Id == payment.BookingId);
-
-        if (booking != null)
-        {
-            booking.Status = BookingStatusEnum.NOTPAID.ToString();
-            _unitOfWork.GetRepository<Booking>().UpdateAsync(booking);
-        }
-    }
-
     _unitOfWork.GetRepository<Payment>().UpdateAsync(payment);
 }
 

@@ -10,7 +10,7 @@ public interface IPaymentService
     Task<ApiResponse> GetPaymentByOrderId(Guid orderId);
     Task<ApiResponse> GetPayments(int page, int size);
     Task<ApiResponse> UpdatePaymentStatus(Guid paymentId, string newStatus);
-    Task<ApiResponse> UpdateBankInfor(Guid paymentId, long? bankNumber, string bankName, string bankHolder);
+    Task<ApiResponse> UpdateBankInfor(Guid paymentId, string bankNumber, string bankName, string bankHolder);
     Task<ApiResponse> GetPaymentsByStatus(string status, int page, int size);
 
 }
