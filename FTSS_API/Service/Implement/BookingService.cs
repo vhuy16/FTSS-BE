@@ -617,6 +617,7 @@ namespace FTSS_API.Service.Implement
                         OrderId = request.OrderId,
                         Url = paymentUrl,
                         BookingCode = newBooking.BookingCode,
+                        PaymentMethod = request.PaymentMethod,
                     };
 
                     return new ApiResponse

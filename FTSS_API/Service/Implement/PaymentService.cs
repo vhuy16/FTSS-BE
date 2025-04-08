@@ -190,10 +190,10 @@ public class PaymentService : BaseService<PaymentService>, IPaymentService
         };
     }
 
-    public async Task<ApiResponse> UpdatePaymentStatus(Guid PaymentId, string newStatus)
+    public async Task<ApiResponse> UpdatePaymentStatus(Guid OrderId, string newStatus)
     {
         var payment = await _unitOfWork.GetRepository<Payment>()
-            .SingleOrDefaultAsync(predicate: o => o.Id == PaymentId);
+            .SingleOrDefaultAsync(predicate: o => o.OrderId == OrderId );
         if (payment == null)
         {
             return new ApiResponse
@@ -215,7 +215,7 @@ public class PaymentService : BaseService<PaymentService>, IPaymentService
             data = payment
         };
     }
-
+  
     public async Task<ApiResponse> UpdateBankInfor(Guid paymentId, long? bankNumber, string bankName, string bankHolder)
     {
         var payment = await _unitOfWork.GetRepository<Payment>()
@@ -230,9 +230,19 @@ public class PaymentService : BaseService<PaymentService>, IPaymentService
             };
         }
 
+        if (payment.PaymentStatus != PaymentStatusEnum.Completed.ToString())
+        {
+            return new ApiResponse()
+            {
+                status = StatusCodes.Status200OK.ToString(),
+                message = "Payment status not completed",
+                data = null
+            };
+        }
         payment.BankNumber = bankNumber;
         payment.BankName = bankName;
         payment.BankHolder = bankHolder;
+        payment.PaymentStatus = PaymentStatusEnum.Refunding.ToString();
         _unitOfWork.GetRepository<Payment>().UpdateAsync(payment);
         await _unitOfWork.CommitAsync();
 
