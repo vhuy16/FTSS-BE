@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging;
 using System;
 using System.Threading.Tasks;
 using FTSS_API.Payload.Request;
+using Supabase;
 
 namespace FTSS_API.Controller
 {
@@ -29,9 +30,9 @@ namespace FTSS_API.Controller
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status201Created)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
         [ProducesErrorResponseType(typeof(ProblemDetails))]
-        public async Task<IActionResult> CreateIssue([FromBody] AddUpdateIssueRequest request)
+        public async Task<IActionResult> CreateIssue([FromForm] AddUpdateIssueRequest request, Client client)
         {
-            var response = await _issueService.CreateIssue(request);
+            var response = await _issueService.CreateIssue(request, client);
             if (response.status == StatusCodes.Status400BadRequest.ToString())
             {
                 return BadRequest(response);
@@ -77,7 +78,7 @@ namespace FTSS_API.Controller
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
         [ProducesErrorResponseType(typeof(ProblemDetails))]
-        public async Task<IActionResult> UpdateIssue([FromRoute] Guid id, [FromBody] AddUpdateIssueRequest request)
+        public async Task<IActionResult> UpdateIssue([FromRoute] Guid id, [FromForm] AddUpdateIssueRequest request, Client client)
         {
             if (request == null)
             {
@@ -88,8 +89,8 @@ namespace FTSS_API.Controller
                     status = StatusCodes.Status400BadRequest.ToString(),
                 });
             }
-
-            var response = await _issueService.UpdateIssue(id, request);
+        
+            var response = await _issueService.UpdateIssue(id, request, client);
             return StatusCode(int.Parse(response.status), response);
         }
 

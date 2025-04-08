@@ -88,7 +88,7 @@ namespace FTSS_API.Controller;
      //         return Redirect("https://www.mrc.vn/payment/callback?status=failed");
      //     }
      // }
-     [HttpPost("webhook-url")]
+     [HttpPost("webhook-uri")]
      public async Task<IActionResult> HandlePayOsWebhook([FromBody] WebhookType payload)
      {
          try
@@ -109,7 +109,7 @@ namespace FTSS_API.Controller;
          }
      }
 
-     [HttpPost("cancleUrl")]
+     [HttpGet("cancleUrl")]
      public async Task<IActionResult> handleCanclePayment()
      {
          string  status = Request.Query["status"].ToString();
@@ -121,6 +121,19 @@ namespace FTSS_API.Controller;
              return Redirect("https://ftss.id.vn/api/v1/cancleUrl");
          }
          return Redirect("https://ftss.id.vn/api/v1/cancleUrl");
+     }
+     [HttpGet("successUrl")]
+     public async Task<IActionResult> handleSuccessPayment()
+     {
+         string  status = Request.Query["status"].ToString();
+         string id = Request.Query["id"].ToString();
+         string orderCode = Request.Query["orderCode"];
+         if (status == "PAID")
+         {
+             var response = await _payOsService.HandleSuccessfulPayment(long.Parse(orderCode));
+             return Redirect("https://ftss-fe.vercel.app/paymentSuccess");
+         }
+         return Redirect("https://ftss-fe.vercel.app/paymentSuccess");
      }
      
      [HttpPost("confirm-webhook")]

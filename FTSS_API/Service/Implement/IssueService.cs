@@ -6,108 +6,143 @@ using FTSS_API.Payload.Response.Issue;
 using FTSS_API.Payload.Response.SetupPackage;
 using FTSS_API.Service.Implement;
 using FTSS_API.Service.Interface;
+using FTSS_API.Utils;
 using FTSS_Model.Context;
+using System.Text.Json;
+using FTSS_API.Payload.Request.Solution;
 using FTSS_Model.Entities;
 using FTSS_Model.Paginate;
 using LinqKit;
 using FTSS_Repository.Interface;
 using Microsoft.EntityFrameworkCore;
+using Supabase.Storage;
+using Client = Supabase.Client;
 
 public class IssueService : BaseService<IssueService>, IIssueService
-{
-    public IssueService(IUnitOfWork<MyDbContext> unitOfWork, ILogger<IssueService> logger, IMapper mapper,
+{ 
+    private readonly SupabaseUltils _supabaseImageService;
+    public IssueService(IUnitOfWork<MyDbContext> unitOfWork, ILogger<IssueService> logger, IMapper mapper, SupabaseUltils supabaseImageService,
         IHttpContextAccessor httpContextAccessor)
         : base(unitOfWork, logger, mapper, httpContextAccessor)
     {
+        _supabaseImageService = supabaseImageService;
     }
 
-    public async Task<ApiResponse> CreateIssue(AddUpdateIssueRequest request)
+
+
+// ...
+
+public async Task<ApiResponse> CreateIssue(AddUpdateIssueRequest request, Client client)
+{
+    string issueImage = null;
+
+    if (request.IssueImage != null)
     {
-        // Create the Issue without including Solutions in the mapping
-        var issue = new Issue
+        var imageUrls = await _supabaseImageService.SendImagesAsync(new List<IFormFile> { request.IssueImage }, client);
+        issueImage = imageUrls.FirstOrDefault();
+    }
+
+    var issue = new Issue
+    {
+        Id = Guid.NewGuid(),
+        Title = request.Title,
+        Description = request.Description,
+        IssueCategoryId = request.IssueCategoryId,
+        CreateDate = DateTime.UtcNow,
+        IsDelete = false,
+        IssueImage = issueImage,
+    };
+
+    await _unitOfWork.GetRepository<Issue>().InsertAsync(issue);
+
+    // Parse JSON strings from SolutionsJson
+    List<SolutionDto> parsedSolutions = new List<SolutionDto>();
+    foreach (var solutionJson in request.SolutionsJson)
+    {
+        try
         {
-            Id = Guid.NewGuid(),
-            Title = request.Title,
-            Description = request.Description,
-            IssueCategoryId = request.IssueCategoryId,
-            CreateDate = DateTime.UtcNow,
-            IsDelete = false
-            // Don't map Solutions here
-        };
-
-        // Add Issue to Database
-        await _unitOfWork.GetRepository<Issue>().InsertAsync(issue);
-
-        // Process solutions and products list
-        if (request.Solutions != null && request.Solutions.Any())
-        {
-            var solutions = new List<Solution>();
-            var solutionProducts = new List<SolutionProduct>();
-
-            foreach (var solutionRequest in request.Solutions)
+            // Deserialize each JSON string into a SolutionDto object
+            var solution = JsonSerializer.Deserialize<SolutionDto>(solutionJson);
+            if (solution != null)
             {
-                // Create new solution
-                var solution = new Solution
-                {
-                    Id = Guid.NewGuid(),
-                    SolutionName = solutionRequest.SolutionName,
-                    Description = solutionRequest.Description,
-                    IssueId = issue.Id,
-                    CreateDate = DateTime.UtcNow,
-                    IsDelete = false
-                };
-                solutions.Add(solution);
+                parsedSolutions.Add(solution);
+            }
+        }
+        catch (Exception ex)
+        {
+            return new ApiResponse
+            {
+                status = StatusCodes.Status400BadRequest.ToString(),
+                message = "Invalid solution JSON format.",
+                data = ex.Message
+            };
+        }
+    }
 
-                // Add related products
-                if (solutionRequest.ProductIds != null && solutionRequest.ProductIds.Any())
+    if (parsedSolutions.Any())
+    {
+        var solutions = new List<Solution>();
+        var solutionProducts = new List<SolutionProduct>();
+
+        foreach (var solutionRequest in parsedSolutions)
+        {
+            var solution = new Solution
+            {
+                Id = Guid.NewGuid(),
+                SolutionName = solutionRequest.SolutionName,
+                Description = solutionRequest.Description,
+                IssueId = issue.Id,
+                CreateDate = DateTime.UtcNow,
+                IsDelete = false
+            };
+            solutions.Add(solution);
+
+            if (solutionRequest.ProductIds != null && solutionRequest.ProductIds.Any())
+            {
+                foreach (var productId in solutionRequest.ProductIds)
                 {
-                    foreach (var productId in solutionRequest.ProductIds)
+                    solutionProducts.Add(new SolutionProduct
                     {
-                        solutionProducts.Add(new SolutionProduct
-                        {
-                            Id = Guid.NewGuid(),
-                            SolutionId = solution.Id,
-                            ProductId = productId,
-                            CreateDate = DateTime.UtcNow
-                        });
-                    }
+                        Id = Guid.NewGuid(),
+                        SolutionId = solution.Id,
+                        ProductId = productId,
+                        CreateDate = DateTime.UtcNow
+                    });
                 }
             }
-
-            // Add solutions and solutionProducts to database
-            await _unitOfWork.GetRepository<Solution>().InsertRangeAsync(solutions);
-            if (solutionProducts.Any())
-            {
-                await _unitOfWork.GetRepository<SolutionProduct>().InsertRangeAsync(solutionProducts);
-            }
         }
 
-        // Commit transaction
-        bool isSuccessful = await _unitOfWork.CommitAsync() > 0;
-
-        Issue createdIssue = null;
-        if (isSuccessful)
+        await _unitOfWork.GetRepository<Solution>().InsertRangeAsync(solutions);
+        if (solutionProducts.Any())
         {
-            createdIssue = await _unitOfWork.GetRepository<Issue>()
-                .SingleOrDefaultAsync(
-                    predicate: i => i.Id == issue.Id,
-                    include: source => source
-                        .Include(i => i.IssueCategory)
-                        .Include(i => i.Solutions)
-                        .ThenInclude(s => s.SolutionProducts)
-                        .ThenInclude(sp => sp.Product)
-                        .ThenInclude(s => s.Images)
-                );
+            await _unitOfWork.GetRepository<SolutionProduct>().InsertRangeAsync(solutionProducts);
         }
-
-        // Return the response
-        return new ApiResponse
-        {
-            status = StatusCodes.Status200OK.ToString(),
-            message = "Issue created successfully with solutions and related products.",
-            data = _mapper.Map<IssueResponse>(createdIssue)
-        };
     }
+
+    bool isSuccessful = await _unitOfWork.CommitAsync() > 0;
+
+    Issue createdIssue = null;
+    if (isSuccessful)
+    {
+        createdIssue = await _unitOfWork.GetRepository<Issue>()
+            .SingleOrDefaultAsync(
+                predicate: i => i.Id == issue.Id,
+                include: source => source
+                    .Include(i => i.IssueCategory)
+                    .Include(i => i.Solutions)
+                    .ThenInclude(s => s.SolutionProducts)
+                    .ThenInclude(sp => sp.Product)
+                    .ThenInclude(p => p.Images)
+            );
+    }
+
+    return new ApiResponse
+    {
+        status = StatusCodes.Status200OK.ToString(),
+        message = "Issue created successfully with solutions and related products.",
+        data = _mapper.Map<IssueResponse>(createdIssue)
+    };
+}
 
     public async Task<ApiResponse> GetAllIssues(int page, int size, bool? isAscending, Guid? issueCategoryId = null, string issueTitle = null)
     {
@@ -146,14 +181,28 @@ public class IssueService : BaseService<IssueService>, IIssueService
                 size);
 
         var mapped = _mapper.Map<List<IssueResponse>>(issues.Items);
+        
+        int totalItems = issues.Total;  // Total number of items without pagination
+        int totalPages = (int)Math.Ceiling((double)totalItems / size);  // Calculate total pages
+
+        // Paginate result
+        var paginatedResult = new Paginate<IssueResponse>
+        {
+            Page = page,
+            Size = size,
+            Total = totalItems,
+            TotalPages = totalPages,
+            Items = mapped
+        };
 
         return new ApiResponse
         {
             status = StatusCodes.Status200OK.ToString(),
-            message = "Lấy danh sách vấn đề thành công",
-            data = mapped
+            message = "Issues retrieved successfully.",
+            data = paginatedResult
         };
     }
+
 
     public async Task<ApiResponse> GetIssueById(Guid id)
     {
@@ -186,159 +235,150 @@ public class IssueService : BaseService<IssueService>, IIssueService
             data = mappedIssue
         };
     }
-
- public async Task<ApiResponse> UpdateIssue(Guid id, AddUpdateIssueRequest request)
+public async Task<ApiResponse> UpdateIssue(Guid id, AddUpdateIssueRequest request, Client client)
 {
-    // var existingIssue = await _unitOfWork.GetRepository<Issue>()
-    //     .Where(i => i.Id == id && i.IsDelete == false)
-    //     .Include(i => i.Solutions)
-    //         .ThenInclude(s => s.Products)  // Include Products for each Solution
-    //     .Include(i => i.Category) // Include Issue Category (for IssueCategoryName)
-    //     .FirstOrDefaultAsync();
+    // Tìm issue cần cập nhật
     var existingIssue = await _unitOfWork.GetRepository<Issue>()
         .SingleOrDefaultAsync(
             predicate: i => i.Id == id && i.IsDelete == false,
-            include: i => i.Include(i => i.Solutions)
+            include: source => source
+                .Include(i => i.Solutions)
                 .ThenInclude(s => s.SolutionProducts)
-                .Include(i => i.IssueCategory)
         );
 
     if (existingIssue == null)
-        return new ApiResponse { status = StatusCodes.Status404NotFound.ToString(), message = "Issue not found." };
-
-    // Update issue properties
-    _mapper.Map(request, existingIssue);
-    existingIssue.ModifiedDate = DateTime.UtcNow;
-
-    // Handle solutions update
-    if (request.Solutions != null)
     {
-        // Get existing solutions
-        var existingSolutions = existingIssue.Solutions?.ToList() ?? new List<Solution>();
-
-        // Process solutions to add or update
-        foreach (var solutionRequest in request.Solutions)
+        return new ApiResponse
         {
-            var existingSolution = existingSolutions.FirstOrDefault(s => s.Id == solutionRequest.Id);
+            status = StatusCodes.Status404NotFound.ToString(),
+            message = "Issue not found",
+            data = null
+        };
+    }
 
-            if (existingSolution != null)
+    // Xử lý hình ảnh nếu có
+    string issueImage = existingIssue.IssueImage;
+    if (request.IssueImage != null)
+    {
+        // Giả sử bạn muốn thay thế hình ảnh cũ
+        var imageUrls = await _supabaseImageService.SendImagesAsync(new List<IFormFile> { request.IssueImage }, client);
+        issueImage = imageUrls.FirstOrDefault();
+    }
+
+    // Cập nhật thông tin cơ bản của issue
+    existingIssue.Title = request.Title ?? existingIssue.Title;
+    existingIssue.Description = request.Description ?? existingIssue.Description;
+    existingIssue.IssueCategoryId = request.IssueCategoryId ?? existingIssue.IssueCategoryId;
+    existingIssue.IssueImage = issueImage;
+    existingIssue.ModifiedDate = DateTime.Now;
+
+    // Xử lý Solutions nếu có
+    if (request.SolutionsJson != null && request.SolutionsJson.Any())
+    {
+        // Xóa các solutions hiện tại
+        var existingSolutions = existingIssue.Solutions.ToList();
+        if (existingSolutions.Any())
+        {
+            _unitOfWork.GetRepository<Solution>().DeleteRangeAsync(existingSolutions);
+        }
+
+        // Parse và tạo mới solutions
+        List<SolutionDto> parsedSolutions = new List<SolutionDto>();
+        foreach (var solutionJson in request.SolutionsJson)
+        {
+            try
             {
-                // Update existing solution
-                _mapper.Map(solutionRequest, existingSolution);
-                existingSolution.ModifiedDate = DateTime.UtcNow;
-                _unitOfWork.GetRepository<Solution>().UpdateAsync(existingSolution);
-
-                // Handle solution products update
-                await UpdateSolutionProducts(existingSolution.Id, solutionRequest.ProductIds);
-            }
-            else
-            {
-                // Add new solution
-                var newSolution = _mapper.Map<Solution>(solutionRequest);
-                newSolution.Id = Guid.NewGuid();
-                newSolution.IssueId = existingIssue.Id;
-                newSolution.CreateDate = DateTime.UtcNow;
-                newSolution.IsDelete = false;
-
-                await _unitOfWork.GetRepository<Solution>().InsertAsync(newSolution);
-
-                // Add solution products
-                if (solutionRequest.ProductIds != null && solutionRequest.ProductIds.Any())
+                var solution = JsonSerializer.Deserialize<SolutionDto>(solutionJson);
+                if (solution != null)
                 {
-                    var solutionProducts = solutionRequest.ProductIds.Select(productId => new SolutionProduct
-                    {
-                        Id = Guid.NewGuid(),
-                        SolutionId = newSolution.Id,
-                        ProductId = productId,
-                        CreateDate = DateTime.UtcNow
-                    }).ToList();
-
-                    await _unitOfWork.GetRepository<SolutionProduct>().InsertRangeAsync(solutionProducts);
+                    parsedSolutions.Add(solution);
                 }
+            }
+            catch (Exception ex)
+            {
+                return new ApiResponse
+                {
+                    status = StatusCodes.Status400BadRequest.ToString(),
+                    message = "Invalid solution JSON format.",
+                    data = ex.Message
+                };
             }
         }
 
-        // Handle solutions to delete (soft delete)
-        var solutionIdsToKeep = request.Solutions.Where(s => s.Id.HasValue).Select(s => s.Id.Value).ToList();
-        var solutionsToDelete = existingSolutions.Where(s => !solutionIdsToKeep.Contains(s.Id)).ToList();
-
-        foreach (var solutionToDelete in solutionsToDelete)
+        if (parsedSolutions.Any())
         {
-            solutionToDelete.IsDelete = true;
-            solutionToDelete.ModifiedDate = DateTime.UtcNow;
-            _unitOfWork.GetRepository<Solution>().UpdateAsync(solutionToDelete);
+            var solutions = new List<Solution>();
+            var solutionProducts = new List<SolutionProduct>();
+
+            foreach (var solutionRequest in parsedSolutions)
+            {
+                var solution = new Solution
+                {
+                    Id = Guid.NewGuid(),
+                    SolutionName = solutionRequest.SolutionName,
+                    Description = solutionRequest.Description,
+                    IssueId = existingIssue.Id,
+                    CreateDate = DateTime.UtcNow,
+                    IsDelete = false,
+                    ModifiedDate = DateTime.UtcNow,
+                };
+                solutions.Add(solution);
+
+                if (solutionRequest.ProductIds != null && solutionRequest.ProductIds.Any())
+                {
+                    foreach (var productId in solutionRequest.ProductIds)
+                    {
+                        solutionProducts.Add(new SolutionProduct
+                        {
+                            Id = Guid.NewGuid(),
+                            SolutionId = solution.Id,
+                            ProductId = productId,
+                            CreateDate = DateTime.UtcNow
+                        });
+                    }
+                }
+            }
+
+            await _unitOfWork.GetRepository<Solution>().InsertRangeAsync(solutions);
+            if (solutionProducts.Any())
+            {
+                await _unitOfWork.GetRepository<SolutionProduct>().InsertRangeAsync(solutionProducts);
+            }
         }
     }
 
+    // Cập nhật issue
+    _unitOfWork.GetRepository<Issue>().UpdateAsync(existingIssue);
     bool isSuccessful = await _unitOfWork.CommitAsync() > 0;
 
-    // Create the response
-    var issueResponse = _mapper.Map<IssueResponse>(existingIssue);
-
-    // Add IssueCategoryName
-    issueResponse.IssueCategoryName = existingIssue.IssueCategory?.IssueCategoryName;
-
-    // Add Products for each Solution
-    foreach (var solution in issueResponse.Solutions)
+    if (isSuccessful)
     {
-        solution.Products = existingIssue.Solutions
-            .FirstOrDefault(s => s.Id == solution.Id)?
-            .SolutionProducts?.Select(p => new IssueProductResponse() // Changed from ProductResponse to IssueProductResponse
-            {
-                ProductId = p.ProductId,
-                ProductName = p.Product?.ProductName,
-                ProductImageUrl = p.Product.Images.FirstOrDefault()?.LinkImage,
-            }).ToList();
+        var updatedIssue = await _unitOfWork.GetRepository<Issue>()
+            .SingleOrDefaultAsync(
+                predicate: i => i.Id == id,
+                include: source => source
+                    .Include(i => i.IssueCategory)
+                    .Include(i => i.Solutions)
+                    .ThenInclude(s => s.SolutionProducts)
+                    .ThenInclude(sp => sp.Product)
+                    .ThenInclude(p => p.Images)
+            );
+
+        return new ApiResponse
+        {
+            status = StatusCodes.Status200OK.ToString(),
+            message = "Issue updated successfully",
+            data = _mapper.Map<IssueResponse>(updatedIssue)
+        };
     }
 
     return new ApiResponse
     {
-        status = isSuccessful
-            ? StatusCodes.Status200OK.ToString()
-            : StatusCodes.Status500InternalServerError.ToString(),
-        message = isSuccessful
-            ? "Issue updated successfully with solutions and products."
-            : "Failed to update Issue.",
-        data = issueResponse
+        status = StatusCodes.Status400BadRequest.ToString(),
+        message = "Failed to update issue",
+        data = null
     };
 }
-
-    private async Task UpdateSolutionProducts(Guid solutionId, List<Guid>? newProductIds)
-    {
-        if (newProductIds == null) return;
-
-        var existingSolutionProducts = await _unitOfWork.GetRepository<SolutionProduct>()
-            .GetListAsync(predicate: sp => sp.SolutionId == solutionId);
-
-        // Get existing product IDs
-        var existingProductIds = existingSolutionProducts.Select(sp => sp.ProductId).ToList();
-
-        // Products to add
-        var productsToAdd = newProductIds.Except(existingProductIds)
-            .Select(productId => new SolutionProduct
-            {
-                Id = Guid.NewGuid(),
-                SolutionId = solutionId,
-                ProductId = productId,
-                CreateDate = DateTime.UtcNow
-            }).ToList();
-
-        if (productsToAdd.Any())
-        {
-            await _unitOfWork.GetRepository<SolutionProduct>().InsertRangeAsync(productsToAdd);
-        }
-
-        // Products to remove
-        var productsToRemove = existingSolutionProducts
-            .Where(sp => !newProductIds.Contains(sp.ProductId))
-            .ToList();
-
-        if (productsToRemove.Any())
-        {
-            _unitOfWork.GetRepository<SolutionProduct>().DeleteRangeAsync(productsToRemove);
-        }
-    }
-
     public async Task<ApiResponse> DeleteIssue(Guid id)
     {
         var issue = await _unitOfWork.GetRepository<Issue>()
