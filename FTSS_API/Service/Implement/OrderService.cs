@@ -10,6 +10,7 @@ using FTSS_API.Payload.Request.Pay;
 using FTSS_API.Payload.Response.Order;
 using FTSS_API.Payload.Response.Pay.Payment;
 using FTSS_API.Payload.Response.SetupPackage;
+using FTSS_API.Service.Implement.Implement;
 using FTSS_API.Service.Interface;
 using FTSS_API.Utils;
 using FTSS_Model.Context;
@@ -25,6 +26,7 @@ namespace FTSS_API.Service.Implement;
 public class OrderService : BaseService<OrderService>, IOrderService
 {
     private readonly Lazy<IPaymentService> _paymentService;
+    private readonly IEmailSender _emailSender;
 
     public OrderService(IUnitOfWork<MyDbContext> unitOfWork, ILogger<OrderService> logger, IMapper mapper,
         Lazy<IPaymentService> paymentService,
@@ -243,7 +245,7 @@ public class OrderService : BaseService<OrderService>, IOrderService
     // }
     public async Task<ApiResponse> CreateOrder(CreateOrderRequest createOrderRequest)
     {
-        Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
+         Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
         if (userId == null)
         {
             return new ApiResponse()
@@ -700,7 +702,7 @@ public class OrderService : BaseService<OrderService>, IOrderService
         }
     }
 
-    public async Task<ApiResponse> UpdateOrder(Guid orderId, UpdateOrderRequest updateOrderRequest)
+  public async Task<ApiResponse> UpdateOrder(Guid orderId, UpdateOrderRequest updateOrderRequest)
     {
         try
         {
@@ -708,7 +710,7 @@ public class OrderService : BaseService<OrderService>, IOrderService
                 predicate: o => o.Id == orderId,
                 include: query => query.Include(o => o.User)
                     .Include(o => o.OrderDetails)
-                    .Include(O => O.Payments)
+                    .Include(o => o.Payments)
             );
 
             if (order == null)
@@ -721,70 +723,24 @@ public class OrderService : BaseService<OrderService>, IOrderService
                 };
             }
 
-            // Cập nhật trạng thái đơn hàng nếu có
+            // Update order status if provided
             if (!string.IsNullOrEmpty(updateOrderRequest.Status))
             {
-                var payment = await _unitOfWork.GetRepository<Payment>()
-                    .SingleOrDefaultAsync(predicate: p => p.OrderId == orderId);
-
-                // Đơn hàng đã thanh toán nhưng bị hủy
-                if (updateOrderRequest.Status == OrderStatus.CANCELLED.ToString() &&
-                    order.Status == OrderStatus.PAID.ToString())
+                // Check if the status is being updated to CANCELLED
+                if (updateOrderRequest.Status == OrderStatus.CANCELLED.ToString())
                 {
-                    if (payment != null)
-                    {
-                        payment.PaymentStatus = PaymentStatusEnum.Refunding.ToString();
-                        _unitOfWork.GetRepository<Payment>().UpdateAsync(payment);
-                    }
-                }
-
-                // Đơn hàng chưa thanh toán nhưng bị hủy và dùng COD
-                if (updateOrderRequest.Status == OrderStatus.CANCELLED.ToString() &&
-                    payment.PaymentMethod == PaymenMethodEnum.COD.GetDescriptionFromEnum())
-                {
-                    payment.PaymentStatus = PaymentStatusEnum.Processing.ToString();
-                }
-
-                // Đơn hàng hoàn thành và dùng COD
-                if (updateOrderRequest.Status == OrderStatus.COMPLETED.ToString() &&
-                    payment.PaymentMethod == PaymenMethodEnum.COD.GetDescriptionFromEnum())
-                {
-                    payment.PaymentStatus = PaymentStatusEnum.Completed.ToString();
-                    _unitOfWork.GetRepository<Payment>().UpdateAsync(payment);
-                }
-
-                // Khi đơn hàng đã giao tới nhưng người dùng từ chối nhận
-                if (updateOrderRequest.Status == OrderStatus.RETURNED.ToString())
-                {
-                    if (order.Status == OrderStatus.DELIVERED.ToString())
-                    {
-                        if (payment.PaymentStatus == PaymentStatusEnum.Completed.ToString())
-                        {
-                            payment.PaymentStatus = PaymentStatusEnum.Refunding.ToString();
-                        }
-                        else
-                        {
-                            payment.PaymentStatus = PaymentStatusEnum.Pending.ToString();
-                        }
-                    }
-                }
-
-                // Khi đơn hàng chưa xử lý nhưng người dùng đã thanh toán và gửi yêu cầu hoàn tiền
-                if (updateOrderRequest.Status == OrderStatus.CANCELLED.ToString() &&
-                    order.Status == OrderStatus.PROCESSING.ToString() &&
-                    payment.PaymentStatus == PaymentStatusEnum.Completed.ToString())
-                {
-                    payment.PaymentStatus = PaymentStatusEnum.Refunding.ToString();
+                    var payment = order.Payments?.FirstOrDefault();
+                    bool isPaid = payment != null && payment.PaymentStatus == PaymentStatusEnum.Completed.ToString();
+                    string emailBody = EmailTemplatesUtils.RefundNotificationEmailTemplate(orderId.ToString(), isPaid);
+                    await _emailSender.SendRefundNotificationEmailAsync(order.User.Email, emailBody);
                 }
 
                 order.Status = updateOrderRequest.Status;
+                order.ModifyDate = DateTime.Now;
                 _unitOfWork.GetRepository<Order>().UpdateAsync(order);
             }
 
-            order.ModifyDate = DateTime.Now;
-            _unitOfWork.GetRepository<Order>().UpdateAsync(order);
-
-            // Commit tất cả thay đổi
+            // Commit all changes
             bool isUpdated = await _unitOfWork.CommitAsync() > 0;
 
             return new ApiResponse

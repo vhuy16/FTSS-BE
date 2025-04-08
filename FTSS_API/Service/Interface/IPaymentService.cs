@@ -12,4 +12,5 @@ public interface IPaymentService
     Task<ApiResponse> UpdatePaymentStatus(Guid paymentId, string newStatus);
     Task<ApiResponse> UpdateBankInfor(Guid paymentId, long? bankNumber, string bankName, string bankHolder);
     Task<ApiResponse> GetPaymentsByStatus(string status, int page, int size);
+
 }
