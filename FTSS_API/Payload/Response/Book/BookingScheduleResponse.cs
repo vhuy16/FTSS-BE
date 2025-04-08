@@ -22,5 +22,6 @@
         public Guid? OrderId { get; set; }
         public string Url { get; set; } = null!;
         public string BookingCode { get; set; } = null!;
+        public string PaymentMethod { get; set; } = null!;
     }
 }
