@@ -194,6 +194,7 @@ public class PaymentService : BaseService<PaymentService>, IPaymentService
     {
         var payment = await _unitOfWork.GetRepository<Payment>()
             .SingleOrDefaultAsync(predicate: o => o.OrderId == OrderId );
+        var order = await _unitOfWork.GetRepository<Order>().SingleOrDefaultAsync(predicate: o => o.Id == OrderId);
         if (payment == null)
         {
             return new ApiResponse
@@ -205,6 +206,11 @@ public class PaymentService : BaseService<PaymentService>, IPaymentService
         }
 
         payment.PaymentStatus = newStatus;
+        if (payment.PaymentStatus == PaymentStatusEnum.Refunded.GetDescriptionFromEnum())
+        {
+            order.Status = OrderStatus.REFUNDED.ToString();
+        }
+        _unitOfWork.GetRepository<Order>().UpdateAsync(order);
         _unitOfWork.GetRepository<Payment>().UpdateAsync(payment);
         await _unitOfWork.CommitAsync();
 

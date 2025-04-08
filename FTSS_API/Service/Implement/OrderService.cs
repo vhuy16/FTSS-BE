@@ -30,9 +30,11 @@ public class OrderService : BaseService<OrderService>, IOrderService
 
     public OrderService(IUnitOfWork<MyDbContext> unitOfWork, ILogger<OrderService> logger, IMapper mapper,
         Lazy<IPaymentService> paymentService,
+        IEmailSender emailSender,
         IHttpContextAccessor httpContextAccessor) : base(unitOfWork, logger, mapper, httpContextAccessor)
     {
         _paymentService = paymentService;
+        _emailSender = emailSender;
     }
 
     // public async Task<ApiResponse> CreateOrder(CreateOrderRequest createOrderRequest)
@@ -732,7 +734,8 @@ public class OrderService : BaseService<OrderService>, IOrderService
                     var payment = order.Payments?.FirstOrDefault();
                     bool isPaid = payment != null && payment.PaymentStatus == PaymentStatusEnum.Completed.ToString();
                     string emailBody = EmailTemplatesUtils.RefundNotificationEmailTemplate(orderId.ToString(), isPaid);
-                    await _emailSender.SendRefundNotificationEmailAsync(order.User.Email, emailBody);
+                    var email = order.User.Email;
+                    await _emailSender.SendRefundNotificationEmailAsync(email, emailBody);
                 }
 
                 order.Status = updateOrderRequest.Status;
@@ -886,6 +889,7 @@ public class OrderService : BaseService<OrderService>, IOrderService
                 Payment = order.Payments != null && order.Payments.Any()
                     ? new GetOrderResponse.PaymentResponse
                     {
+                        PaymentId = order.Payments.FirstOrDefault()?.Id ?? Guid.Empty,
                         PaymentMethod = order.Payments.FirstOrDefault()?.PaymentMethod ?? "Unknown",
                         PaymentStatus = order.Payments.FirstOrDefault()?.PaymentStatus ?? "Unknown"
                     }
@@ -1086,6 +1090,7 @@ public class OrderService : BaseService<OrderService>, IOrderService
                 Payment = order.Payments != null && order.Payments.Any()
                     ? new GetOrderResponse.PaymentResponse
                     {
+                        PaymentId = order.Payments.FirstOrDefault()?.Id ?? Guid.Empty,
                         PaymentMethod = order.Payments.FirstOrDefault()?.PaymentMethod ?? "Unknown",
                         PaymentStatus = order.Payments.FirstOrDefault()?.PaymentStatus ?? "Unknown"
                     }
@@ -1256,6 +1261,7 @@ public class OrderService : BaseService<OrderService>, IOrderService
                 Payment = new GetOrderResponse.PaymentResponse
                 {
                     PaymentMethod = order.Payments.FirstOrDefault()?.PaymentMethod,
+                    PaymentId = order.Payments.FirstOrDefault()?.Id ?? Guid.Empty,
                     PaymentStatus = order.Payments.FirstOrDefault()?.PaymentStatus,
                 },
                 userResponse = new GetOrderResponse.UserResponse
