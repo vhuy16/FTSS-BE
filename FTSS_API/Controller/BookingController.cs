@@ -80,13 +80,14 @@ namespace FTSS_API.Controller
             [FromQuery] int? page,
             [FromQuery] int? size,
             [FromQuery] string? status,
-            [FromQuery] string? missionstatus,
+            [FromQuery] string? paymentstatus,
+            [FromQuery] string? bookingcode,
             [FromQuery] bool? isAscending = null,
             [FromQuery] bool? isAssigned = null)
         {
             int pageNumber = page ?? 1;
             int pageSize = size ?? 10;
-            var response = await _bookingService.GetListBookingForManager(pageNumber, pageSize, status, missionstatus, isAscending, isAssigned);
+            var response = await _bookingService.GetListBookingForManager(pageNumber, pageSize, status, paymentstatus, bookingcode, isAscending, isAssigned);
             return StatusCode(int.Parse(response.status), response);
         }
         /// <summary>
@@ -173,12 +174,13 @@ namespace FTSS_API.Controller
             [FromQuery] int? page,
             [FromQuery] int? size,
             [FromQuery] string? status,
-            [FromQuery] string? missionstatus,
+            [FromQuery] string? paymentstatus,
+            [FromQuery] string? bookingcode,
             [FromQuery] bool? isAscending = null)
         {
             int pageNumber = page ?? 1;
             int pageSize = size ?? 10;
-            var response = await _bookingService.GetListBookingForUser(pageNumber, pageSize, status, missionstatus, isAscending);
+            var response = await _bookingService.GetListBookingForUser(pageNumber, pageSize, status, bookingcode, paymentstatus, isAscending);
             return StatusCode(int.Parse(response.status), response);
         }
         /// <summary>
