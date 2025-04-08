@@ -15,17 +15,21 @@ using FTSS_Model.Paginate;
 using LinqKit;
 using FTSS_Repository.Interface;
 using Microsoft.EntityFrameworkCore;
+using MRC_API.Utils;
 using Supabase.Storage;
 using Client = Supabase.Client;
 
 public class IssueService : BaseService<IssueService>, IIssueService
 { 
     private readonly SupabaseUltils _supabaseImageService;
-    public IssueService(IUnitOfWork<MyDbContext> unitOfWork, ILogger<IssueService> logger, IMapper mapper, SupabaseUltils supabaseImageService,
+    private readonly HtmlSanitizerUtils _sanitizer;
+    public IssueService(IUnitOfWork<MyDbContext> unitOfWork, ILogger<IssueService> logger, IMapper mapper, 
+        SupabaseUltils supabaseImageService, HtmlSanitizerUtils sanitizer,
         IHttpContextAccessor httpContextAccessor)
         : base(unitOfWork, logger, mapper, httpContextAccessor)
     {
         _supabaseImageService = supabaseImageService;
+        _sanitizer = sanitizer;
     }
 
 
@@ -86,11 +90,12 @@ public async Task<ApiResponse> CreateIssue(AddUpdateIssueRequest request, Client
 
         foreach (var solutionRequest in parsedSolutions)
         {
+            var description = _sanitizer.Sanitize(solutionRequest.Description);
             var solution = new Solution
             {
                 Id = Guid.NewGuid(),
                 SolutionName = solutionRequest.SolutionName,
-                Description = solutionRequest.Description,
+                Description = description,
                 IssueId = issue.Id,
                 CreateDate = DateTime.UtcNow,
                 IsDelete = false
@@ -267,7 +272,7 @@ public async Task<ApiResponse> UpdateIssue(Guid id, AddUpdateIssueRequest reques
 
     // Cập nhật thông tin cơ bản của issue
     existingIssue.Title = request.Title ?? existingIssue.Title;
-    existingIssue.Description = request.Description ?? existingIssue.Description;
+    existingIssue.Description = _sanitizer.Sanitize(request.Description) ?? existingIssue.Description;
     existingIssue.IssueCategoryId = request.IssueCategoryId ?? existingIssue.IssueCategoryId;
     existingIssue.IssueImage = issueImage;
     existingIssue.ModifiedDate = DateTime.Now;
