@@ -53,11 +53,11 @@ public class PaymentController : BaseController<PaymentController>
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> UpdatePaymentStatus([FromBody]  String Status, [FromForm]  Guid PaymentId)
+    public async Task<IActionResult> UpdatePaymentStatus([FromBody]  String Status, [FromRoute]  Guid id)
     {
       
 
-        var result = await _paymentService.UpdatePaymentStatus(PaymentId, Status);
+        var result = await _paymentService.UpdatePaymentStatus(id, Status);
 
         return result.status == StatusCodes.Status200OK.ToString() ? Ok(result) : BadRequest(result);
     }
@@ -110,4 +110,5 @@ public class PaymentController : BaseController<PaymentController>
         var result = await _paymentService.GetPaymentsByStatus(paymentStatus, page, size);
         return Ok(result);
     }
+    
 }
