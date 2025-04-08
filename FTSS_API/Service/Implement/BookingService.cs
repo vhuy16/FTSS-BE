@@ -822,7 +822,7 @@ namespace FTSS_API.Service.Implement
             }
         }
 
-        public async Task<ApiResponse> GetListBookingForManager(int pageNumber, int pageSize, string? status, bool? isAscending, bool? isAssigned)
+        public async Task<ApiResponse> GetListBookingForManager(int pageNumber, int pageSize, string? status,string? missionstatus, bool? isAscending, bool? isAssigned)
         {
             try
             {
@@ -853,7 +853,8 @@ namespace FTSS_API.Service.Implement
                 var bookings = await _unitOfWork.GetRepository<Booking>().GetPagingListAsync(
                     predicate: filter,
                     orderBy: orderBy,
-                    include: b => b.Include(x => x.User),
+                    include: b => b.Include(x => x.User)
+                                   .Include(x => x.Missions),
                     page: pageNumber,
                     size: pageSize
                 );
@@ -863,9 +864,9 @@ namespace FTSS_API.Service.Implement
                     Id = b.Id,
                     ScheduleDate = b.ScheduleDate,
                     Status = b.Status,
+                    MissionStatus = b.Missions.FirstOrDefault(m => m.IsDelete == false)?.Status,
                     Address = b.Address,
                     PhoneNumber = b.PhoneNumber,
-
                     bookingCode = b.BookingCode,
                     TotalPrice = b.TotalPrice,
                     UserId = b.User?.Id,
@@ -873,7 +874,7 @@ namespace FTSS_API.Service.Implement
                     FullName = b.FullName,
                     OrderId = b.OrderId,
                     IsAssigned = b.IsAssigned
-                }).ToList();
+                }).Where(r => string.IsNullOrEmpty(missionstatus) || r.MissionStatus == missionstatus).ToList();
 
                 return new ApiResponse
                 {
@@ -946,7 +947,7 @@ namespace FTSS_API.Service.Implement
                         ServiceName = bd.ServicePackage.ServiceName,
                         Price = bd.ServicePackage.Price
                     }).ToList()
-                }).ToList();
+                }).Where(r => string.IsNullOrEmpty(missionstatus) || r.MissionStatus == missionstatus).ToList();
 
                 return new ApiResponse
                 {
