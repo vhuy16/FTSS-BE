@@ -889,6 +889,7 @@ public class OrderService : BaseService<OrderService>, IOrderService
                 Payment = order.Payments != null && order.Payments.Any()
                     ? new GetOrderResponse.PaymentResponse
                     {
+                        PaymentId = order.Payments.FirstOrDefault()?.Id ?? Guid.Empty,
                         PaymentMethod = order.Payments.FirstOrDefault()?.PaymentMethod ?? "Unknown",
                         PaymentStatus = order.Payments.FirstOrDefault()?.PaymentStatus ?? "Unknown"
                     }
@@ -1089,6 +1090,7 @@ public class OrderService : BaseService<OrderService>, IOrderService
                 Payment = order.Payments != null && order.Payments.Any()
                     ? new GetOrderResponse.PaymentResponse
                     {
+                        PaymentId = order.Payments.FirstOrDefault()?.Id ?? Guid.Empty,
                         PaymentMethod = order.Payments.FirstOrDefault()?.PaymentMethod ?? "Unknown",
                         PaymentStatus = order.Payments.FirstOrDefault()?.PaymentStatus ?? "Unknown"
                     }
@@ -1259,6 +1261,7 @@ public class OrderService : BaseService<OrderService>, IOrderService
                 Payment = new GetOrderResponse.PaymentResponse
                 {
                     PaymentMethod = order.Payments.FirstOrDefault()?.PaymentMethod,
+                    PaymentId = order.Payments.FirstOrDefault()?.Id ?? Guid.Empty,
                     PaymentStatus = order.Payments.FirstOrDefault()?.PaymentStatus,
                 },
                 userResponse = new GetOrderResponse.UserResponse

@@ -51,6 +51,7 @@ namespace FTSS_API.Payload.Response.Order
 
         public class PaymentResponse
         {
+            public Guid PaymentId { get; set; }
             public string PaymentMethod { get; set; } = null!;
             public string PaymentStatus { get; set; } = null!;
         }
