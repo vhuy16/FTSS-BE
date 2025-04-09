@@ -74,7 +74,7 @@ namespace FTSS_API.Service.Implement
         public async Task<ApiResponse> GetAllIssueCategories()
         {
             var categories = await _unitOfWork.GetRepository<IssueCategory>()
-                .GetListAsync(predicate: c => c.IsDelete == false);
+                .GetListAsync();
             return new ApiResponse
             {
                 status = StatusCodes.Status200OK.ToString(),
