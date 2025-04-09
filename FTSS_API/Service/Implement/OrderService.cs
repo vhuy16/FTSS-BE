@@ -733,7 +733,7 @@ public class OrderService : BaseService<OrderService>, IOrderService
                 {
                     var payment = order.Payments?.FirstOrDefault();
                     bool isPaid = payment != null && payment.PaymentStatus == PaymentStatusEnum.Completed.ToString();
-                    string emailBody = EmailTemplatesUtils.RefundNotificationEmailTemplate(orderId.ToString(), isPaid);
+                    string emailBody = EmailTemplatesUtils.RefundNotificationEmailTemplate(order.Id, order.OrderCode, isPaid);
                     var email = order.User.Email;
                     await _emailSender.SendRefundNotificationEmailAsync(email, emailBody);
                 }
@@ -950,207 +950,197 @@ public class OrderService : BaseService<OrderService>, IOrderService
     }
 
 
-    public async Task<ApiResponse> GetAllOrder(int page, int size, string? status, string? ordercode, bool? isAscending)
+
+public async Task<ApiResponse> GetAllOrder(int page, int size, string status, string orderCode, bool? isAscending)
+{
+    try
     {
-        try
+        Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
+        var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
+            predicate: u => u.Id.Equals(userId) &&
+                            u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()));
+
+        if (user == null)
         {
-            Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
-            var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
-                predicate: u => u.Id.Equals(userId) &&
-                                u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()));
-
-            if (user == null)
+            return new ApiResponse
             {
-                return new ApiResponse()
-                {
-                    status = StatusCodes.Status401Unauthorized.ToString(),
-                    message = "Unauthorized: Token is missing or expired.",
-                    data = null
-                };
-            }
+                status = StatusCodes.Status401Unauthorized.ToString(),
+                message = "Unauthorized: Token is missing or expired.",
+                data = null
+            };
+        }
 
-            var query = _unitOfWork.Context.Set<Order>()
-                .Include(o => o.User)
-                .Include(o => o.Voucher)
-                .Include(o => o.Payments)
-                .Include(o => o.OrderDetails)
-                    .ThenInclude(od => od.Product)
-                        .ThenInclude(p => p.SubCategory)
-                            .ThenInclude(sc => sc.Category)
-                .Include(o => o.OrderDetails)
-                    .ThenInclude(od => od.Product)
-                        .ThenInclude(p => p.Images)
-                .Include(o => o.SetupPackage)
-                    .ThenInclude(sp => sp.SetupPackageDetails)
-                        .ThenInclude(spd => spd.Product)
-                            .ThenInclude(p => p.SubCategory)
-                                .ThenInclude(sc => sc.Category)
-                .Include(o => o.SetupPackage)
-                    .ThenInclude(sp => sp.SetupPackageDetails)
-                        .ThenInclude(spd => spd.Product)
-                            .ThenInclude(p => p.Images)
-                .AsQueryable();
+        var query = _unitOfWork.Context.Set<Order>()
+            .Where(x =>
+                (string.IsNullOrEmpty(status) || x.Status.Equals(status)) &&
+                (string.IsNullOrEmpty(orderCode) || x.OrderCode.Contains(orderCode)))
+            .Include(o => o.User)
+            .Include(o => o.Voucher)
+            .Include(o => o.Payments)
+            .Include(o => o.OrderDetails)
+            .ThenInclude(od => od.Product)
+            .ThenInclude(p => p.SubCategory)
+            .ThenInclude(sc => sc.Category)
+            .Include(o => o.OrderDetails)
+            .ThenInclude(od => od.Product)
+            .ThenInclude(p => p.Images)
+            .Include(o => o.SetupPackage)
+            .ThenInclude(sp => sp.SetupPackageDetails)
+            .ThenInclude(spd => spd.Product)
+            .ThenInclude(p => p.SubCategory)
+            .ThenInclude(sc => sc.Category)
+            .Include(o => o.SetupPackage)
+            .ThenInclude(sp => sp.SetupPackageDetails)
+            .ThenInclude(spd => spd.Product)
+            .ThenInclude(p => p.Images)
+            .AsQueryable();
 
-            // Lọc theo status nếu có
-            if (!string.IsNullOrEmpty(status))
-            {
-                query = query.Where(o => o.Status == status);
-            }
+        // Sắp xếp nếu cần
+        if (!isAscending.HasValue) isAscending = true;
+        query = isAscending.Value
+            ? query.OrderBy(o => o.CreateDate)
+            : query.OrderByDescending(o => o.CreateDate);
 
-            // ✅ Lọc theo ordercode nếu có
-            if (!string.IsNullOrEmpty(ordercode))
-            {
-                query = query.Where(o => o.OrderCode.Contains(ordercode));
-            }
+        // Phân trang
+        var totalItems = await query.CountAsync();
+        var orders = await query
+            .Skip((page - 1) * size)
+            .Take(size)
+            .ToListAsync();
 
-            // Sắp xếp
-            if (!isAscending.HasValue) isAscending = true;
-            query = isAscending.Value
-                ? query.OrderBy(o => o.CreateDate)
-                : query.OrderByDescending(o => o.CreateDate);
-
-            // Phân trang
-            var totalItems = await query.CountAsync();
-            var orders = await query
-                .Skip((page - 1) * size)
-                .Take(size)
-                .ToListAsync();
-
-            if (!orders.Any())
-            {
-                return new ApiResponse
-                {
-                    status = StatusCodes.Status200OK.ToString(),
-                    message = "No orders found for the specified user.",
-                    data = new List<Order>()
-                };
-            }
-
-            // Chuyển đổi sang response (không đổi phần này để tiết kiệm không gian)
-            var orderResponses = orders.Select(order =>
-            {
-                decimal discountAmount = 0;
-
-                if (order.Voucher != null)
-                {
-                    if (order.Voucher.DiscountType.Equals(VoucherTypeEnum.Percentage.GetDescriptionFromEnum()))
-                    {
-                        discountAmount = order.TotalPrice * (order.Voucher.Discount / 100);
-                        discountAmount = Math.Min(discountAmount, (decimal)order.Voucher.MaximumOrderValue);
-                    }
-                    else if (order.Voucher.DiscountType.Trim().Equals(VoucherTypeEnum.Fixed.GetDescriptionFromEnum()))
-                    {
-                        discountAmount = order.Voucher.Discount;
-                        discountAmount = Math.Min(discountAmount, (decimal)order.Voucher.MaximumOrderValue);
-                    }
-                }
-
-                return new GetOrderResponse
-                {
-                    Id = order.Id,
-                    TotalPrice = order.TotalPrice,
-                    Status = order.Status,
-                    ShipCost = order.Shipcost,
-                    Address = order.Address,
-                    CreateDate = order.CreateDate,
-                    IsAssigned = order.IsAssigned,
-                    IsEligible = order.IsEligible,
-                    OderCode = order.OrderCode,
-                    ModifyDate = order.ModifyDate,
-                    PhoneNumber = order.PhoneNumber,
-                    BuyerName = order.RecipientName,
-                    SetupPackage = order.SetupPackage != null
-                        ? new SetupPackageResponse
-                        {
-                            SetupPackageId = order.SetupPackageId,
-                            SetupName = order.SetupPackage?.SetupName,
-                            ModifyDate = order.ModifyDate,
-                            Size = order.SetupPackage?.SetupPackageDetails?
-                                .Where(spd => spd.Product?.SubCategory?.Category?.CategoryName == "Bể")
-                                .Select(spd => spd.Product?.Size)
-                                .FirstOrDefault(),
-                            CreateDate = order.CreateDate,
-                            TotalPrice = order.SetupPackage?.Price ?? 0,
-                            Description = order.SetupPackage?.Description ?? "N/A",
-                            IsDelete = order.SetupPackage?.IsDelete ?? false,
-                            Products = order.SetupPackage?.SetupPackageDetails?.Select(spd => new ProductResponse
-                            {
-                                Id = spd.Product?.Id ?? Guid.Empty,
-                                ProductName = spd.Product?.ProductName ?? "Unknown",
-                                Quantity = spd.Quantity,
-                                Price = spd.Product?.Price ?? 0,
-                                InventoryQuantity = spd.Product?.Quantity ?? 0,
-                                Status = spd.Product != null ? spd.Product.Status : "false",
-                                IsDelete = order.SetupPackage?.IsDelete ?? false,
-                                CategoryName = spd.Product?.SubCategory?.Category?.CategoryName ?? "Unknown",
-                                images = spd.Product?.Images?
-                                    .Where(img => img.IsDelete == false)
-                                    .OrderBy(img => img.CreateDate)
-                                    .Select(img => img.LinkImage)
-                                    .FirstOrDefault() ?? "NoImageAvailable"
-                            }).ToList() ?? new List<ProductResponse>()
-                        }
-                        : null,
-                    Payment = order.Payments != null && order.Payments.Any()
-                        ? new GetOrderResponse.PaymentResponse
-                        {
-                            PaymentId = order.Payments.FirstOrDefault()?.Id ?? Guid.Empty,
-                            PaymentMethod = order.Payments.FirstOrDefault()?.PaymentMethod ?? "Unknown",
-                            PaymentStatus = order.Payments.FirstOrDefault()?.PaymentStatus ?? "Unknown"
-                        }
-                        : null,
-                    userResponse = order.User != null
-                        ? new GetOrderResponse.UserResponse
-                        {
-                            Name = order.User.UserName ?? "Unknown",
-                            Email = order.User.Email ?? "Unknown",
-                            PhoneNumber = order.User.PhoneNumber ?? "Unknown"
-                        }
-                        : null,
-                    Voucher = order.Voucher != null ? new GetOrderResponse.VoucherResponse()
-                    {
-                        VoucherCode = order.Voucher?.VoucherCode,
-                        DiscountType = order.Voucher?.DiscountType,
-                        Discount = order.Voucher?.Discount,
-                        MaximumOrderValue = order.Voucher?.MaximumOrderValue,
-                    } : null,
-                    OrderDetails = order.OrderDetails?.Select(od => new GetOrderResponse.OrderDetailCreateResponse
-                    {
-                        ProductName = od.Product?.ProductName ?? "Unknown",
-                        Price = od.Price,
-                        Quantity = od.Quantity,
-                        LinkImage = od.Product?.Images?.FirstOrDefault()?.LinkImage ?? "NoImageAvailable",
-                        SubCategoryName = od.Product?.SubCategory?.SubCategoryName ?? "NoSubCategory",
-                        CategoryName = od.Product?.SubCategory?.Category?.CategoryName ?? "NoCategory"
-                    }).ToList() ?? new List<GetOrderResponse.OrderDetailCreateResponse>()
-                };
-            }).ToList();
-
+        if (!orders.Any())
+        {
             return new ApiResponse
             {
                 status = StatusCodes.Status200OK.ToString(),
-                message = "Orders retrieved successfully.",
-                data = new
-                {
-                    TotalItems = totalItems,
-                    Page = page,
-                    PageSize = size,
-                    Orders = orderResponses
-                }
+                message = "No orders found for the specified criteria.",
+                data = new List<Order>()
             };
         }
-        catch (Exception ex)
+
+        // Chuyển đổi sang response
+        var orderResponses = orders.Select(order =>
         {
-            return new ApiResponse
+            decimal discountAmount = 0;
+
+            if (order.Voucher != null)
             {
-                status = StatusCodes.Status500InternalServerError.ToString(),
-                message = "An error occurred while retrieving orders.",
-                data = ex.Message
+                if (order.Voucher.DiscountType.Equals(VoucherTypeEnum.Percentage.GetDescriptionFromEnum()))
+                {
+                    discountAmount = order.TotalPrice * (order.Voucher.Discount / 100);
+                    discountAmount = Math.Min(discountAmount, (decimal)order.Voucher.MaximumOrderValue);
+                }
+                else if (order.Voucher.DiscountType.Trim().Equals(VoucherTypeEnum.Fixed.GetDescriptionFromEnum()))
+                {
+                    discountAmount = order.Voucher.Discount;
+                    discountAmount = Math.Min(discountAmount, (decimal)order.Voucher.MaximumOrderValue);
+                }
+            }
+
+            return new GetOrderResponse
+            {
+                Id = order.Id,
+                TotalPrice = order.TotalPrice,
+                Status = order.Status,
+                ShipCost = order.Shipcost,
+                Address = order.Address,
+                CreateDate = order.CreateDate,
+                IsAssigned = order.IsAssigned,
+                IsEligible = order.IsEligible,
+                OderCode = order.OrderCode,
+                ModifyDate = order.ModifyDate,
+                PhoneNumber = order.PhoneNumber,
+                BuyerName = order.RecipientName,
+                SetupPackage = order.SetupPackage != null
+                    ? new SetupPackageResponse
+                    {
+                        SetupPackageId = order.SetupPackageId,
+                        SetupName = order.SetupPackage?.SetupName,
+                        ModifyDate = order.ModifyDate,
+                        Size = order.SetupPackage?.SetupPackageDetails?
+                            .Where(spd => spd.Product?.SubCategory?.Category?.CategoryName == "Bể")
+                            .Select(spd => spd.Product?.Size)
+                            .FirstOrDefault(),
+                        CreateDate = order.CreateDate,
+                        TotalPrice = order.SetupPackage?.Price ?? 0,
+                        Description = order.SetupPackage?.Description ?? "N/A",
+                        IsDelete = order.SetupPackage?.IsDelete ?? false,
+                        Products = order.SetupPackage?.SetupPackageDetails?.Select(spd => new ProductResponse
+                        {
+                            Id = spd.Product?.Id ?? Guid.Empty,
+                            ProductName = spd.Product?.ProductName ?? "Unknown",
+                            Quantity = spd.Quantity,
+                            Price = spd.Product?.Price ?? 0,
+                            InventoryQuantity = spd.Product?.Quantity ?? 0,
+                            Status = spd.Product != null ? spd.Product.Status : "false",
+                            IsDelete = order.SetupPackage?.IsDelete ?? false,
+                            CategoryName = spd.Product?.SubCategory?.Category?.CategoryName ?? "Unknown",
+                            images = spd.Product?.Images?
+                                .Where(img => img.IsDelete == false)
+                                .OrderBy(img => img.CreateDate)
+                                .Select(img => img.LinkImage)
+                                .FirstOrDefault() ?? "NoImageAvailable"
+                        }).ToList() ?? new List<ProductResponse>()
+                    }
+                    : null,
+                Payment = order.Payments != null && order.Payments.Any()
+                    ? new GetOrderResponse.PaymentResponse
+                    {
+                        PaymentId = order.Payments.FirstOrDefault()?.Id ?? Guid.Empty,
+                        PaymentMethod = order.Payments.FirstOrDefault()?.PaymentMethod ?? "Unknown",
+                        PaymentStatus = order.Payments.FirstOrDefault()?.PaymentStatus ?? "Unknown"
+                    }
+                    : null,
+                userResponse = order.User != null
+                    ? new GetOrderResponse.UserResponse
+                    {
+                        Name = order.User.UserName ?? "Unknown",
+                        Email = order.User.Email ?? "Unknown",
+                        PhoneNumber = order.User.PhoneNumber ?? "Unknown"
+                    }
+                    : null,
+                Voucher = order.Voucher != null ? new GetOrderResponse.VoucherResponse
+                {
+                    VoucherCode = order.Voucher?.VoucherCode,
+                    DiscountType = order.Voucher?.DiscountType,
+                    Discount = order.Voucher?.Discount,
+                    MaximumOrderValue = order.Voucher?.MaximumOrderValue,
+                } : null,
+                OrderDetails = order.OrderDetails?.Select(od => new GetOrderResponse.OrderDetailCreateResponse
+                {
+                    ProductName = od.Product?.ProductName ?? "Unknown",
+                    Price = od.Price,
+                    Quantity = od.Quantity,
+                    LinkImage = od.Product?.Images?.FirstOrDefault()?.LinkImage ?? "NoImageAvailable",
+                    SubCategoryName = od.Product?.SubCategory?.SubCategoryName ?? "NoSubCategory",
+                    CategoryName = od.Product?.SubCategory?.Category?.CategoryName ?? "NoCategory"
+                }).ToList() ?? new List<GetOrderResponse.OrderDetailCreateResponse>()
             };
-        }
+        }).ToList();
+
+        return new ApiResponse
+        {
+            status = StatusCodes.Status200OK.ToString(),
+            message = "Orders retrieved successfully.",
+            data = new
+            {
+                TotalItems = totalItems,
+                Page = page,
+                PageSize = size,
+                Orders = orderResponses
+            }
+        };
     }
-
-
+    catch (Exception ex)
+    {
+        return new ApiResponse
+        {
+            status = StatusCodes.Status500InternalServerError.ToString(),
+            message = "An error occurred while retrieving orders.",
+            data = ex.Message
+        };
+    }
+}
     public async Task<ApiResponse> GetOrderById(Guid id)
     {
         try

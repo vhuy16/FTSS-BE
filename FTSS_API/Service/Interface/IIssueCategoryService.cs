@@ -33,5 +33,7 @@ namespace FTSS_API.Service.Interface
         /// Xóa danh mục sự cố
         /// </summary>
         Task<ApiResponse> DeleteIssueCategory(Guid id);
+
+        Task<ApiResponse> EnableIssueCategory(Guid id);
     }
 }
