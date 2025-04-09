@@ -236,10 +236,6 @@ public class PayOsService : BaseService<PayOsService>, IPayOSService
         if (booking == null)
             throw new InvalidOperationException("Booking not found.");
 
-        booking.Status = BookingStatusEnum.PAID.GetDescriptionFromEnum();
-
-
-        _unitOfWork.GetRepository<Booking>().UpdateAsync(booking);
         _unitOfWork.GetRepository<Payment>().UpdateAsync(payment);
     }
 
@@ -270,10 +266,8 @@ public class PayOsService : BaseService<PayOsService>, IPayOSService
 
         payment.PaymentStatus = PaymentStatusEnum.Cancelled.ToString();
         payment.PaymentDate = DateTime.UtcNow;
-        booking.Status = BookingStatusEnum.NOTPAID.GetDescriptionFromEnum();
 
         _unitOfWork.GetRepository<Payment>().UpdateAsync(payment);
-        _unitOfWork.GetRepository<Booking>().UpdateAsync(booking);
         await _unitOfWork.CommitAsync();
 
         return new ApiResponse

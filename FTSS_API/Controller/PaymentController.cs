@@ -65,7 +65,7 @@ public class PaymentController : BaseController<PaymentController>
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> UpdateBankInfor(Guid paymentId, long? bankNumber, string bankName, string bankHolder)
+    public async Task<IActionResult> UpdateBankInfor(Guid paymentId, string bankNumber, string bankName, string bankHolder)
     {
         var result = await _paymentService.UpdateBankInfor(paymentId, bankNumber, bankName, bankHolder);
 

@@ -2,7 +2,11 @@
 
 public enum BookingStatusEnum
 {
-    NOTPAID,
-    PAID,
-    FREE
+    CANCELLED,
+    NOTASSIGN,
+    ASSIGNED,
+    DONE,
+    MISSED,
+    PROCESSING,
+    NOTSTARTED
 }

@@ -1,4 +1,6 @@
-﻿namespace FTSS_API.Payload.Response.Book
+﻿using static FTSS_API.Payload.Response.Order.GetOrderResponse;
+
+namespace FTSS_API.Payload.Response.Book
 {
     public class GetListBookingForManagerResponse
     {
@@ -22,5 +24,6 @@
         public Guid? OrderId { get; set; }
 
         public bool? IsAssigned { get; set; }
+        public PaymentResponse Payment { get; set; } = new PaymentResponse();
     }
 }

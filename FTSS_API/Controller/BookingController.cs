@@ -80,12 +80,14 @@ namespace FTSS_API.Controller
             [FromQuery] int? page,
             [FromQuery] int? size,
             [FromQuery] string? status,
+            [FromQuery] string? paymentstatus,
+            [FromQuery] string? bookingcode,
             [FromQuery] bool? isAscending = null,
             [FromQuery] bool? isAssigned = null)
         {
             int pageNumber = page ?? 1;
             int pageSize = size ?? 10;
-            var response = await _bookingService.GetListBookingForManager(pageNumber, pageSize, status, isAscending, isAssigned);
+            var response = await _bookingService.GetListBookingForManager(pageNumber, pageSize, status, paymentstatus, bookingcode, isAscending, isAssigned);
             return StatusCode(int.Parse(response.status), response);
         }
         /// <summary>
@@ -172,11 +174,13 @@ namespace FTSS_API.Controller
             [FromQuery] int? page,
             [FromQuery] int? size,
             [FromQuery] string? status,
+            [FromQuery] string? paymentstatus,
+            [FromQuery] string? bookingcode,
             [FromQuery] bool? isAscending = null)
         {
             int pageNumber = page ?? 1;
             int pageSize = size ?? 10;
-            var response = await _bookingService.GetListBookingForUser(pageNumber, pageSize, status, isAscending);
+            var response = await _bookingService.GetListBookingForUser(pageNumber, pageSize, status, bookingcode, paymentstatus, isAscending);
             return StatusCode(int.Parse(response.status), response);
         }
         /// <summary>
@@ -225,6 +229,32 @@ namespace FTSS_API.Controller
         public async Task<IActionResult> UpdateBooking(Guid bookingid, [FromForm] UpdateBookingRequest request)
         {
             var response = await _bookingService.UpdateBooking(bookingid, request);
+            return StatusCode(int.Parse(response.status), response);
+        }
+        /// <summary>
+        /// API cancel booking.
+        /// </summary>
+        [HttpPut(ApiEndPointConstant.Booking.CancelBooking)]
+        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
+        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
+        [ProducesErrorResponseType(typeof(ProblemDetails))]
+        public async Task<IActionResult> CancelBooking(Guid bookingid)
+        {
+            var response = await _bookingService.CancelBooking(bookingid);
+            return StatusCode(int.Parse(response.status), response);
+        }
+        /// <summary>
+        /// API update booking status REFUNDED cho manager.
+        /// </summary>
+        [HttpPut(ApiEndPointConstant.Booking.UpdateBookingStatus)]
+        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
+        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
+        [ProducesErrorResponseType(typeof(ProblemDetails))]
+        public async Task<IActionResult> UpdateBookingStatus(Guid bookingid)
+        {
+            var response = await _bookingService.UpdateBookingStatus(bookingid);
             return StatusCode(int.Parse(response.status), response);
         }
     }

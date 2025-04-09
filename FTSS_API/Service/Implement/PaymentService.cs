@@ -228,7 +228,7 @@ public class PaymentService : BaseService<PaymentService>, IPaymentService
         };
     }
   
-    public async Task<ApiResponse> UpdateBankInfor(Guid paymentId, long? bankNumber, string bankName, string bankHolder)
+    public async Task<ApiResponse> UpdateBankInfor(Guid paymentId, string bankNumber, string bankName, string bankHolder)
     {
         var payment = await _unitOfWork.GetRepository<Payment>()
             .SingleOrDefaultAsync(predicate: p => p.Id == paymentId);
