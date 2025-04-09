@@ -733,7 +733,7 @@ public class OrderService : BaseService<OrderService>, IOrderService
                 {
                     var payment = order.Payments?.FirstOrDefault();
                     bool isPaid = payment != null && payment.PaymentStatus == PaymentStatusEnum.Completed.ToString();
-                    string emailBody = EmailTemplatesUtils.RefundNotificationEmailTemplate(orderId.ToString(), isPaid);
+                    string emailBody = EmailTemplatesUtils.RefundNotificationEmailTemplate(order.Id, order.OrderCode, isPaid);
                     var email = order.User.Email;
                     await _emailSender.SendRefundNotificationEmailAsync(email, emailBody);
                 }
@@ -950,7 +950,11 @@ public class OrderService : BaseService<OrderService>, IOrderService
     }
 
 
-    public async Task<ApiResponse> GetAllOrder(int page, int size, string? status, string? ordercode, bool? isAscending)
+
+    public async Task<ApiResponse> GetAllOrder(int page, int size, string status,string orderCode, bool? isAscending)
+{
+    try
+
     {
         try
         {
@@ -969,30 +973,49 @@ public class OrderService : BaseService<OrderService>, IOrderService
                 };
             }
 
-            var query = _unitOfWork.Context.Set<Order>()
-                .Include(o => o.User)
-                .Include(o => o.Voucher)
-                .Include(o => o.Payments)
-                .Include(o => o.OrderDetails)
-                    .ThenInclude(od => od.Product)
-                        .ThenInclude(p => p.SubCategory)
-                            .ThenInclude(sc => sc.Category)
-                .Include(o => o.OrderDetails)
-                    .ThenInclude(od => od.Product)
-                        .ThenInclude(p => p.Images)
-                .Include(o => o.SetupPackage)
-                    .ThenInclude(sp => sp.SetupPackageDetails)
-                        .ThenInclude(spd => spd.Product)
-                            .ThenInclude(p => p.SubCategory)
-                                .ThenInclude(sc => sc.Category)
-                .Include(o => o.SetupPackage)
-                    .ThenInclude(sp => sp.SetupPackageDetails)
-                        .ThenInclude(spd => spd.Product)
-                            .ThenInclude(p => p.Images)
-                .AsQueryable();
 
-            // Lọc theo status nếu có
-            if (!string.IsNullOrEmpty(status))
+        var query = _unitOfWork.Context.Set<Order>()
+                .Where(x =>
+                    (string.IsNullOrEmpty(status) || x.Status.Equals(status)) &&
+                    (string.IsNullOrEmpty(orderCode) || x.OrderCode.Contains(orderCode))
+                )
+            .Include(o => o.User)
+            .Include(o => o.Voucher)
+            .Include(o => o.Payments)
+            .Include(o => o.OrderDetails)
+            .ThenInclude(od => od.Product)
+            .ThenInclude(p => p.SubCategory)
+            .ThenInclude(sc => sc.Category)
+            .Include(o => o.OrderDetails)
+            .ThenInclude(od => od.Product)
+            .ThenInclude(p => p.Images)
+            .Include(o => o.SetupPackage)
+            .ThenInclude(sp => sp.SetupPackageDetails)
+            .ThenInclude(spd => spd.Product)
+            .ThenInclude(p => p.SubCategory)
+            .ThenInclude(sc => sc.Category)
+            .Include(o => o.SetupPackage)
+            .ThenInclude(sp => sp.SetupPackageDetails)
+            .ThenInclude(spd => spd.Product)
+            .ThenInclude(p => p.Images)
+            .AsQueryable();
+
+        // Sắp xếp nếu cần
+        if (!isAscending.HasValue) isAscending = true;
+        query = isAscending.Value
+            ? query.OrderBy(o => o.CreateDate)
+            : query.OrderByDescending(o => o.CreateDate);
+
+        // Phân trang
+        var totalItems = await query.CountAsync();
+        var orders = await query
+            .Skip((page - 1) * size)
+            .Take(size)
+            .ToListAsync();
+
+        if (!orders.Any())
+        {
+            return new ApiResponse
             {
                 query = query.Where(o => o.Status == status);
             }

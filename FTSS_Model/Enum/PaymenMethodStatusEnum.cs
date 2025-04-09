@@ -4,5 +4,6 @@ public enum PaymenMethodEnum
 {
     PayOs,
     VnPay,
-    COD
+    COD,
+    FREE
 }
