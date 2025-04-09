@@ -20,10 +20,11 @@ using Supabase.Storage;
 using Client = Supabase.Client;
 
 public class IssueService : BaseService<IssueService>, IIssueService
-{ 
+{
     private readonly SupabaseUltils _supabaseImageService;
     private readonly HtmlSanitizerUtils _sanitizer;
-    public IssueService(IUnitOfWork<MyDbContext> unitOfWork, ILogger<IssueService> logger, IMapper mapper, 
+
+    public IssueService(IUnitOfWork<MyDbContext> unitOfWork, ILogger<IssueService> logger, IMapper mapper,
         SupabaseUltils supabaseImageService, HtmlSanitizerUtils sanitizer,
         IHttpContextAccessor httpContextAccessor)
         : base(unitOfWork, logger, mapper, httpContextAccessor)
@@ -33,123 +34,124 @@ public class IssueService : BaseService<IssueService>, IIssueService
     }
 
 
-
 // ...
 
-public async Task<ApiResponse> CreateIssue(AddUpdateIssueRequest request, Client client)
-{
-    string issueImage = null;
-
-    if (request.IssueImage != null)
+    public async Task<ApiResponse> CreateIssue(AddUpdateIssueRequest request, Client client)
     {
-        var imageUrls = await _supabaseImageService.SendImagesAsync(new List<IFormFile> { request.IssueImage }, client);
-        issueImage = imageUrls.FirstOrDefault();
-    }
+        string issueImage = null;
 
-    var issue = new Issue
-    {
-        Id = Guid.NewGuid(),
-        Title = request.Title,
-        Description = request.Description,
-        IssueCategoryId = request.IssueCategoryId,
-        CreateDate = DateTime.UtcNow,
-        IsDelete = false,
-        IssueImage = issueImage,
-    };
-
-    await _unitOfWork.GetRepository<Issue>().InsertAsync(issue);
-
-    // Parse JSON strings from SolutionsJson
-    List<SolutionDto> parsedSolutions = new List<SolutionDto>();
-    foreach (var solutionJson in request.SolutionsJson)
-    {
-        try
+        if (request.IssueImage != null)
         {
-            // Deserialize each JSON string into a SolutionDto object
-            var solution = JsonSerializer.Deserialize<SolutionDto>(solutionJson);
-            if (solution != null)
-            {
-                parsedSolutions.Add(solution);
-            }
+            var imageUrls =
+                await _supabaseImageService.SendImagesAsync(new List<IFormFile> { request.IssueImage }, client);
+            issueImage = imageUrls.FirstOrDefault();
         }
-        catch (Exception ex)
+
+        var issue = new Issue
         {
-            return new ApiResponse
-            {
-                status = StatusCodes.Status400BadRequest.ToString(),
-                message = "Invalid solution JSON format.",
-                data = ex.Message
-            };
-        }
-    }
+            Id = Guid.NewGuid(),
+            Title = request.Title,
+            Description = request.Description,
+            IssueCategoryId = request.IssueCategoryId,
+            CreateDate = DateTime.UtcNow,
+            IsDelete = false,
+            IssueImage = issueImage,
+        };
 
-    if (parsedSolutions.Any())
-    {
-        var solutions = new List<Solution>();
-        var solutionProducts = new List<SolutionProduct>();
+        await _unitOfWork.GetRepository<Issue>().InsertAsync(issue);
 
-        foreach (var solutionRequest in parsedSolutions)
+        // Parse JSON strings from SolutionsJson
+        List<SolutionDto> parsedSolutions = new List<SolutionDto>();
+        foreach (var solutionJson in request.SolutionsJson)
         {
-            var description = _sanitizer.Sanitize(solutionRequest.Description);
-            var solution = new Solution
+            try
             {
-                Id = Guid.NewGuid(),
-                SolutionName = solutionRequest.SolutionName,
-                Description = description,
-                IssueId = issue.Id,
-                CreateDate = DateTime.UtcNow,
-                IsDelete = false
-            };
-            solutions.Add(solution);
-
-            if (solutionRequest.ProductIds != null && solutionRequest.ProductIds.Any())
-            {
-                foreach (var productId in solutionRequest.ProductIds)
+                // Deserialize each JSON string into a SolutionDto object
+                var solution = JsonSerializer.Deserialize<SolutionDto>(solutionJson);
+                if (solution != null)
                 {
-                    solutionProducts.Add(new SolutionProduct
-                    {
-                        Id = Guid.NewGuid(),
-                        SolutionId = solution.Id,
-                        ProductId = productId,
-                        CreateDate = DateTime.UtcNow
-                    });
+                    parsedSolutions.Add(solution);
                 }
             }
+            catch (Exception ex)
+            {
+                return new ApiResponse
+                {
+                    status = StatusCodes.Status400BadRequest.ToString(),
+                    message = "Invalid solution JSON format.",
+                    data = ex.Message
+                };
+            }
         }
 
-        await _unitOfWork.GetRepository<Solution>().InsertRangeAsync(solutions);
-        if (solutionProducts.Any())
+        if (parsedSolutions.Any())
         {
-            await _unitOfWork.GetRepository<SolutionProduct>().InsertRangeAsync(solutionProducts);
+            var solutions = new List<Solution>();
+            var solutionProducts = new List<SolutionProduct>();
+
+            foreach (var solutionRequest in parsedSolutions)
+            {
+                var description = _sanitizer.Sanitize(solutionRequest.Description);
+                var solution = new Solution
+                {
+                    Id = Guid.NewGuid(),
+                    SolutionName = solutionRequest.SolutionName,
+                    Description = description,
+                    IssueId = issue.Id,
+                    CreateDate = DateTime.UtcNow,
+                    IsDelete = false
+                };
+                solutions.Add(solution);
+
+                if (solutionRequest.ProductIds != null && solutionRequest.ProductIds.Any())
+                {
+                    foreach (var productId in solutionRequest.ProductIds)
+                    {
+                        solutionProducts.Add(new SolutionProduct
+                        {
+                            Id = Guid.NewGuid(),
+                            SolutionId = solution.Id,
+                            ProductId = productId,
+                            CreateDate = DateTime.UtcNow
+                        });
+                    }
+                }
+            }
+
+            await _unitOfWork.GetRepository<Solution>().InsertRangeAsync(solutions);
+            if (solutionProducts.Any())
+            {
+                await _unitOfWork.GetRepository<SolutionProduct>().InsertRangeAsync(solutionProducts);
+            }
         }
+
+        bool isSuccessful = await _unitOfWork.CommitAsync() > 0;
+
+        Issue createdIssue = null;
+        if (isSuccessful)
+        {
+            createdIssue = await _unitOfWork.GetRepository<Issue>()
+                .SingleOrDefaultAsync(
+                    predicate: i => i.Id == issue.Id,
+                    include: source => source
+                        .Include(i => i.IssueCategory)
+                        .Include(i => i.Solutions)
+                        .ThenInclude(s => s.SolutionProducts)
+                        .ThenInclude(sp => sp.Product)
+                        .ThenInclude(p => p.Images)
+                );
+        }
+
+        return new ApiResponse
+        {
+            status = StatusCodes.Status200OK.ToString(),
+            message = "Issue created successfully with solutions and related products.",
+            data = _mapper.Map<IssueResponse>(createdIssue)
+        };
     }
 
-    bool isSuccessful = await _unitOfWork.CommitAsync() > 0;
-
-    Issue createdIssue = null;
-    if (isSuccessful)
-    {
-        createdIssue = await _unitOfWork.GetRepository<Issue>()
-            .SingleOrDefaultAsync(
-                predicate: i => i.Id == issue.Id,
-                include: source => source
-                    .Include(i => i.IssueCategory)
-                    .Include(i => i.Solutions)
-                    .ThenInclude(s => s.SolutionProducts)
-                    .ThenInclude(sp => sp.Product)
-                    .ThenInclude(p => p.Images)
-            );
-    }
-
-    return new ApiResponse
-    {
-        status = StatusCodes.Status200OK.ToString(),
-        message = "Issue created successfully with solutions and related products.",
-        data = _mapper.Map<IssueResponse>(createdIssue)
-    };
-}
-
-    public async Task<ApiResponse> GetAllIssues(int page, int size, bool? isAscending, Guid? issueCategoryId = null, string issueTitle = null)
+    public async Task<ApiResponse> GetAllIssues(int page, int size, bool? isAscending, Guid? issueCategoryId = null,
+        string issueTitle = null)
     {
         Expression<Func<Issue, bool>> predicate = i => i.IsDelete == false;
 
@@ -186,9 +188,9 @@ public async Task<ApiResponse> CreateIssue(AddUpdateIssueRequest request, Client
                 size);
 
         var mapped = _mapper.Map<List<IssueResponse>>(issues.Items);
-        
-        int totalItems = issues.Total;  // Total number of items without pagination
-        int totalPages = (int)Math.Ceiling((double)totalItems / size);  // Calculate total pages
+
+        int totalItems = issues.Total; // Total number of items without pagination
+        int totalPages = (int)Math.Ceiling((double)totalItems / size); // Calculate total pages
 
         // Paginate result
         var paginatedResult = new Paginate<IssueResponse>
@@ -240,159 +242,187 @@ public async Task<ApiResponse> CreateIssue(AddUpdateIssueRequest request, Client
             data = mappedIssue
         };
     }
-public async Task<ApiResponse> UpdateIssue(Guid id, AddUpdateIssueRequest request, Client client)
-{
-    // Tìm issue cần cập nhật
-    var existingIssue = await _unitOfWork.GetRepository<Issue>()
-        .SingleOrDefaultAsync(
-            predicate: i => i.Id == id && i.IsDelete == false,
-            include: source => source
-                .Include(i => i.Solutions)
-                .ThenInclude(s => s.SolutionProducts)
-        );
 
-    if (existingIssue == null)
+    public async Task<ApiResponse> UpdateIssue(Guid id, AddUpdateIssueRequest request, Client client)
     {
+        // Tìm issue cần cập nhật
+        var existingIssue = await _unitOfWork.GetRepository<Issue>()
+            .SingleOrDefaultAsync(
+                predicate: i => i.Id == id && i.IsDelete == false,
+                include: source => source
+                    .Include(i => i.Solutions)
+                    .ThenInclude(s => s.SolutionProducts)
+            );
+
+        if (existingIssue == null)
+        {
+            return new ApiResponse
+            {
+                status = StatusCodes.Status404NotFound.ToString(),
+                message = "Issue not found",
+                data = null
+            };
+        }
+
+        // Xử lý hình ảnh nếu có
+        string issueImage = existingIssue.IssueImage;
+        if (request.IssueImage != null)
+        {
+            // Giả sử bạn muốn thay thế hình ảnh cũ
+            var imageUrls =
+                await _supabaseImageService.SendImagesAsync(new List<IFormFile> { request.IssueImage }, client);
+            issueImage = imageUrls.FirstOrDefault();
+        }
+
+        // Cập nhật thông tin cơ bản của issue
+        existingIssue.Title = request.Title ?? existingIssue.Title;
+        existingIssue.Description = _sanitizer.Sanitize(request.Description) ?? existingIssue.Description;
+        existingIssue.IssueCategoryId = request.IssueCategoryId ?? existingIssue.IssueCategoryId;
+        existingIssue.IssueImage = issueImage;
+        existingIssue.ModifiedDate = DateTime.Now;
+
+        // Xử lý Solutions nếu có
+        if (request.SolutionsJson != null && request.SolutionsJson.Any())
+        {
+            // Xóa các solutions hiện tại
+            var existingSolutions = existingIssue.Solutions.ToList();
+            if (existingSolutions.Any())
+            {
+                _unitOfWork.GetRepository<Solution>().DeleteRangeAsync(existingSolutions);
+            }
+
+            // Parse và tạo mới solutions
+            List<SolutionDto> parsedSolutions = new List<SolutionDto>();
+            foreach (var solutionJson in request.SolutionsJson)
+            {
+                try
+                {
+                    var solution = JsonSerializer.Deserialize<SolutionDto>(solutionJson);
+                    if (solution != null)
+                    {
+                        parsedSolutions.Add(solution);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    return new ApiResponse
+                    {
+                        status = StatusCodes.Status400BadRequest.ToString(),
+                        message = "Invalid solution JSON format.",
+                        data = ex.Message
+                    };
+                }
+            }
+
+            if (parsedSolutions.Any())
+            {
+                var solutions = new List<Solution>();
+                var solutionProducts = new List<SolutionProduct>();
+
+                foreach (var solutionRequest in parsedSolutions)
+                {
+                    var solution = new Solution
+                    {
+                        Id = Guid.NewGuid(),
+                        SolutionName = solutionRequest.SolutionName,
+                        Description = solutionRequest.Description,
+                        IssueId = existingIssue.Id,
+                        CreateDate = DateTime.UtcNow,
+                        IsDelete = false,
+                        ModifiedDate = DateTime.UtcNow,
+                    };
+                    solutions.Add(solution);
+
+                    if (solutionRequest.ProductIds != null && solutionRequest.ProductIds.Any())
+                    {
+                        foreach (var productId in solutionRequest.ProductIds)
+                        {
+                            solutionProducts.Add(new SolutionProduct
+                            {
+                                Id = Guid.NewGuid(),
+                                SolutionId = solution.Id,
+                                ProductId = productId,
+                                CreateDate = DateTime.UtcNow
+                            });
+                        }
+                    }
+                }
+
+                await _unitOfWork.GetRepository<Solution>().InsertRangeAsync(solutions);
+                if (solutionProducts.Any())
+                {
+                    await _unitOfWork.GetRepository<SolutionProduct>().InsertRangeAsync(solutionProducts);
+                }
+            }
+        }
+
+        // Cập nhật issue
+        _unitOfWork.GetRepository<Issue>().UpdateAsync(existingIssue);
+        bool isSuccessful = await _unitOfWork.CommitAsync() > 0;
+
+        if (isSuccessful)
+        {
+            var updatedIssue = await _unitOfWork.GetRepository<Issue>()
+                .SingleOrDefaultAsync(
+                    predicate: i => i.Id == id,
+                    include: source => source
+                        .Include(i => i.IssueCategory)
+                        .Include(i => i.Solutions)
+                        .ThenInclude(s => s.SolutionProducts)
+                        .ThenInclude(sp => sp.Product)
+                        .ThenInclude(p => p.Images)
+                );
+
+            return new ApiResponse
+            {
+                status = StatusCodes.Status200OK.ToString(),
+                message = "Issue updated successfully",
+                data = _mapper.Map<IssueResponse>(updatedIssue)
+            };
+        }
+
         return new ApiResponse
         {
-            status = StatusCodes.Status404NotFound.ToString(),
-            message = "Issue not found",
+            status = StatusCodes.Status400BadRequest.ToString(),
+            message = "Failed to update issue",
             data = null
         };
     }
 
-    // Xử lý hình ảnh nếu có
-    string issueImage = existingIssue.IssueImage;
-    if (request.IssueImage != null)
+    public async Task<ApiResponse> DeleteIssue(Guid id)
     {
-        // Giả sử bạn muốn thay thế hình ảnh cũ
-        var imageUrls = await _supabaseImageService.SendImagesAsync(new List<IFormFile> { request.IssueImage }, client);
-        issueImage = imageUrls.FirstOrDefault();
-    }
+        // Lấy issue cần xóa cùng với các Solutions và IssueCategory liên quan
+        var issue = await _unitOfWork.GetRepository<Issue>()
+            .SingleOrDefaultAsync(
+                predicate: i => i.Id == id && i.IsDelete == false,
+                include: i => i.Include(i => i.Solutions)
+                    .Include(i => i.IssueCategory)); // Giả sử Issue có quan hệ với IssueCategory
 
-    // Cập nhật thông tin cơ bản của issue
-    existingIssue.Title = request.Title ?? existingIssue.Title;
-    existingIssue.Description = _sanitizer.Sanitize(request.Description) ?? existingIssue.Description;
-    existingIssue.IssueCategoryId = request.IssueCategoryId ?? existingIssue.IssueCategoryId;
-    existingIssue.IssueImage = issueImage;
-    existingIssue.ModifiedDate = DateTime.Now;
-
-    // Xử lý Solutions nếu có
-    if (request.SolutionsJson != null && request.SolutionsJson.Any())
-    {
-        // Xóa các solutions hiện tại
-        var existingSolutions = existingIssue.Solutions.ToList();
-        if (existingSolutions.Any())
-        {
-            _unitOfWork.GetRepository<Solution>().DeleteRangeAsync(existingSolutions);
-        }
-
-        // Parse và tạo mới solutions
-        List<SolutionDto> parsedSolutions = new List<SolutionDto>();
-        foreach (var solutionJson in request.SolutionsJson)
-        {
-            try
+        if (issue == null)
+            return new ApiResponse
             {
-                var solution = JsonSerializer.Deserialize<SolutionDto>(solutionJson);
-                if (solution != null)
-                {
-                    parsedSolutions.Add(solution);
-                }
-            }
-            catch (Exception ex)
+                status = StatusCodes.Status404NotFound.ToString(),
+                message = "Không tìm thấy vấn đề."
+            };
+
+        // Kiểm tra xem IssueCategory của issue này có đang được sử dụng bởi các issue khác không
+        if (issue.IssueCategoryId.HasValue) // Giả sử Issue có trường IssueCategoryId
+        {
+            var otherIssuesWithSameCategory = await _unitOfWork.GetRepository<Issue>()
+                .GetListAsync(
+                    predicate: i => i.IssueCategoryId == issue.IssueCategoryId
+                                    && i.Id != id
+                                    && i.IsDelete == false);
+
+            if (otherIssuesWithSameCategory.Any()) // Kiểm tra xem danh sách có phần tử nào không
             {
                 return new ApiResponse
                 {
                     status = StatusCodes.Status400BadRequest.ToString(),
-                    message = "Invalid solution JSON format.",
-                    data = ex.Message
+                    message = "Không thể xóa vấn đề vì danh mục vấn đề này đang được sử dụng bởi các vấn đề khác."
                 };
             }
         }
-
-        if (parsedSolutions.Any())
-        {
-            var solutions = new List<Solution>();
-            var solutionProducts = new List<SolutionProduct>();
-
-            foreach (var solutionRequest in parsedSolutions)
-            {
-                var solution = new Solution
-                {
-                    Id = Guid.NewGuid(),
-                    SolutionName = solutionRequest.SolutionName,
-                    Description = solutionRequest.Description,
-                    IssueId = existingIssue.Id,
-                    CreateDate = DateTime.UtcNow,
-                    IsDelete = false,
-                    ModifiedDate = DateTime.UtcNow,
-                };
-                solutions.Add(solution);
-
-                if (solutionRequest.ProductIds != null && solutionRequest.ProductIds.Any())
-                {
-                    foreach (var productId in solutionRequest.ProductIds)
-                    {
-                        solutionProducts.Add(new SolutionProduct
-                        {
-                            Id = Guid.NewGuid(),
-                            SolutionId = solution.Id,
-                            ProductId = productId,
-                            CreateDate = DateTime.UtcNow
-                        });
-                    }
-                }
-            }
-
-            await _unitOfWork.GetRepository<Solution>().InsertRangeAsync(solutions);
-            if (solutionProducts.Any())
-            {
-                await _unitOfWork.GetRepository<SolutionProduct>().InsertRangeAsync(solutionProducts);
-            }
-        }
-    }
-
-    // Cập nhật issue
-    _unitOfWork.GetRepository<Issue>().UpdateAsync(existingIssue);
-    bool isSuccessful = await _unitOfWork.CommitAsync() > 0;
-
-    if (isSuccessful)
-    {
-        var updatedIssue = await _unitOfWork.GetRepository<Issue>()
-            .SingleOrDefaultAsync(
-                predicate: i => i.Id == id,
-                include: source => source
-                    .Include(i => i.IssueCategory)
-                    .Include(i => i.Solutions)
-                    .ThenInclude(s => s.SolutionProducts)
-                    .ThenInclude(sp => sp.Product)
-                    .ThenInclude(p => p.Images)
-            );
-
-        return new ApiResponse
-        {
-            status = StatusCodes.Status200OK.ToString(),
-            message = "Issue updated successfully",
-            data = _mapper.Map<IssueResponse>(updatedIssue)
-        };
-    }
-
-    return new ApiResponse
-    {
-        status = StatusCodes.Status400BadRequest.ToString(),
-        message = "Failed to update issue",
-        data = null
-    };
-}
-    public async Task<ApiResponse> DeleteIssue(Guid id)
-    {
-        var issue = await _unitOfWork.GetRepository<Issue>()
-            .SingleOrDefaultAsync(
-                predicate: i => i.Id == id && i.IsDelete == false,
-                include: i => i.Include(i => i.Solutions));
-
-        if (issue == null)
-            return new ApiResponse { status = StatusCodes.Status404NotFound.ToString(), message = "Issue not found." };
 
         // Soft delete issue
         issue.IsDelete = true;
@@ -417,7 +447,58 @@ public async Task<ApiResponse> UpdateIssue(Guid id, AddUpdateIssueRequest reques
             status = isSuccessful
                 ? StatusCodes.Status200OK.ToString()
                 : StatusCodes.Status500InternalServerError.ToString(),
-            message = isSuccessful ? "Issue and related solutions deleted successfully." : "Failed to delete Issue."
+            message = isSuccessful
+                ? "Vấn đề và các giải pháp liên quan đã được xóa thành công."
+                : "Xóa vấn đề thất bại."
+        };
+    }
+
+    public async Task<ApiResponse> EnableIssue(Guid id)
+    {
+        // Lấy issue cần kích hoạt cùng với các Solutions liên quan
+        var issue = await _unitOfWork.GetRepository<Issue>()
+            .SingleOrDefaultAsync(
+                predicate: i => i.Id == id && i.IsDelete == true,
+                include: i => i.Include(i => i.Solutions));
+
+        if (issue == null)
+            return new ApiResponse
+            {
+                status = StatusCodes.Status404NotFound.ToString(),
+                message = "Không tìm thấy vấn đề hoặc vấn đề chưa bị xóa."
+            };
+
+
+        // Kích hoạt lại issue
+        issue.IsDelete = false;
+        issue.ModifiedDate = DateTime.UtcNow;
+        _unitOfWork.GetRepository<Issue>().UpdateAsync(issue);
+
+        // Kích hoạt lại các solutions liên quan
+        if (issue.Solutions != null)
+        {
+            foreach (var solution in issue.Solutions)
+            {
+                // Kiểm tra nếu solution đã bị soft delete (IsDelete là true)
+                if (solution.IsDelete.HasValue && solution.IsDelete.Value)
+                {
+                    solution.IsDelete = false;
+                    solution.ModifiedDate = DateTime.UtcNow;
+                    _unitOfWork.GetRepository<Solution>().UpdateAsync(solution);
+                }
+            }
+        }
+
+        bool isSuccessful = await _unitOfWork.CommitAsync() > 0;
+
+        return new ApiResponse
+        {
+            status = isSuccessful
+                ? StatusCodes.Status200OK.ToString()
+                : StatusCodes.Status500InternalServerError.ToString(),
+            message = isSuccessful
+                ? "Vấn đề và các giải pháp liên quan đã được kích hoạt lại thành công."
+                : "Kích hoạt lại vấn đề thất bại."
         };
     }
 }
