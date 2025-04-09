@@ -13,4 +13,5 @@ public interface IIssueService
     Task<ApiResponse> GetIssueById(Guid id);
     Task<ApiResponse> UpdateIssue(Guid id, AddUpdateIssueRequest request, Client client);
     Task<ApiResponse> DeleteIssue(Guid id);
+    Task<ApiResponse> EnableIssue(Guid id);
 }

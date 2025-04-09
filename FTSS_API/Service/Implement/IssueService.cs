@@ -153,7 +153,7 @@ public class IssueService : BaseService<IssueService>, IIssueService
     public async Task<ApiResponse> GetAllIssues(int page, int size, bool? isAscending, Guid? issueCategoryId = null,
         string issueTitle = null)
     {
-        Expression<Func<Issue, bool>> predicate = i => i.IsDelete == false;
+        Expression<Func<Issue, bool>> predicate = i => true;
 
         if (issueCategoryId.HasValue)
         {
@@ -391,64 +391,51 @@ public class IssueService : BaseService<IssueService>, IIssueService
 
     public async Task<ApiResponse> DeleteIssue(Guid id)
     {
-        // Lấy issue cần xóa cùng với các Solutions và IssueCategory liên quan
+        // Lấy issue cần xóa cùng với các Solutions liên quan
         var issue = await _unitOfWork.GetRepository<Issue>()
             .SingleOrDefaultAsync(
                 predicate: i => i.Id == id && i.IsDelete == false,
-                include: i => i.Include(i => i.Solutions)
-                    .Include(i => i.IssueCategory)); // Giả sử Issue có quan hệ với IssueCategory
+                include: i => i.Include(i => i.Solutions));
 
+        // Kiểm tra nếu không tìm thấy issue
         if (issue == null)
-            return new ApiResponse
-            {
-                status = StatusCodes.Status404NotFound.ToString(),
-                message = "Không tìm thấy vấn đề."
+            return new ApiResponse 
+            { 
+                status = StatusCodes.Status404NotFound.ToString(), 
+                message = "Không tìm thấy vấn đề." 
             };
-
-        // Kiểm tra xem IssueCategory của issue này có đang được sử dụng bởi các issue khác không
-        if (issue.IssueCategoryId.HasValue) // Giả sử Issue có trường IssueCategoryId
-        {
-            var otherIssuesWithSameCategory = await _unitOfWork.GetRepository<Issue>()
-                .GetListAsync(
-                    predicate: i => i.IssueCategoryId == issue.IssueCategoryId
-                                    && i.Id != id
-                                    && i.IsDelete == false);
-
-            if (otherIssuesWithSameCategory.Any()) // Kiểm tra xem danh sách có phần tử nào không
-            {
-                return new ApiResponse
-                {
-                    status = StatusCodes.Status400BadRequest.ToString(),
-                    message = "Không thể xóa vấn đề vì danh mục vấn đề này đang được sử dụng bởi các vấn đề khác."
-                };
-            }
-        }
 
         // Soft delete issue
         issue.IsDelete = true;
         issue.ModifiedDate = DateTime.UtcNow;
         _unitOfWork.GetRepository<Issue>().UpdateAsync(issue);
 
-        // Soft delete related solutions
+        // Soft delete các solutions liên quan
         if (issue.Solutions != null)
         {
             foreach (var solution in issue.Solutions)
             {
-                solution.IsDelete = true;
-                solution.ModifiedDate = DateTime.UtcNow;
-                _unitOfWork.GetRepository<Solution>().UpdateAsync(solution);
+                // Chỉ soft delete nếu solution chưa bị xóa (IsDelete không phải true)
+                if (!solution.IsDelete.HasValue || !solution.IsDelete.Value)
+                {
+                    solution.IsDelete = true;
+                    solution.ModifiedDate = DateTime.UtcNow;
+                    _unitOfWork.GetRepository<Solution>().UpdateAsync(solution);
+                }
             }
         }
 
+        // Lưu thay đổi vào cơ sở dữ liệu
         bool isSuccessful = await _unitOfWork.CommitAsync() > 0;
 
+        // Trả về phản hồi
         return new ApiResponse
         {
             status = isSuccessful
                 ? StatusCodes.Status200OK.ToString()
                 : StatusCodes.Status500InternalServerError.ToString(),
-            message = isSuccessful
-                ? "Vấn đề và các giải pháp liên quan đã được xóa thành công."
+            message = isSuccessful 
+                ? "Vấn đề và các giải pháp liên quan đã được xóa thành công." 
                 : "Xóa vấn đề thất bại."
         };
     }

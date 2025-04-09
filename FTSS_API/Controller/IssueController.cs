@@ -85,7 +85,7 @@ namespace FTSS_API.Controller
                 return BadRequest(new ApiResponse
                 {
                     data = null,
-                    message = "Invalid request data",
+                    message = "Dữ liệu yêu cầu không hợp lệ",
                     status = StatusCodes.Status400BadRequest.ToString(),
                 });
             }
@@ -104,6 +104,20 @@ namespace FTSS_API.Controller
         public async Task<IActionResult> DeleteIssue([FromRoute] Guid id)
         {
             var response = await _issueService.DeleteIssue(id);
+            return StatusCode(int.Parse(response.status), response);
+        }
+
+        /// <summary>
+        /// API kích hoạt lại sự cố đã bị xóa mềm
+        /// </summary>
+        [HttpPut(ApiEndPointConstant.Issue.EnableIssue)]
+        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
+        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status500InternalServerError)]
+        [ProducesErrorResponseType(typeof(ProblemDetails))]
+        public async Task<IActionResult> EnableIssue([FromRoute] Guid id)
+        {
+            var response = await _issueService.EnableIssue(id);
             return StatusCode(int.Parse(response.status), response);
         }
     }
