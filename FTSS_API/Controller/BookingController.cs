@@ -180,7 +180,7 @@ namespace FTSS_API.Controller
         {
             int pageNumber = page ?? 1;
             int pageSize = size ?? 10;
-            var response = await _bookingService.GetListBookingForUser(pageNumber, pageSize, status, bookingcode, paymentstatus, isAscending);
+            var response = await _bookingService.GetListBookingForUser(pageNumber, pageSize, status , paymentstatus,bookingcode, isAscending);
             return StatusCode(int.Parse(response.status), response);
         }
         /// <summary>
