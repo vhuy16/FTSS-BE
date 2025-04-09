@@ -36,6 +36,7 @@ public static class ApiEndPointConstant
         public const string GetIssueById = IssueEndPoint + "/{id}";
         public const string UpdateIssue = IssueEndPoint + "/{id}";
         public const string DeleteIssue = IssueEndPoint + "/{id}";
+        public const string EnableIssue = IssueEndPoint + "/{id}/enable";
     }
 
     public static class PaymentOS
@@ -56,6 +57,7 @@ public static class ApiEndPointConstant
         public const string GetIssueCategoryById = IssueCategoryEndPoint + "/{id}";
         public const string UpdateIssueCategory = IssueCategoryEndPoint + "/{id}";
         public const string DeleteIssueCategory = IssueCategoryEndPoint + "/{id}";
+        public const string EnableIssueCategory = IssueCategoryEndPoint + "/{id}/enable"; // Thêm endpoint mới
     }
 
     public static class Shipment

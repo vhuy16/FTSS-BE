@@ -100,5 +100,18 @@ namespace FTSS_API.Controller
             var response = await _issueCategoryService.DeleteIssueCategory(id);
             return StatusCode(int.Parse(response.status), response);
         }
+        /// <summary>
+        /// API kích hoạt lại danh mục vấn đề đã bị xóa mềm
+        /// </summary>
+        [HttpPut(ApiEndPointConstant.IssueCategory.EnableIssueCategory)]
+        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
+        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status500InternalServerError)]
+        [ProducesErrorResponseType(typeof(ProblemDetails))]
+        public async Task<IActionResult> EnableIssueCategory([FromRoute] Guid id)
+        {
+            var response = await _issueCategoryService.EnableIssueCategory(id);
+            return StatusCode(int.Parse(response.status), response);
+        }
     }
 }
