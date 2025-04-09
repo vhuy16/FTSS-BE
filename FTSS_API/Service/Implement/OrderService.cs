@@ -733,7 +733,7 @@ public class OrderService : BaseService<OrderService>, IOrderService
                 {
                     var payment = order.Payments?.FirstOrDefault();
                     bool isPaid = payment != null && payment.PaymentStatus == PaymentStatusEnum.Completed.ToString();
-                    string emailBody = EmailTemplatesUtils.RefundNotificationEmailTemplate(orderId.ToString(), isPaid);
+                    string emailBody = EmailTemplatesUtils.RefundNotificationEmailTemplate(order.OrderCode, isPaid);
                     var email = order.User.Email;
                     await _emailSender.SendRefundNotificationEmailAsync(email, emailBody);
                 }
@@ -950,7 +950,7 @@ public class OrderService : BaseService<OrderService>, IOrderService
     }
 
 
-    public async Task<ApiResponse> GetAllOrder(int page, int size, string status, bool? isAscending)
+    public async Task<ApiResponse> GetAllOrder(int page, int size, string status,string orderCode, bool? isAscending)
 {
     try
     {
@@ -970,7 +970,10 @@ public class OrderService : BaseService<OrderService>, IOrderService
         }
 
         var query = _unitOfWork.Context.Set<Order>()
-            .Where(x => x.Status.Equals(status))
+                .Where(x =>
+                    (string.IsNullOrEmpty(status) || x.Status.Equals(status)) &&
+                    (string.IsNullOrEmpty(orderCode) || x.OrderCode.Contains(orderCode))
+                )
             .Include(o => o.User)
             .Include(o => o.Voucher)
             .Include(o => o.Payments)

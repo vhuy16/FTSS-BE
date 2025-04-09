@@ -490,9 +490,11 @@ namespace FTSS_API.Service.Implement
                 if (isEligibleForFreeBooking)
                 {
                     // Nếu là Booking FREE, lấy tất cả ServicePackage có trạng thái Available
-                    selectedServices = (List<ServicePackage>)await _unitOfWork.GetRepository<ServicePackage>().GetListAsync(
-                        predicate: sp => sp.Status.Equals(ServicePackageStatus.Available.GetDescriptionFromEnum()) &&
-                                         sp.IsDelete == false);
+                    selectedServices = (List<ServicePackage>)await _unitOfWork.GetRepository<ServicePackage>()
+                        .GetListAsync(
+                            predicate: sp =>
+                                sp.Status.Equals(ServicePackageStatus.Available.GetDescriptionFromEnum()) &&
+                                sp.IsDelete == false);
 
                     totalPrice = 0; // FREE booking luôn có giá 0
                 }
@@ -500,10 +502,12 @@ namespace FTSS_API.Service.Implement
                 {
 
                     // Nếu không FREE, chỉ lấy các ServicePackage theo danh sách serviceIds
-                    selectedServices = (List<ServicePackage>)await _unitOfWork.GetRepository<ServicePackage>().GetListAsync(
-                        predicate: sp => serviceIds.Contains(sp.Id) &&
-                                         sp.Status.Equals(ServicePackageStatus.Available.GetDescriptionFromEnum()) &&
-                                         sp.IsDelete == false);
+                    selectedServices = (List<ServicePackage>)await _unitOfWork.GetRepository<ServicePackage>()
+                        .GetListAsync(
+                            predicate: sp => serviceIds.Contains(sp.Id) &&
+                                             sp.Status.Equals(ServicePackageStatus.Available
+                                                 .GetDescriptionFromEnum()) &&
+                                             sp.IsDelete == false);
 
                     // Kiểm tra nếu có serviceId không hợp lệ
                     var invalidServices = serviceIds.Except(selectedServices.Select(sp => sp.Id)).ToList();
@@ -531,7 +535,7 @@ namespace FTSS_API.Service.Implement
                     PhoneNumber = request.PhoneNumber,
                     FullName = request.FullName,
                     TotalPrice = totalPrice,
-                    BookingCode =  GenerateBookingCode(),
+                    BookingCode = GenerateBookingCode(),
                     UserId = userId,
                     OrderId = request.OrderId,
                     IsAssigned = false
@@ -569,7 +573,7 @@ namespace FTSS_API.Service.Implement
                     };
 
                     var paymentResponse = await _paymentService.CreatePayment(paymentRequest);
-    
+
                     // Kiểm tra null và status code
                     if (paymentResponse == null || paymentResponse.status != StatusCodes.Status200OK.ToString())
                     {
@@ -581,7 +585,7 @@ namespace FTSS_API.Service.Implement
                         };
                     }
 
-                    // Lấy URL từ response.data (không cần cast)
+                    // Lấy URL từ response.data (chỉ áp dụng cho booking không FREE)
                     string paymentUrl = string.Empty;
                     if (paymentResponse.data is Dictionary<string, object> dict)
                     {
@@ -589,13 +593,12 @@ namespace FTSS_API.Service.Implement
                     }
                     else if (paymentResponse.data != null)
                     {
-                        // Dùng reflection nếu cần
                         var type = paymentResponse.data.GetType();
                         var prop = type.GetProperty("PaymentURL") ?? type.GetProperty("paymentUrl");
                         paymentUrl = prop?.GetValue(paymentResponse.data)?.ToString() ?? "";
                     }
 
-                    // Chuẩn bị respons
+                    // Chuẩn bị response cho booking không FREE
                     var response = new BookingScheduleResponse
                     {
                         Id = newBooking.Id,
@@ -608,7 +611,7 @@ namespace FTSS_API.Service.Implement
                         UserName = user.UserName,
                         FullName = newBooking.FullName,
                         OrderId = request.OrderId,
-                        Url = paymentUrl,
+                        Url = paymentUrl, // Chỉ có URL khi không FREE
                         BookingCode = newBooking.BookingCode,
                         PaymentMethod = request.PaymentMethod,
                     };
@@ -620,8 +623,28 @@ namespace FTSS_API.Service.Implement
                         data = response
                     };
                 }
-                
-                    // Trả về response cho booking FREE
+                else
+                {
+                    // Tạo payment cho booking FREE nhưng không cần URL
+                    var paymentRequest = new CreatePaymentRequest
+                    {
+                        BookingId = newBooking.Id,
+                        PaymentMethod = PaymenMethodEnum.FREE.GetDescriptionFromEnum() // Gán một giá trị đặc biệt để nhận diện
+                    };
+
+                    var paymentResponse = await _paymentService.CreatePayment(paymentRequest);
+
+                    if (paymentResponse == null || paymentResponse.status != StatusCodes.Status200OK.ToString())
+                    {
+                        return new ApiResponse
+                        {
+                            status = StatusCodes.Status500InternalServerError.ToString(),
+                            message = "Đặt lịch thành công nhưng lỗi tạo payment cho booking miễn phí",
+                            data = paymentResponse?.data
+                        };
+                    }
+
+                    // Chuẩn bị response cho booking FREE (không có Url)
                     var freeBookingResponse = new BookingScheduleResponse
                     {
                         Id = newBooking.Id,
@@ -634,7 +657,8 @@ namespace FTSS_API.Service.Implement
                         UserName = user.UserName,
                         FullName = newBooking.FullName,
                         OrderId = request.OrderId,
-                        BookingCode =  newBooking.BookingCode,
+                        BookingCode = newBooking.BookingCode,
+                        // Không có Url ở đây
                     };
 
                     return new ApiResponse
@@ -643,8 +667,7 @@ namespace FTSS_API.Service.Implement
                         message = "Đặt lịch booking thành công.",
                         data = freeBookingResponse
                     };
-                
-
+                }
             }
             catch (Exception ex)
             {
@@ -655,7 +678,7 @@ namespace FTSS_API.Service.Implement
                     data = ex.Message
                 };
             }
-           
+
         }
 
         public async Task<ApiResponse> GetBookingById(Guid bookingId)

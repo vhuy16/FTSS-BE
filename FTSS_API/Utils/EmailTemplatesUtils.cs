@@ -32,7 +32,7 @@ public class EmailTemplatesUtils
                  "<p>Vì đơn hàng này chưa được thanh toán, bạn không cần thực hiện thêm hành động nào. Đây chỉ là thông báo để bạn nắm thông tin.</p>")}
              <p>Nếu bạn không hủy đơn hàng này hoặc cho rằng đây là lỗi, vui lòng liên hệ với chúng tôi ngay lập tức.</p>
              <p>Chúng tôi xin lỗi vì bất kỳ sự bất tiện nào gây ra và cảm ơn sự thông cảm của bạn.</p>
-             <p>Trân trọng,<br>Đội ngũ Hỗ trợ Công ty Tên Công Ty</p>
+             
              <p style='font-size: 12px; color: #888;'>Nếu bạn có bất kỳ câu hỏi nào, vui lòng <a href='mailto:support@yourcompany.com'>liên hệ với đội ngũ hỗ trợ của chúng tôi</a>.</p>
          </div>";
 }
