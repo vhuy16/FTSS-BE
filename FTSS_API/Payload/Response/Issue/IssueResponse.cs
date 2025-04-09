@@ -11,6 +11,7 @@ public class IssueResponse
     public string IssueImage { get; set; }
     public DateTime? CreateDate { get; set; }
     public DateTime? ModifiedDate { get; set; }
+    public bool? IsDelete { get; set; }
     public List<SolutionResponse> Solutions { get; set; } = new List<SolutionResponse>();
     
     // Additional statistics/metrics (optional)
