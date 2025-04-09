@@ -733,7 +733,7 @@ public class OrderService : BaseService<OrderService>, IOrderService
                 {
                     var payment = order.Payments?.FirstOrDefault();
                     bool isPaid = payment != null && payment.PaymentStatus == PaymentStatusEnum.Completed.ToString();
-                    string emailBody = EmailTemplatesUtils.RefundNotificationEmailTemplate(order.OrderCode, isPaid);
+                    string emailBody = EmailTemplatesUtils.RefundNotificationEmailTemplate(order.Id, order.OrderCode, isPaid);
                     var email = order.User.Email;
                     await _emailSender.SendRefundNotificationEmailAsync(email, emailBody);
                 }
