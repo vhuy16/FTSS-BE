@@ -732,7 +732,7 @@ namespace FTSS_API.Service.Implement
                     Status = booking.Status,
                     UserId = booking.UserId,
                     UserName = booking.User?.UserName ?? "Không xác định",
-                    FullName = booking.User?.FullName ?? "Không xác định",
+                    FullName = booking.FullName ?? "Không xác định",
                     Address = booking.Address,
                     PhoneNumber = booking.PhoneNumber,
                     TotalPrice = booking.TotalPrice,
