@@ -891,7 +891,10 @@ public class OrderService : BaseService<OrderService>, IOrderService
                     {
                         PaymentId = order.Payments.FirstOrDefault()?.Id ?? Guid.Empty,
                         PaymentMethod = order.Payments.FirstOrDefault()?.PaymentMethod ?? "Unknown",
-                        PaymentStatus = order.Payments.FirstOrDefault()?.PaymentStatus ?? "Unknown"
+                        PaymentStatus = order.Payments.FirstOrDefault()?.PaymentStatus ?? "Unknown",
+                        BankHolder = order.Payments.FirstOrDefault()?.BankHolder ?? "Unknown",
+                        BankName = order.Payments.FirstOrDefault()?.BankName ?? "Unknown",
+                        BankNumber = order.Payments.FirstOrDefault()?.BankNumber ?? "Unknown",
                     }
                     : null,
 
@@ -1088,7 +1091,10 @@ public async Task<ApiResponse> GetAllOrder(int page, int size, string status, st
                     {
                         PaymentId = order.Payments.FirstOrDefault()?.Id ?? Guid.Empty,
                         PaymentMethod = order.Payments.FirstOrDefault()?.PaymentMethod ?? "Unknown",
-                        PaymentStatus = order.Payments.FirstOrDefault()?.PaymentStatus ?? "Unknown"
+                        PaymentStatus = order.Payments.FirstOrDefault()?.PaymentStatus ?? "Unknown",
+                        BankHolder = order.Payments.FirstOrDefault()?.BankHolder ?? "Unknown",
+                        BankName = order.Payments.FirstOrDefault()?.BankName ?? "Unknown",
+                        BankNumber = order.Payments.FirstOrDefault()?.BankNumber ?? "Unknown",
                     }
                     : null,
                 userResponse = order.User != null
@@ -1255,6 +1261,9 @@ public async Task<ApiResponse> GetAllOrder(int page, int size, string status, st
                     PaymentMethod = order.Payments.FirstOrDefault()?.PaymentMethod,
                     PaymentId = order.Payments.FirstOrDefault()?.Id ?? Guid.Empty,
                     PaymentStatus = order.Payments.FirstOrDefault()?.PaymentStatus,
+                    BankHolder = order.Payments.FirstOrDefault()?.BankHolder ?? "Unknown",
+                    BankName = order.Payments.FirstOrDefault()?.BankName ?? "Unknown",
+                    BankNumber = order.Payments.FirstOrDefault()?.BankNumber ?? "Unknown",
                 },
                 userResponse = new GetOrderResponse.UserResponse
                 {

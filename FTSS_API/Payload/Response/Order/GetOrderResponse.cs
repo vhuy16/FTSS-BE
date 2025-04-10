@@ -54,6 +54,11 @@ namespace FTSS_API.Payload.Response.Order
             public Guid PaymentId { get; set; }
             public string PaymentMethod { get; set; } = null!;
             public string PaymentStatus { get; set; } = null!;
+            public string? BankNumber { get; set; }
+
+            public string? BankName { get; set; }
+
+            public string? BankHolder { get; set; }
         }
     }
 }
