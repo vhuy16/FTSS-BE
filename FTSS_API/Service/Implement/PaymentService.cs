@@ -215,10 +215,7 @@ public class PaymentService : BaseService<PaymentService>, IPaymentService
         }
 
         payment.PaymentStatus = newStatus;
-        if (payment.PaymentStatus == PaymentStatusEnum.Refunded.GetDescriptionFromEnum())
-        {
-            order.Status = OrderStatus.REFUNDED.ToString();
-        }
+       
 
         _unitOfWork.GetRepository<Order>().UpdateAsync(order);
         _unitOfWork.GetRepository<Payment>().UpdateAsync(payment);
