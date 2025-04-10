@@ -20,15 +20,21 @@ jobs:
       with:
         dotnet-version: 8.0 # Thay đổi phiên bản .NET nếu cần
 
-    # 3. Build dự án .NET và tạo tài liệu Swagger XML
+    # 3. Cài đặt Node.js (để sử dụng npm và npx)
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18' # Chọn phiên bản Node.js (18 là phiên bản ổn định)
+
+    # 4. Build dự án .NET và tạo tài liệu Swagger XML
     - name: Build project
       run: dotnet publish -c Release -o ./publish /p:DocumentationFile=./publish/FTSS_API.xml
 
-    # 4. Triển khai mã nguồn qua FTP với retry
+    # 5. Triển khai mã nguồn qua FTP với retry
     - name: Deploy via FTP
       uses: nick-fields/retry@v3
       with:
-        timeout_minutes: 10 # Thời gian tối đa cho mỗi lần thử (tùy chọn)
+        timeout_minutes: 10 # Thời gian tối đa cho mỗi lần thử
         max_attempts: 3 # Thử lại tối đa 3 lần
         retry_wait_seconds: 30 # Chờ 30 giây giữa các lần thử
         command: |
