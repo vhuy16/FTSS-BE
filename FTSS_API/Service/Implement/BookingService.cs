@@ -721,7 +721,10 @@ namespace FTSS_API.Service.Implement
                     {
                         PaymentId = payment.Id,
                         PaymentMethod = payment.PaymentMethod ?? "Không xác định",
-                        PaymentStatus = payment.PaymentStatus ?? "Không xác định"
+                        PaymentStatus = payment.PaymentStatus ?? "Không xác định",
+                        BankHolder =payment.BankHolder ?? "Unknown",
+                        BankName = payment.BankName ?? "Unknown",
+                        BankNumber = payment.BankNumber ?? "Unknown",
                     }
                     : new PaymentResponse(); // Trả về đối tượng rỗng nếu không có payment
 
@@ -1002,7 +1005,10 @@ namespace FTSS_API.Service.Implement
                     {
                         PaymentId = p.Id,
                         PaymentMethod = p.PaymentMethod ?? "Không xác định",
-                        PaymentStatus = p.PaymentStatus ?? "Không xác định"
+                        PaymentStatus = p.PaymentStatus ?? "Không xác định",
+                        BankHolder =p.BankHolder ?? "Unknown",
+                        BankName = p.BankName ?? "Unknown",
+                        BankNumber = p.BankNumber ?? "Unknown",
                     }).FirstOrDefault() ?? new PaymentResponse()
                 }).ToList();
 
