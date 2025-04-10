@@ -2,6 +2,7 @@
 using FTSS_API.Payload;
 using FTSS_API.Payload.Request.Pay;
 using FTSS_API.Payload.Response.Pay.Payment;
+using FTSS_API.Payload.Response.Payment;
 using FTSS_API.Service.Interface;
 using FTSS_API.Utils;
 using FTSS_Model.Context;
@@ -196,11 +197,13 @@ public class PaymentService : BaseService<PaymentService>, IPaymentService
         };
     }
 
-    public async Task<ApiResponse> UpdatePaymentStatus(Guid OrderId, string newStatus)
+    public async Task<ApiResponse> UpdatePaymentStatus(Guid PaymentId, string newStatus)
     {
         var payment = await _unitOfWork.GetRepository<Payment>()
-            .SingleOrDefaultAsync(predicate: o => o.OrderId == OrderId );
-        var order = await _unitOfWork.GetRepository<Order>().SingleOrDefaultAsync(predicate: o => o.Id == OrderId);
+            .SingleOrDefaultAsync(predicate: o => o.Id == PaymentId);
+        var order = await _unitOfWork.GetRepository<Order>()
+            .SingleOrDefaultAsync(predicate: o => o.Id == payment.OrderId);
+
         if (payment == null)
         {
             return new ApiResponse
@@ -216,18 +219,26 @@ public class PaymentService : BaseService<PaymentService>, IPaymentService
         {
             order.Status = OrderStatus.REFUNDED.ToString();
         }
+
         _unitOfWork.GetRepository<Order>().UpdateAsync(order);
         _unitOfWork.GetRepository<Payment>().UpdateAsync(payment);
         await _unitOfWork.CommitAsync();
+
+        // Ánh xạ sang DTO
+        var paymentDto = new PaymentDto
+        {
+            Id = payment.Id,
+            PaymentStatus = payment.PaymentStatus,
+            OrderId = payment.OrderId
+        };
 
         return new ApiResponse
         {
             status = StatusCodes.Status200OK.ToString(),
             message = "Order status updated successfully",
-            data = payment
+            data = paymentDto
         };
     }
-  
     public async Task<ApiResponse> UpdateBankInfor(Guid paymentId, string bankNumber, string bankName, string bankHolder)
     {
         var payment = await _unitOfWork.GetRepository<Payment>()
