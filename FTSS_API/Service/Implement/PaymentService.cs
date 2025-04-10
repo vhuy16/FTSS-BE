@@ -216,8 +216,7 @@ public class PaymentService : BaseService<PaymentService>, IPaymentService
 
         payment.PaymentStatus = newStatus;
        
-
-        _unitOfWork.GetRepository<Order>().UpdateAsync(order);
+        
         _unitOfWork.GetRepository<Payment>().UpdateAsync(payment);
         await _unitOfWork.CommitAsync();
 
