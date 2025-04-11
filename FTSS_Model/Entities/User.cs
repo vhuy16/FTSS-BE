@@ -1,8 +1,15 @@
 ﻿using System;
 using System.Collections.Generic;
+using Microsoft.EntityFrameworkCore;
 
 namespace FTSS_Model.Entities;
-
+[Index(nameof(UserName), IsUnique = true, Name = "idx_user_username")]
+[Index(nameof(Email), IsUnique = true, Name = "idx_user_email")]
+[Index(nameof(Role), IsUnique = false, Name = "idx_user_role")]
+[Index(nameof(Status), IsUnique = false, Name = "idx_user_status")]
+[Index(nameof(CreateDate), IsUnique = false, Name = "idx_user_createdate")]
+[Index(nameof(ModifyDate), IsUnique = false, Name = "idx_user_modifydate")]
+[Index(nameof(IsDelete), IsUnique = false, Name = "idx_user_isdelete")]
 public partial class User
 {
     public Guid Id { get; set; }

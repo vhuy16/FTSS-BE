@@ -1,8 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
+using Microsoft.EntityFrameworkCore;
 
 namespace FTSS_Model.Entities;
-
+[Index(nameof(OrderId), IsUnique = false, Name = "idx_orderdetail_orderid")]
+[Index(nameof(ProductId), IsUnique = false, Name = "idx_orderdetail_productid")]
 public partial class OrderDetail
 {
     public Guid Id { get; set; }

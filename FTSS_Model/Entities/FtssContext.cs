@@ -49,8 +49,7 @@ public partial class FtssContext : DbContext
 
     public virtual DbSet<SetupPackageDetail> SetupPackageDetails { get; set; }
 
-    public virtual DbSet<Shipment> Shipments { get; set; }
-
+   
     public virtual DbSet<Solution> Solutions { get; set; }
 
     public virtual DbSet<SolutionProduct> SolutionProducts { get; set; }
@@ -634,43 +633,7 @@ public partial class FtssContext : DbContext
                 .HasConstraintName("FK_SetupPackageDetail_SetupPackage");
         });
 
-        modelBuilder.Entity<Shipment>(entity =>
-        {
-            entity.HasKey(e => e.Id).HasName("PK__Shipment__3213E83FF6F447A2");
-
-            entity.ToTable("Shipment");
-
-            entity.Property(e => e.Id)
-                .HasDefaultValueSql("(newid())")
-                .HasColumnName("id");
-            entity.Property(e => e.DeliveryAt)
-                .HasMaxLength(100)
-                .HasColumnName("deliveryAt");
-            entity.Property(e => e.DeliveryDate)
-                .HasColumnType("datetime")
-                .HasColumnName("deliveryDate");
-            entity.Property(e => e.DeliveryStatus)
-                .HasMaxLength(50)
-                .IsUnicode(false)
-                .HasColumnName("deliveryStatus");
-            entity.Property(e => e.OrderId).HasColumnName("orderId");
-            entity.Property(e => e.ShippingAddress)
-                .HasMaxLength(255)
-                .HasColumnName("shippingAddress");
-            entity.Property(e => e.ShippingFee)
-                .HasColumnType("decimal(10, 2)")
-                .HasColumnName("shippingFee");
-            entity.Property(e => e.TrackingNumber)
-                .HasMaxLength(100)
-                .IsUnicode(false)
-                .HasColumnName("trackingNumber");
-
-            entity.HasOne(d => d.Order).WithMany(p => p.Shipments)
-                .HasForeignKey(d => d.OrderId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK__Shipment__orderI__1BC821DD");
-        });
-
+      
         modelBuilder.Entity<Solution>(entity =>
         {
             entity.HasKey(e => e.Id).HasName("PK__Solution__3213E83FE0CC4A1A");
