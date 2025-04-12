@@ -272,13 +272,14 @@ public class ProductService : BaseService<ProductService>, IProductService
 }
 
 
-  public async Task<ApiResponse> GetAllProduct(int page, int size, bool? isAscending, string? SubcategoryName,
+ public async Task<ApiResponse> GetAllProduct(int page, int size, bool? isAscending, string? SubcategoryName,
     string? productName, string? cateName, decimal? minPrice, decimal? maxPrice)
 {
     page = page > 0 ? page : 1;
     size = size > 0 ? size : 10;
 
-    var cacheKey = $"GetAllProduct_{page}_{size}_{isAscending}_{SubcategoryName}_{productName}_{cateName}_{minPrice}_{maxPrice}";
+    // Dùng hash key cache để gọn và an toàn hơn
+    var cacheKey = $"GetAllProduct_{page}_{size}_{isAscending}_{SubcategoryName}_{productName}_{cateName}_{minPrice}_{maxPrice}".GetHashCode();
     if (_memoryCache.TryGetValue(cacheKey, out ApiResponse cachedResponse))
     {
         return cachedResponse;
@@ -291,27 +292,34 @@ public class ProductService : BaseService<ProductService>, IProductService
             SubCategoryName = s.SubCategory != null ? s.SubCategory.SubCategoryName : null,
             CategoryName = s.SubCategory != null && s.SubCategory.Category != null ? s.SubCategory.Category.CategoryName : null,
             Description = s.Description,
-            Images = s.Images.Take(1).Select(i => i.LinkImage).ToList(),
+            Images = s.Images.Where(i => i.IsDelete == false)
+                             .OrderBy(i => i.CreateDate)
+                             .Select(i => i.LinkImage)
+                             .Take(1)
+                             .ToList(),
             ProductName = s.ProductName,
             Quantity = s.Quantity,
             Price = s.Price,
             Size = s.Size,
             Status = s.Status
         },
-        include: i => i.Include(p => p.Images),
+        include: i => i.Include(p => p.Images)
+                       .Include(p => p.SubCategory)
+                           .ThenInclude(sc => sc.Category),
         predicate: p =>
-            (string.IsNullOrEmpty(productName) || p.ProductName.Contains(productName)) &&
-            (string.IsNullOrEmpty(cateName) || p.SubCategory.Category.CategoryName.Contains(cateName)) &&
-            (string.IsNullOrEmpty(SubcategoryName) || p.SubCategory.SubCategoryName.Contains(SubcategoryName)) &&
+            (string.IsNullOrEmpty(productName) || EF.Functions.Like(p.ProductName, $"%{productName}%")) &&
+            (string.IsNullOrEmpty(cateName) || EF.Functions.Like(p.SubCategory.Category.CategoryName, $"%{cateName}%")) &&
+            (string.IsNullOrEmpty(SubcategoryName) || EF.Functions.Like(p.SubCategory.SubCategoryName, $"%{SubcategoryName}%")) &&
             (!minPrice.HasValue || p.Price >= minPrice.Value) &&
             (!maxPrice.HasValue || p.Price <= maxPrice.Value) &&
-            (p.IsDelete == false) &&
-            (p.Status.Equals(ProductStatusEnum.Available.GetDescriptionFromEnum())),
+            p.IsDelete == false &&
+            p.Status.Equals(ProductStatusEnum.Available.GetDescriptionFromEnum()),
         orderBy: q => isAscending.HasValue
             ? (isAscending.Value ? q.OrderBy(p => p.Price) : q.OrderByDescending(p => p.Price))
             : q.OrderByDescending(p => p.CreateDate),
         page: page,
         size: size
+        // <-- bật AsNoTracking() cho query read-only
     );
 
     int totalItems = products.Total;
@@ -334,6 +342,7 @@ public class ProductService : BaseService<ProductService>, IProductService
     _memoryCache.Set(cacheKey, response, TimeSpan.FromMinutes(10));
     return response;
 }
+
     public async Task<ApiResponse> GetAllProductsGroupedByCategory(int page, int size)
     {
         // Lấy toàn bộ danh sách sản phẩm có trạng thái "Available"
