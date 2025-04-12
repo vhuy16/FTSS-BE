@@ -212,18 +212,23 @@ namespace FTSS_Model.Entities
                     b.HasKey("Id")
                         .HasName("PK__CartItem__3213E83F04624BAE");
 
-                    b.HasIndex(new[] { "CartId" }, "idx_cartitem_cartid");
+                    b.HasIndex("CartId")
+                        .HasDatabaseName("IX_CartItem_CartId");
 
-                    b.HasIndex(new[] { "CreateDate" }, "idx_cartitem_createdate");
+                    b.HasIndex("CreateDate")
+                        .HasDatabaseName("IX_CartItem_CreateDate");
 
-                    b.HasIndex(new[] { "IsDelete" }, "idx_cartitem_isdelete")
-                        .HasFilter("isDelete = 0");
+                    b.HasIndex("IsDelete")
+                        .HasDatabaseName("IX_CartItem_IsDelete");
 
-                    b.HasIndex(new[] { "ModifyDate" }, "idx_cartitem_modifydate");
+                    b.HasIndex("ProductId")
+                        .HasDatabaseName("IX_CartItem_ProductId");
 
-                    b.HasIndex(new[] { "ProductId" }, "idx_cartitem_productid");
+                    b.HasIndex("Status")
+                        .HasDatabaseName("IX_CartItem_Status");
 
-                    b.HasIndex(new[] { "Status" }, "idx_cartitem_status");
+                    b.HasIndex("CartId", "IsDelete", "Status")
+                        .HasDatabaseName("IX_CartItem_CartId_IsDelete_Status");
 
                     b.ToTable("CartItem", (string)null);
                 });
@@ -825,6 +830,18 @@ namespace FTSS_Model.Entities
                     b.HasKey("Id")
                         .HasName("PK__Product__3213E83F4D0F84D3");
 
+                    b.HasIndex(new[] { "CreateDate" }, "IX_Product_CreateDate");
+
+                    b.HasIndex(new[] { "IsDelete" }, "IX_Product_IsDelete");
+
+                    b.HasIndex(new[] { "Price" }, "IX_Product_Price");
+
+                    b.HasIndex(new[] { "ProductName" }, "IX_Product_ProductName");
+
+                    b.HasIndex(new[] { "Status" }, "IX_Product_Status");
+
+                    b.HasIndex(new[] { "SubCategoryId" }, "IX_Product_SubCategoryId");
+
                     b.HasIndex(new[] { "CreateDate" }, "idx_product_createdate");
 
                     b.HasIndex(new[] { "IsDelete" }, "idx_product_isdelete")
@@ -986,62 +1003,6 @@ namespace FTSS_Model.Entities
                     b.HasIndex(new[] { "SetupPackageId" }, "idx_setuppackagedetail_setuppackageid");
 
                     b.ToTable("SetupPackageDetail", (string)null);
-                });
-
-            modelBuilder.Entity("FTSS_Model.Entities.Shipment", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier")
-                        .HasColumnName("id")
-                        .HasDefaultValueSql("(newid())");
-
-                    b.Property<string>("DeliveryAt")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)")
-                        .HasColumnName("deliveryAt");
-
-                    b.Property<DateTime?>("DeliveryDate")
-                        .HasColumnType("datetime")
-                        .HasColumnName("deliveryDate");
-
-                    b.Property<string>("DeliveryStatus")
-                        .HasMaxLength(50)
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(50)")
-                        .HasColumnName("deliveryStatus");
-
-                    b.Property<Guid>("OrderId")
-                        .HasColumnType("uniqueidentifier")
-                        .HasColumnName("orderId");
-
-                    b.Property<string>("ShippingAddress")
-                        .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)")
-                        .HasColumnName("shippingAddress");
-
-                    b.Property<decimal?>("ShippingFee")
-                        .HasColumnType("decimal(10, 2)")
-                        .HasColumnName("shippingFee");
-
-                    b.Property<string>("TrackingNumber")
-                        .HasMaxLength(100)
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(100)")
-                        .HasColumnName("trackingNumber");
-
-                    b.HasKey("Id")
-                        .HasName("PK__Shipment__3213E83FF6F447A2");
-
-                    b.HasIndex(new[] { "DeliveryDate" }, "idx_shipment_deliverydate");
-
-                    b.HasIndex(new[] { "DeliveryStatus" }, "idx_shipment_deliverystatus");
-
-                    b.HasIndex(new[] { "OrderId" }, "idx_shipment_orderid");
-
-                    b.HasIndex(new[] { "TrackingNumber" }, "idx_shipment_trackingnumber");
-
-                    b.ToTable("Shipment", (string)null);
                 });
 
             modelBuilder.Entity("FTSS_Model.Entities.Solution", b =>
@@ -1602,17 +1563,6 @@ namespace FTSS_Model.Entities
                     b.Navigation("SetupPackage");
                 });
 
-            modelBuilder.Entity("FTSS_Model.Entities.Shipment", b =>
-                {
-                    b.HasOne("FTSS_Model.Entities.Order", "Order")
-                        .WithMany("Shipments")
-                        .HasForeignKey("OrderId")
-                        .IsRequired()
-                        .HasConstraintName("FK__Shipment__orderI__1BC821DD");
-
-                    b.Navigation("Order");
-                });
-
             modelBuilder.Entity("FTSS_Model.Entities.Solution", b =>
                 {
                     b.HasOne("FTSS_Model.Entities.Issue", "Issue")
@@ -1694,8 +1644,6 @@ namespace FTSS_Model.Entities
                     b.Navigation("OrderDetails");
 
                     b.Navigation("Payments");
-
-                    b.Navigation("Shipments");
                 });
 
             modelBuilder.Entity("FTSS_Model.Entities.Product", b =>

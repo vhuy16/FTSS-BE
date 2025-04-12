@@ -220,12 +220,23 @@ public partial class MyDbContext : DbContext
             .HasConstraintName("FK__CartItem__produc__0B91BA14");
 
         // Chỉ mục cho CartItem
-        entity.HasIndex(e => e.CartId, "idx_cartitem_cartid");
-        entity.HasIndex(e => e.ProductId, "idx_cartitem_productid");
-        entity.HasIndex(e => e.Status, "idx_cartitem_status");
-        entity.HasIndex(e => e.CreateDate, "idx_cartitem_createdate");
-        entity.HasIndex(e => e.ModifyDate, "idx_cartitem_modifydate");
-        entity.HasIndex(e => e.IsDelete, "idx_cartitem_isdelete").HasFilter("isDelete = 0");
+        entity.HasIndex(ci => ci.ProductId)
+            .HasDatabaseName("IX_CartItem_ProductId");
+
+        entity.HasIndex(ci => ci.CartId)
+            .HasDatabaseName("IX_CartItem_CartId");
+
+        entity.HasIndex(ci => ci.Status)
+            .HasDatabaseName("IX_CartItem_Status");
+
+        entity.HasIndex(ci => ci.IsDelete)
+            .HasDatabaseName("IX_CartItem_IsDelete");
+
+        entity.HasIndex(ci => ci.CreateDate)
+            .HasDatabaseName("IX_CartItem_CreateDate");
+
+        entity.HasIndex(ci => new { ci.CartId, ci.IsDelete, ci.Status })
+            .HasDatabaseName("IX_CartItem_CartId_IsDelete_Status");
     });
 
     modelBuilder.Entity<Category>(entity =>
