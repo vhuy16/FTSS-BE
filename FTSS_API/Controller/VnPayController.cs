@@ -10,6 +10,7 @@ namespace FTSS_API.Controller;
 public class VnPayController : BaseController<VnPayController>
 {
     private readonly IVnPayService _vnPayService;
+
     public VnPayController(ILogger<VnPayController> logger, IVnPayService vnPayService) : base(logger)
     {
         _vnPayService = vnPayService;
@@ -36,77 +37,83 @@ public class VnPayController : BaseController<VnPayController>
     //         return Problem(MessageConstant.PaymentMessage.CreatePaymentFail);
     //     }
     // }
-   [HttpGet("callback")]
-public async Task<IActionResult> VnPayCallBack()
-{
-    try
+    [HttpGet("callback")]
+    public async Task<IActionResult> VnPayCallBack()
     {
-        // Lấy query string từ request
-        var queryString = HttpContext.Request.Query;
-
-        // Lấy giá trị của vnp_TxnRef từ query string
-        if (!queryString.TryGetValue("vnp_TxnRef", out var txnRef))
-        {
-            return BadRequest(new ApiResponse
-            {
-                status = "400",
-                message = "Thiếu tham số vnp_TxnRef trong phản hồi từ VNPay",
-                data = false
-            });
-        }
-
-        // Chuyển đổi txnRef sang Guid
-        Guid orderId;
         try
         {
-            orderId = new Guid(txnRef); // Sử dụng new Guid() để parse
-        }
-        catch (FormatException)
-        {
-            return BadRequest(new ApiResponse
+            // Lấy query string từ request
+            var queryString = HttpContext.Request.Query;
+
+            // Lấy giá trị của vnp_TxnRef từ query string
+            if (!queryString.TryGetValue("vnp_TxnRef", out var txnRef))
             {
-                status = "400",
-                message = "Order ID không hợp lệ",
+                return BadRequest(new ApiResponse
+                {
+                    status = "400",
+                    message = "Thiếu tham số vnp_TxnRef trong phản hồi từ VNPay",
+                    data = false
+                });
+            }
+
+            // Chuyển đổi txnRef sang Guid
+            Guid orderId;
+            try
+            {
+                orderId = new Guid(txnRef); // Sử dụng new Guid() để parse
+            }
+            catch (FormatException)
+            {
+                return BadRequest(new ApiResponse
+                {
+                    status = "400",
+                    message = "Order ID không hợp lệ",
+                    data = false
+                });
+            }
+
+            // Lấy trạng thái giao dịch
+            if (!queryString.TryGetValue("vnp_TransactionStatus", out var vnp_TransactionStatus))
+            {
+                return BadRequest(new ApiResponse
+                {
+                    status = "400",
+                    message = "Thiếu tham số vnp_TransactionStatus trong phản hồi từ VNPay",
+                    data = false
+                });
+            }
+
+            // Gọi service để xử lý callback
+            var (response, order) = await _vnPayService.HandleCallBack(vnp_TransactionStatus, orderId);
+
+            // Kiểm tra trạng thái giao dịch và thực hiện redirect
+            if (vnp_TransactionStatus == "00") // "00" là mã thành công của VNPay
+            {
+                // Kiểm tra SetupPackageId của order
+                if (order != null && order.SetupPackageId.HasValue)
+                {
+                    // Redirect tới trang setup-booking với orderId
+                    return Redirect($"https://ftss-fe.vercel.app/setup-booking/{order.Id}");
+                }
+
+                // Nếu không có SetupPackageId, redirect tới trang thành công mặc định
+                return Redirect("https://ftss-fe.vercel.app/paymentSuccess");
+            }
+            else
+            {
+                // Chuyển hướng đến trang thất bại
+                return Redirect("https://ftss-fe.vercel.app/paymentError");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError($"VNPay Callback Error: {ex.Message}");
+            return StatusCode(500, new ApiResponse
+            {
+                status = "500",
+                message = "Lỗi xử lý callback VNPay",
                 data = false
             });
         }
-
-        // Lấy trạng thái giao dịch
-        if (!queryString.TryGetValue("vnp_TransactionStatus", out var vnp_TransactionStatus))
-        {
-            return BadRequest(new ApiResponse
-            {
-                status = "400",
-                message = "Thiếu tham số vnp_TransactionStatus trong phản hồi từ VNPay",
-                data = false
-            });
-        }
-
-        // Gọi service để xử lý callback
-        var response = await _vnPayService.HandleCallBack(vnp_TransactionStatus, orderId);
-
-        // Kiểm tra trạng thái giao dịch và thực hiện redirect
-        if (vnp_TransactionStatus == "00") // "00" là mã thành công của VNPay
-        {
-            // Chuyển hướng đến trang thành công
-            return Redirect("https://ftss-fe.vercel.app/paymentSuccess");
-        }
-        else
-        {
-            // Chuyển hướng đến trang thất bại
-            return Redirect("https://ftss-fe.vercel.app/paymentError");
-        }
     }
-    catch (Exception ex)
-    {
-        _logger.LogError($"VNPay Callback Error: {ex.Message}");
-        return StatusCode(500, new ApiResponse
-        {
-            status = "500",
-            message = "Lỗi xử lý callback VNPay",
-            data = false
-        });
-    }
-}
-
 }
