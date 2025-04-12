@@ -10,6 +10,7 @@ using FTSS_Model.Enum;
 using FTSS_Model.Paginate;
 using FTSS_Repository.Interface;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using MRC_API.Utils;
 
 namespace FTSS_API.Service.Implement.Implement;
@@ -19,16 +20,18 @@ public class ProductService : BaseService<ProductService>, IProductService
     private readonly HtmlSanitizerUtils _sanitizer;
     private readonly GoogleUtils.GoogleDriveService _driveService;
     private readonly SupabaseUltils _supabaseImageService;
+    private readonly IMemoryCache _memoryCache;
 
     public ProductService(IUnitOfWork<MyDbContext> unitOfWork, ILogger<ProductService> logger, IMapper mapper,
         IHttpContextAccessor httpContextAccessor, HtmlSanitizerUtils htmlSanitizer,
-        GoogleUtils.GoogleDriveService driveService, SupabaseUltils supabaseImageService) : base(unitOfWork, logger,
+        GoogleUtils.GoogleDriveService driveService, SupabaseUltils supabaseImageService, IMemoryCache memoryCache) : base(unitOfWork, logger,
         mapper,
         httpContextAccessor)
     {
         _sanitizer = htmlSanitizer;
         _driveService = driveService;
         _supabaseImageService = supabaseImageService;
+        _memoryCache = memoryCache;
     }
 
     public async Task<ApiResponse> CreateProduct(CreateProductRequest createProductRequest, Supabase.Client client)
@@ -197,146 +200,140 @@ public class ProductService : BaseService<ProductService>, IProductService
     }
 
 
-    public async Task<ApiResponse> GetListProduct(int page, int size, bool? isAscending, string? SubcategoryName,
-        string? productName,
-        string? cateName,
-        string? status,
-        decimal? minPrice,
-        decimal? maxPrice)
+   public async Task<ApiResponse> GetListProduct(int page, int size, bool? isAscending, string? SubcategoryName,
+    string? productName, string? cateName, string? status, decimal? minPrice, decimal? maxPrice)
+{
+    Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
+    var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
+        predicate: u => u.Id.Equals(userId) &&
+                        u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) && u.IsDelete == false &&
+                        (u.Role == RoleEnum.Admin.GetDescriptionFromEnum() || u.Role == RoleEnum.Manager.GetDescriptionFromEnum()));
+
+    if (user == null)
     {
-        // Lấy UserId từ HttpContext
-        Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
-        var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
-            predicate: u => u.Id.Equals(userId) &&
-                            u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) && u.IsDelete == false &&
-                            (u.Role == RoleEnum.Admin.GetDescriptionFromEnum() || u.Role == RoleEnum.Manager.GetDescriptionFromEnum()));
+        throw new BadHttpRequestException("You don't have permission to do this.");
+    }
 
-        if (user == null)
+    var products = await _unitOfWork.GetRepository<Product>().GetPagingListAsync(
+        selector: s => new GetProductResponse
         {
-            throw new BadHttpRequestException("You don't have permission to do this.");
-        }
-        var products = await _unitOfWork.GetRepository<Product>().GetPagingListAsync(
-            selector: s => new GetProductResponse
-            {
-                Id = s.Id,
-                SubCategoryName = s.SubCategory.SubCategoryName,
-                CategoryName = s.SubCategory.Category.CategoryName,
-                Description = s.Description,
-                Images = s.Images.Select(i => i.LinkImage).ToList(),
-                ProductName = s.ProductName,
-                Quantity = s.Quantity,
-                Price = s.Price,
-                Size = s.Size,
-                Status = s.Status
-            },
-            include: i => i.Include(p => p.SubCategory)
-                .ThenInclude(p => p.Category),
-            predicate: p =>
-                (string.IsNullOrEmpty(productName) || p.ProductName.Contains(productName)) &&
-                (string.IsNullOrEmpty(cateName) || p.SubCategory.Category.CategoryName.Contains(cateName)) &&
-                (string.IsNullOrEmpty(SubcategoryName) || p.SubCategory.SubCategoryName.Contains(SubcategoryName)) &&
-                (string.IsNullOrEmpty(status) || p.Status.Equals(status)) &&
-                (!minPrice.HasValue || p.Price >= minPrice.Value) &&
-                (!maxPrice.HasValue || p.Price <= maxPrice.Value),
-            orderBy: q => isAscending.HasValue
-                ? (isAscending.Value ? q.OrderBy(p => p.Price) : q.OrderByDescending(p => p.Price))
-                : q.OrderByDescending(p => p.CreateDate),
-            page: page,
-            size: size
-        );
+            Id = s.Id,
+            SubCategoryName = s.SubCategory != null ? s.SubCategory.SubCategoryName : null,
+            CategoryName = s.SubCategory != null && s.SubCategory.Category != null ? s.SubCategory.Category.CategoryName : null,
+            Description = s.Description,
+            Images = s.Images.Take(1).Select(i => i.LinkImage).ToList(),
+            ProductName = s.ProductName,
+            Quantity = s.Quantity,
+            Price = s.Price,
+            Size = s.Size,
+            Status = s.Status
+        },
+        include: i => i.Include(p => p.Images),
+        predicate: p =>
+            (string.IsNullOrEmpty(productName) || p.ProductName.Contains(productName)) &&
+            (string.IsNullOrEmpty(cateName) || p.SubCategory.Category.CategoryName.Contains(cateName)) &&
+            (string.IsNullOrEmpty(SubcategoryName) || p.SubCategory.SubCategoryName.Contains(SubcategoryName)) &&
+            (string.IsNullOrEmpty(status) || p.Status.Equals(status)) &&
+            (!minPrice.HasValue || p.Price >= minPrice.Value) &&
+            (!maxPrice.HasValue || p.Price <= maxPrice.Value),
+        orderBy: q => isAscending.HasValue
+            ? (isAscending.Value ? q.OrderBy(p => p.Price) : q.OrderByDescending(p => p.Price))
+            : q.OrderByDescending(p => p.CreateDate),
+        page: page,
+        size: size
+    );
 
-        int totalItems = products.Total;
-        int totalPages = (int)Math.Ceiling((double)totalItems / size);
-        if (products == null || products.Items.Count == 0)
-        {
-            return new ApiResponse
-            {
-                status = StatusCodes.Status200OK.ToString(),
-                message = "Products retrieved successfully.",
-                data = new Paginate<Product>()
-                {
-                    Page = page,
-                    Size = size,
-                    Total = totalItems,
-                    TotalPages = totalPages,
-                    Items = new List<Product>()
-                }
-            };
-        }
+    int totalItems = products.Total;
+    int totalPages = (int)Math.Ceiling((double)totalItems / size);
 
+    if (products == null || products.Items.Count == 0)
+    {
         return new ApiResponse
         {
             status = StatusCodes.Status200OK.ToString(),
             message = "Products retrieved successfully.",
-            data = products
-        };
-    }
-
-
-    public async Task<ApiResponse> GetAllProduct(int page, int size, bool? isAscending, string? SubcategoryName,
-        string? productName,
-        string? cateName,
-        decimal? minPrice,
-        decimal? maxPrice)
-    {
-        
-        // Đặt giá trị mặc định cho page và size nếu không hợp lệ
-        page = page > 0 ? page : 1;
-        size = size > 0 ? size : 10;
-
-        // Lấy danh sách sản phẩm
-        var products = await _unitOfWork.GetRepository<Product>().GetPagingListAsync(
-            selector: s => new GetProductResponse
-            {
-                Id = s.Id,
-                SubCategoryName = s.SubCategory.SubCategoryName,
-                CategoryName = s.SubCategory.Category.CategoryName,
-                Description = s.Description,
-                Images = s.Images.Select(i => i.LinkImage).ToList(),
-                ProductName = s.ProductName,
-                Quantity = s.Quantity,
-                Price = s.Price,
-                Size = s.Size,
-                Status = s.Status
-            },
-            include: i => i.Include(p => p.SubCategory)
-                .ThenInclude(p => p.Category),
-            predicate: p =>
-                (string.IsNullOrEmpty(productName) || p.ProductName.Contains(productName)) &&
-                (string.IsNullOrEmpty(cateName) || p.SubCategory.Category.CategoryName.Contains(cateName)) &&
-                (string.IsNullOrEmpty(SubcategoryName) || p.SubCategory.SubCategoryName.Contains(SubcategoryName)) &&
-                (!minPrice.HasValue || p.Price >= minPrice.Value) &&
-                (!maxPrice.HasValue || p.Price <= maxPrice.Value) &&
-                (p.IsDelete == false) &&
-                (p.Status.Equals(ProductStatusEnum.Available.GetDescriptionFromEnum())),
-            orderBy: q => isAscending.HasValue
-                ? (isAscending.Value ? q.OrderBy(p => p.Price) : q.OrderByDescending(p => p.Price))
-                : q.OrderByDescending(p => p.CreateDate),
-            page: page,
-            size: size
-        );
-
-        // Tổng số sản phẩm và số trang
-        int totalItems = products.Total;
-        int totalPages = (int)Math.Ceiling((double)totalItems / size);
-
-        // Tạo response
-        return new ApiResponse
-        {
-            status = StatusCodes.Status200OK.ToString(),
-            message = totalItems > 0 ? "Products retrieved successfully." : "No products found.",
-            data = new Paginate<GetProductResponse>
+            data = new Paginate<Product>()
             {
                 Page = page,
                 Size = size,
                 Total = totalItems,
                 TotalPages = totalPages,
-                Items = products.Items.ToList()
+                Items = new List<Product>()
             }
         };
     }
 
+    return new ApiResponse
+    {
+        status = StatusCodes.Status200OK.ToString(),
+        message = "Products retrieved successfully.",
+        data = products
+    };
+}
 
+
+  public async Task<ApiResponse> GetAllProduct(int page, int size, bool? isAscending, string? SubcategoryName,
+    string? productName, string? cateName, decimal? minPrice, decimal? maxPrice)
+{
+    page = page > 0 ? page : 1;
+    size = size > 0 ? size : 10;
+
+    var cacheKey = $"GetAllProduct_{page}_{size}_{isAscending}_{SubcategoryName}_{productName}_{cateName}_{minPrice}_{maxPrice}";
+    if (_memoryCache.TryGetValue(cacheKey, out ApiResponse cachedResponse))
+    {
+        return cachedResponse;
+    }
+
+    var products = await _unitOfWork.GetRepository<Product>().GetPagingListAsync(
+        selector: s => new GetProductResponse
+        {
+            Id = s.Id,
+            SubCategoryName = s.SubCategory != null ? s.SubCategory.SubCategoryName : null,
+            CategoryName = s.SubCategory != null && s.SubCategory.Category != null ? s.SubCategory.Category.CategoryName : null,
+            Description = s.Description,
+            Images = s.Images.Take(1).Select(i => i.LinkImage).ToList(),
+            ProductName = s.ProductName,
+            Quantity = s.Quantity,
+            Price = s.Price,
+            Size = s.Size,
+            Status = s.Status
+        },
+        include: i => i.Include(p => p.Images),
+        predicate: p =>
+            (string.IsNullOrEmpty(productName) || p.ProductName.Contains(productName)) &&
+            (string.IsNullOrEmpty(cateName) || p.SubCategory.Category.CategoryName.Contains(cateName)) &&
+            (string.IsNullOrEmpty(SubcategoryName) || p.SubCategory.SubCategoryName.Contains(SubcategoryName)) &&
+            (!minPrice.HasValue || p.Price >= minPrice.Value) &&
+            (!maxPrice.HasValue || p.Price <= maxPrice.Value) &&
+            (p.IsDelete == false) &&
+            (p.Status.Equals(ProductStatusEnum.Available.GetDescriptionFromEnum())),
+        orderBy: q => isAscending.HasValue
+            ? (isAscending.Value ? q.OrderBy(p => p.Price) : q.OrderByDescending(p => p.Price))
+            : q.OrderByDescending(p => p.CreateDate),
+        page: page,
+        size: size
+    );
+
+    int totalItems = products.Total;
+    int totalPages = (int)Math.Ceiling((double)totalItems / size);
+
+    var response = new ApiResponse
+    {
+        status = StatusCodes.Status200OK.ToString(),
+        message = totalItems > 0 ? "Products retrieved successfully." : "No products found.",
+        data = new Paginate<GetProductResponse>
+        {
+            Page = page,
+            Size = size,
+            Total = totalItems,
+            TotalPages = totalPages,
+            Items = products.Items.ToList()
+        }
+    };
+
+    _memoryCache.Set(cacheKey, response, TimeSpan.FromMinutes(10));
+    return response;
+}
     public async Task<ApiResponse> GetAllProductsGroupedByCategory(int page, int size)
     {
         // Lấy toàn bộ danh sách sản phẩm có trạng thái "Available"

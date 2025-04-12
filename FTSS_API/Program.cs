@@ -26,6 +26,7 @@ builder.Services.AddDatabase();
 builder.Services.AddUnitOfWork();
 builder.Services.AddCustomServices();
 builder.Services.AddJwtValidation();
+builder.Services.AddMemoryCache();
 builder.Services.Configure<EmailSettings>(builder.Configuration.GetSection("EmailSettings"));
 builder.Services.Configure<PayOSSettings>(builder.Configuration.GetSection("PayOS"));
 builder.Services.Configure<VNPaySettings>(builder.Configuration.GetSection("VNPaySettings"));
