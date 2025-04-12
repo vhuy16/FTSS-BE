@@ -1,0 +1,48 @@
+name: Build and Deploy .NET Application to VPS via SSH
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    # 1. Lấy mã nguồn từ repository.
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    # 2. Cài đặt .NET SDK
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: 8.0 # Thay đổi phiên bản .NET nếu cần
+
+    # 3. Build dự án .NET và tạo tài liệu Swagger XML
+    - name: Build project
+      run: dotnet publish -c Release -o ./publish /p:DocumentationFile=./publish/FTSS_API.xml
+
+    # 4. Copy file lên VPS qua SSH (SCP)
+    - name: Deploy via SCP over SSH
+      uses: appleboy/scp-action@v0.1.7
+      with:
+        host: ${{ secrets.VPS_HOST }}                 # IP VPS
+        username: Administrator
+        key: ${{ secrets.VPS_SSH_PRIVATE_KEY }}       # Private key từ GitHub Secrets
+        port: 22
+        source: "./publish/*"
+        target: "C:/inetpub/ftss_api/"                # Thư mục đích trên VPS
+        strip_components: 1
+
+    # 5. (Tuỳ chọn) Restart service hoặc app pool qua SSH
+    - name: Restart IIS App Pool (hoặc service khác)
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: ${{ secrets.VPS_HOST }}
+        username: Administrator
+        key: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
+        port: 22
+        script: |
+          iisreset  # Hoặc các lệnh khác như restart service
