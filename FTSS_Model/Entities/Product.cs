@@ -1,14 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
-using Microsoft.EntityFrameworkCore;
 
 namespace FTSS_Model.Entities;
-[Index(nameof(ProductName), Name = "IX_Product_ProductName")]
-[Index(nameof(SubCategoryId), Name = "IX_Product_SubCategoryId")]
-[Index(nameof(Price), Name = "IX_Product_Price")]
-[Index(nameof(Status), Name = "IX_Product_Status")]
-[Index(nameof(CreateDate), Name = "IX_Product_CreateDate")]
-[Index(nameof(IsDelete), Name = "IX_Product_IsDelete")]
+
 public partial class Product
 {
     public Guid Id { get; set; }

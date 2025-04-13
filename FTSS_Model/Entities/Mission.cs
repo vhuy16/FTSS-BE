@@ -29,6 +29,8 @@ public partial class Mission
 
     public virtual Booking? Booking { get; set; }
 
+    public virtual ICollection<MissionImage> MissionImages { get; set; } = new List<MissionImage>();
+
     public virtual Order? Order { get; set; }
 
     public virtual User? User { get; set; }
