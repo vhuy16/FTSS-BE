@@ -13,6 +13,7 @@ namespace FTSS_API.Service.Interface
         Task<ApiResponse> CancelBooking(Guid bookingid);
         Task<ApiResponse> GetBookingById(Guid bookingid);
         Task<ApiResponse> GetDateUnavailable();
+        Task<ApiResponse> GetHistoryOrder(Guid orderid);
         Task<ApiResponse> GetListBookingForManager(int pageNumber, int pageSize, string? status, string? paymentstatus, string? bookingcode, bool? isAscending, bool? isAssigned);
         Task<ApiResponse> GetListBookingForUser(int pageNumber, int pageSize, string? status, string? paymentstatus, string? bookingcode, bool? isAscending);
         Task<ApiResponse> GetListMissionForManager(int pageNumber, int pageSize, string? status, bool? isAscending);

@@ -220,7 +220,7 @@ namespace FTSS_API.Controller
             return StatusCode(int.Parse(response.status), response);
         }
         /// <summary>
-        /// API cập nhật thông tin mission cho user.
+        /// API cập nhật thông tin booking cho user.
         /// </summary>
         [HttpPut(ApiEndPointConstant.Booking.UpdateBooking)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
@@ -256,6 +256,17 @@ namespace FTSS_API.Controller
         public async Task<IActionResult> UpdateBookingStatus(Guid bookingid)
         {
             var response = await _bookingService.UpdateBookingStatus(bookingid);
+            return StatusCode(int.Parse(response.status), response);
+        }
+        /// <summary>
+        /// API lịch sử bảo trì của order.
+        /// </summary>
+        [HttpGet(ApiEndPointConstant.Booking.GetHistoryOrder)]
+        [ProducesResponseType(typeof(IPaginate<ApiResponse>), StatusCodes.Status200OK)]
+        [ProducesErrorResponseType(typeof(ProblemDetails))]
+        public async Task<IActionResult> GetHistoryOrder(Guid orderid)
+        {
+            var response = await _bookingService.GetHistoryOrder(orderid);
             return StatusCode(int.Parse(response.status), response);
         }
     }

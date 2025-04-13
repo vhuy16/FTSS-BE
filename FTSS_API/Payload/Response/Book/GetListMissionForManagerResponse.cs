@@ -21,5 +21,13 @@
         public Guid? OrderId { get; set; }
         public string? OrderCode { get; set; }
         public string? BookingCode { get; set; }
+        public DateTime? EndMissionSchedule { get; set; }
+        public string? CancelReason { get; set; }
+
+        public string FullName { get; set; } = null!;
+        public string? BookingImage { get; set; }
+        public DateTime? InstallationDate { get; set; }
+
+        public List<ServicePackageResponse> Services { get; set; } = new();
     }
 }
