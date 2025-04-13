@@ -31,8 +31,6 @@ public partial class Booking
 
     public virtual ICollection<BookingDetail> BookingDetails { get; set; } = new List<BookingDetail>();
 
-    public virtual ICollection<BookingImage> BookingImages { get; set; } = new List<BookingImage>();
-
     public virtual ICollection<Mission> Missions { get; set; } = new List<Mission>();
 
     public virtual Order? Order { get; set; }

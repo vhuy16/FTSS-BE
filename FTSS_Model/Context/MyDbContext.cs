@@ -20,8 +20,6 @@ public partial class MyDbContext : DbContext
 
     public virtual DbSet<BookingDetail> BookingDetails { get; set; }
 
-    public virtual DbSet<BookingImage> BookingImages { get; set; }
-
     public virtual DbSet<Cart> Carts { get; set; }
 
     public virtual DbSet<CartItem> CartItems { get; set; }
@@ -35,6 +33,8 @@ public partial class MyDbContext : DbContext
     public virtual DbSet<IssueCategory> IssueCategories { get; set; }
 
     public virtual DbSet<Mission> Missions { get; set; }
+
+    public virtual DbSet<MissionImage> MissionImages { get; set; }
 
     public virtual DbSet<Order> Orders { get; set; }
 
@@ -152,31 +152,6 @@ public partial class MyDbContext : DbContext
                 .HasForeignKey(d => d.ServicePackageId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_BookingDetail_ServicePackage");
-        });
-
-        modelBuilder.Entity<BookingImage>(entity =>
-        {
-            entity.ToTable("BookingImage");
-
-            entity.Property(e => e.Id).HasDefaultValueSql("(newid())");
-            entity.Property(e => e.BookingId).HasColumnName("bookingId");
-            entity.Property(e => e.CreateDate)
-                .HasColumnType("datetime")
-                .HasColumnName("createDate");
-            entity.Property(e => e.IsDelete).HasColumnName("isDelete");
-            entity.Property(e => e.LinkImage).HasColumnName("linkImage");
-            entity.Property(e => e.ModifyDate)
-                .HasColumnType("datetime")
-                .HasColumnName("modifyDate");
-            entity.Property(e => e.Status)
-                .HasMaxLength(10)
-                .IsUnicode(false)
-                .IsFixedLength()
-                .HasColumnName("status");
-
-            entity.HasOne(d => d.Booking).WithMany(p => p.BookingImages)
-                .HasForeignKey(d => d.BookingId)
-                .HasConstraintName("FK_BookingImage_Booking");
         });
 
         modelBuilder.Entity<Cart>(entity =>
@@ -474,6 +449,31 @@ public partial class MyDbContext : DbContext
             entity.HasOne(d => d.User).WithMany(p => p.Missions)
                 .HasForeignKey(d => d.Userid)
                 .HasConstraintName("FK_MaintenanceTask_User");
+        });
+
+        modelBuilder.Entity<MissionImage>(entity =>
+        {
+            entity.ToTable("MissionImage");
+
+            entity.Property(e => e.Id).HasDefaultValueSql("(newid())");
+            entity.Property(e => e.CreateDate)
+                .HasColumnType("datetime")
+                .HasColumnName("createDate");
+            entity.Property(e => e.IsDelete).HasColumnName("isDelete");
+            entity.Property(e => e.LinkImage).HasColumnName("linkImage");
+            entity.Property(e => e.MissionId).HasColumnName("missionId");
+            entity.Property(e => e.ModifyDate)
+                .HasColumnType("datetime")
+                .HasColumnName("modifyDate");
+            entity.Property(e => e.Status)
+                .HasMaxLength(10)
+                .IsUnicode(false)
+                .IsFixedLength()
+                .HasColumnName("status");
+
+            entity.HasOne(d => d.Mission).WithMany(p => p.MissionImages)
+                .HasForeignKey(d => d.MissionId)
+                .HasConstraintName("FK_MissionImage_Mission");
         });
 
         modelBuilder.Entity<Order>(entity =>
