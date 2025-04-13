@@ -561,7 +561,7 @@ namespace FTSS_API.Service.Implement
                         BookingId = newBooking.Id
                     }).ToList();
 
-                    await _unitOfWork.Context.Set<BookingDetail>().AddRangeAsync(bookingDetails);
+                    await _unitOfWork.GetRepository<BookingDetail>().InsertRangeAsync(bookingDetails);
                 }
 
                 // Nếu là lần đầu tiên booking và IsEligible == true, cập nhật lại IsEligible của Order thành false
@@ -735,7 +735,7 @@ namespace FTSS_API.Service.Implement
                     Status = booking.Status,
                     UserId = booking.UserId,
                     UserName = booking.User?.UserName ?? "Không xác định",
-                    FullName = booking.User?.FullName ?? "Không xác định",
+                    FullName = booking.FullName ?? "Không xác định",
                     Address = booking.Address,
                     PhoneNumber = booking.PhoneNumber,
                     TotalPrice = booking.TotalPrice,
@@ -1451,6 +1451,18 @@ namespace FTSS_API.Service.Implement
         {
             try
             {
+                // Lấy UserId từ HttpContext
+                Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
+                var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
+                    predicate: u => u.Id.Equals(userId) &&
+                                    u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) &&
+                                    u.IsDelete == false &&
+                                    u.Role.Equals(RoleEnum.Technician.GetDescriptionFromEnum()));
+
+                if (user == null)
+                {
+                    throw new BadHttpRequestException("Bạn không có quyền thực hiện thao tác này.");
+                }
                 var mission = await _unitOfWork.GetRepository<Mission>().SingleOrDefaultAsync(
                     predicate: m => m.Id.Equals(missionId) && m.IsDelete == false);
 
@@ -1463,7 +1475,16 @@ namespace FTSS_API.Service.Implement
                         data = null
                     };
                 }
-
+                // ✅ Kiểm tra technician chỉ được cập nhật mission của chính mình
+                if (mission.Userid == null || mission.Userid != userId)
+                {
+                    return new ApiResponse
+                    {
+                        status = StatusCodes.Status403Forbidden.ToString(),
+                        message = "Bạn không được phép cập nhật trạng thái nhiệm vụ này.",
+                        data = null
+                    };
+                }
                 if (!Enum.TryParse(status, out MissionStatusEnum missionStatus))
                 {
                     return new ApiResponse
@@ -1474,10 +1495,10 @@ namespace FTSS_API.Service.Implement
                     };
                 }
 
-                // Cập nhật trạng thái của nhiệm vụ
+                // Cập nhật trạng thái Mission
                 mission.Status = missionStatus.ToString();
 
-                // Chỉ cập nhật Order nếu Mission có OrderId và không có BookingId
+                // Nếu mission liên kết với OrderId và không có BookingId => cập nhật Order
                 if (mission.OrderId.HasValue && mission.BookingId == null)
                 {
                     string? orderStatus = missionStatus switch
@@ -1498,6 +1519,30 @@ namespace FTSS_API.Service.Implement
                             order.Status = orderStatus;
                             order.ModifyDate = DateTime.UtcNow;
                             _unitOfWork.GetRepository<Order>().UpdateAsync(order);
+                        }
+                    }
+                }
+
+                // Nếu mission liên kết với BookingId và không có OrderId => cập nhật Booking
+                if (mission.BookingId.HasValue && mission.OrderId == null)
+                {
+                    string? bookingStatus = missionStatus switch
+                    {
+                        MissionStatusEnum.Processing => BookingStatusEnum.PROCESSING.ToString(),
+                        MissionStatusEnum.Done => BookingStatusEnum.DONE.ToString(),
+                        MissionStatusEnum.Cancel => BookingStatusEnum.MISSED.ToString(),
+                        _ => null
+                    };
+
+                    if (bookingStatus != null)
+                    {
+                        var booking = await _unitOfWork.GetRepository<Booking>().SingleOrDefaultAsync(
+                            predicate: b => b.Id == mission.BookingId.Value);
+
+                        if (booking != null)
+                        {
+                            booking.Status = bookingStatus;
+                            _unitOfWork.GetRepository<Booking>().UpdateAsync(booking);
                         }
                     }
                 }
