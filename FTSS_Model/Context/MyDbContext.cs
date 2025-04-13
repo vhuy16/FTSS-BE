@@ -34,6 +34,8 @@ public partial class MyDbContext : DbContext
 
     public virtual DbSet<Mission> Missions { get; set; }
 
+    public virtual DbSet<MissionImage> MissionImages { get; set; }
+
     public virtual DbSet<Order> Orders { get; set; }
 
     public virtual DbSet<OrderDetail> OrderDetails { get; set; }
@@ -49,8 +51,6 @@ public partial class MyDbContext : DbContext
     public virtual DbSet<SetupPackage> SetupPackages { get; set; }
 
     public virtual DbSet<SetupPackageDetail> SetupPackageDetails { get; set; }
-
-    public virtual DbSet<Shipment> Shipments { get; set; }
 
     public virtual DbSet<Solution> Solutions { get; set; }
 
@@ -74,6 +74,18 @@ public partial class MyDbContext : DbContext
 
             entity.ToTable("Booking");
 
+            entity.HasIndex(e => e.BookingCode, "idx_booking_bookingcode")
+                .IsUnique()
+                .HasFilter("([bookingCode] IS NOT NULL)");
+
+            entity.HasIndex(e => e.OrderId, "idx_booking_orderid");
+
+            entity.HasIndex(e => e.ScheduleDate, "idx_booking_scheduledate");
+
+            entity.HasIndex(e => e.Status, "idx_booking_status");
+
+            entity.HasIndex(e => e.UserId, "idx_booking_userid");
+
             entity.Property(e => e.Id)
                 .HasDefaultValueSql("(newid())")
                 .HasColumnName("id");
@@ -84,6 +96,9 @@ public partial class MyDbContext : DbContext
                 .HasMaxLength(10)
                 .IsUnicode(false)
                 .HasColumnName("bookingCode");
+            entity.Property(e => e.BookingImage)
+                .IsUnicode(false)
+                .HasColumnName("bookingImage");
             entity.Property(e => e.FullName)
                 .HasMaxLength(255)
                 .HasColumnName("fullName");
@@ -118,6 +133,10 @@ public partial class MyDbContext : DbContext
 
             entity.ToTable("BookingDetail");
 
+            entity.HasIndex(e => e.BookingId, "idx_bookingdetail_bookingid");
+
+            entity.HasIndex(e => e.ServicePackageId, "idx_bookingdetail_servicepackageid");
+
             entity.Property(e => e.Id)
                 .HasDefaultValueSql("(newid())")
                 .HasColumnName("id");
@@ -140,6 +159,14 @@ public partial class MyDbContext : DbContext
             entity.HasKey(e => e.Id).HasName("PK__Cart__3213E83F39ED5C43");
 
             entity.ToTable("Cart");
+
+            entity.HasIndex(e => e.CreateDate, "idx_cart_createdate");
+
+            entity.HasIndex(e => e.IsDelete, "idx_cart_isdelete").HasFilter("([isDelete]=(0))");
+
+            entity.HasIndex(e => e.ModifyDate, "idx_cart_modifydate");
+
+            entity.HasIndex(e => e.Status, "idx_cart_status");
 
             entity.Property(e => e.Id)
                 .HasDefaultValueSql("(newid())")
@@ -170,6 +197,16 @@ public partial class MyDbContext : DbContext
             entity.HasKey(e => e.Id).HasName("PK__CartItem__3213E83F04624BAE");
 
             entity.ToTable("CartItem");
+
+            entity.HasIndex(e => e.CreateDate, "idx_cartitem_createdate");
+
+            entity.HasIndex(e => e.IsDelete, "idx_cartitem_isdelete");
+
+            entity.HasIndex(e => e.ModifyDate, "idx_cartitem_modifydate");
+
+            entity.HasIndex(e => e.ProductId, "idx_cartitem_productid");
+
+            entity.HasIndex(e => e.Status, "idx_cartitem_status");
 
             entity.Property(e => e.Id)
                 .HasDefaultValueSql("(newid())")
@@ -208,6 +245,14 @@ public partial class MyDbContext : DbContext
 
             entity.ToTable("Category");
 
+            entity.HasIndex(e => e.CategoryName, "idx_category_categoryname");
+
+            entity.HasIndex(e => e.CreateDate, "idx_category_createdate");
+
+            entity.HasIndex(e => e.IsDelete, "idx_category_isdelete").HasFilter("([isDelete]=(0))");
+
+            entity.HasIndex(e => e.ModifyDate, "idx_category_modifydate");
+
             entity.Property(e => e.Id)
                 .HasDefaultValueSql("(newid())")
                 .HasColumnName("id");
@@ -236,6 +281,16 @@ public partial class MyDbContext : DbContext
             entity.HasKey(e => e.Id).HasName("PK__Image__3213E83F222143F7");
 
             entity.ToTable("Image");
+
+            entity.HasIndex(e => new { e.ProductId, e.IsDelete, e.CreateDate }, "IX_Image_ProductId_IsDelete_CreateDate");
+
+            entity.HasIndex(e => e.CreateDate, "idx_image_createdate");
+
+            entity.HasIndex(e => e.IsDelete, "idx_image_isdelete").HasFilter("([isDelete]=(0))");
+
+            entity.HasIndex(e => e.ModifyDate, "idx_image_modifydate");
+
+            entity.HasIndex(e => e.Status, "idx_image_status");
 
             entity.Property(e => e.Id)
                 .HasDefaultValueSql("(newid())")
@@ -269,6 +324,14 @@ public partial class MyDbContext : DbContext
             entity.HasKey(e => e.Id).HasName("PK__tmp_ms_x__3213E83F8331A313");
 
             entity.ToTable("Issue");
+
+            entity.HasIndex(e => e.CreateDate, "idx_issue_createdate");
+
+            entity.HasIndex(e => e.IsDelete, "idx_issue_isdelete").HasFilter("([isDelete]=(0))");
+
+            entity.HasIndex(e => e.IssueName, "idx_issue_issuename");
+
+            entity.HasIndex(e => e.ModifiedDate, "idx_issue_modifieddate");
 
             entity.Property(e => e.Id)
                 .HasDefaultValueSql("(newid())")
@@ -304,6 +367,14 @@ public partial class MyDbContext : DbContext
 
             entity.ToTable("IssueCategory");
 
+            entity.HasIndex(e => e.CreateDate, "idx_issuecategory_createdate");
+
+            entity.HasIndex(e => e.IsDelete, "idx_issuecategory_isdelete").HasFilter("([isDelete]=(0))");
+
+            entity.HasIndex(e => e.ModifyDate, "idx_issuecategory_modifydate");
+
+            entity.HasIndex(e => e.IssueCategoryName, "idx_issuecategory_name");
+
             entity.Property(e => e.Id)
                 .HasDefaultValueSql("(newid())")
                 .HasColumnName("id");
@@ -327,6 +398,18 @@ public partial class MyDbContext : DbContext
             entity.HasKey(e => e.Id).HasName("PK__Maintena__3213E83F3561400D");
 
             entity.ToTable("Mission");
+
+            entity.HasIndex(e => e.BookingId, "idx_mission_bookingid");
+
+            entity.HasIndex(e => e.IsDelete, "idx_mission_isdelete").HasFilter("([isDelete]=(0))");
+
+            entity.HasIndex(e => e.MissionSchedule, "idx_mission_missionschedule");
+
+            entity.HasIndex(e => e.OrderId, "idx_mission_orderid");
+
+            entity.HasIndex(e => e.Status, "idx_mission_status");
+
+            entity.HasIndex(e => e.Userid, "idx_mission_userid");
 
             entity.Property(e => e.Id)
                 .HasDefaultValueSql("(newid())")
@@ -368,11 +451,52 @@ public partial class MyDbContext : DbContext
                 .HasConstraintName("FK_MaintenanceTask_User");
         });
 
+        modelBuilder.Entity<MissionImage>(entity =>
+        {
+            entity.ToTable("MissionImage");
+
+            entity.Property(e => e.Id).HasDefaultValueSql("(newid())");
+            entity.Property(e => e.CreateDate)
+                .HasColumnType("datetime")
+                .HasColumnName("createDate");
+            entity.Property(e => e.IsDelete).HasColumnName("isDelete");
+            entity.Property(e => e.LinkImage).HasColumnName("linkImage");
+            entity.Property(e => e.MissionId).HasColumnName("missionId");
+            entity.Property(e => e.ModifyDate)
+                .HasColumnType("datetime")
+                .HasColumnName("modifyDate");
+            entity.Property(e => e.Status)
+                .HasMaxLength(10)
+                .IsUnicode(false)
+                .IsFixedLength()
+                .HasColumnName("status");
+
+            entity.HasOne(d => d.Mission).WithMany(p => p.MissionImages)
+                .HasForeignKey(d => d.MissionId)
+                .HasConstraintName("FK_MissionImage_Mission");
+        });
+
         modelBuilder.Entity<Order>(entity =>
         {
             entity.HasKey(e => e.Id).HasName("PK__Order__3213E83F7F61BE3E");
 
             entity.ToTable("Order");
+
+            entity.HasIndex(e => e.CreateDate, "idx_order_createdate");
+
+            entity.HasIndex(e => e.IsDelete, "idx_order_isdelete").HasFilter("([IsDelete]=(0))");
+
+            entity.HasIndex(e => e.ModifyDate, "idx_order_modifydate");
+
+            entity.HasIndex(e => e.OrderCode, "idx_order_ordercode")
+                .IsUnique()
+                .HasFilter("([orderCode] IS NOT NULL)");
+
+            entity.HasIndex(e => e.SetupPackageId, "idx_order_setuppackageid");
+
+            entity.HasIndex(e => e.Status, "idx_order_status");
+
+            entity.HasIndex(e => new { e.UserId, e.Status }, "idx_order_userid_status");
 
             entity.Property(e => e.Id)
                 .HasDefaultValueSql("(newid())")
@@ -473,6 +597,14 @@ public partial class MyDbContext : DbContext
 
             entity.ToTable("Payment");
 
+            entity.HasIndex(e => e.BookingId, "idx_payment_bookingid");
+
+            entity.HasIndex(e => e.OrderCode, "idx_payment_ordercode");
+
+            entity.HasIndex(e => e.PaymentDate, "idx_payment_paymentdate");
+
+            entity.HasIndex(e => e.PaymentStatus, "idx_payment_paymentstatus");
+
             entity.Property(e => e.Id)
                 .HasDefaultValueSql("(newid())")
                 .HasColumnName("id");
@@ -481,13 +613,13 @@ public partial class MyDbContext : DbContext
                 .HasColumnName("amountPaid");
             entity.Property(e => e.BankHolder)
                 .HasMaxLength(50)
-                .IsUnicode(false)
                 .HasColumnName("bankHolder");
             entity.Property(e => e.BankName)
-                .HasMaxLength(50)
-                .IsUnicode(false)
+                .HasMaxLength(100)
                 .HasColumnName("bankName");
-            entity.Property(e => e.BankNumber).HasColumnName("bankNumber");
+            entity.Property(e => e.BankNumber)
+                .HasMaxLength(50)
+                .HasColumnName("bankNumber");
             entity.Property(e => e.BookingId).HasColumnName("bookingId");
             entity.Property(e => e.OrderCode).HasColumnName("orderCode");
             entity.Property(e => e.OrderId).HasColumnName("orderId");
@@ -516,6 +648,30 @@ public partial class MyDbContext : DbContext
             entity.HasKey(e => e.Id).HasName("PK__Product__3213E83F4D0F84D3");
 
             entity.ToTable("Product");
+
+            entity.HasIndex(e => e.CreateDate, "IX_Product_CreateDate");
+
+            entity.HasIndex(e => e.IsDelete, "IX_Product_IsDelete");
+
+            entity.HasIndex(e => e.Price, "IX_Product_Price");
+
+            entity.HasIndex(e => e.ProductName, "IX_Product_ProductName");
+
+            entity.HasIndex(e => e.Status, "IX_Product_Status");
+
+            entity.HasIndex(e => new { e.Status, e.IsDelete, e.CreateDate }, "IX_Product_Status_IsDelete_CreateDate");
+
+            entity.HasIndex(e => e.SubCategoryId, "IX_Product_SubCategoryId");
+
+            entity.HasIndex(e => e.CreateDate, "idx_product_createdate");
+
+            entity.HasIndex(e => e.IsDelete, "idx_product_isdelete").HasFilter("([isDelete]=(0))");
+
+            entity.HasIndex(e => e.ModifyDate, "idx_product_modifydate");
+
+            entity.HasIndex(e => e.ProductName, "idx_product_productname");
+
+            entity.HasIndex(e => e.Status, "idx_product_status");
 
             entity.Property(e => e.Id)
                 .HasDefaultValueSql("(newid())")
@@ -556,6 +712,12 @@ public partial class MyDbContext : DbContext
 
             entity.ToTable("ServicePackage");
 
+            entity.HasIndex(e => e.IsDelete, "idx_servicepackage_isdelete").HasFilter("([isDelete]=(0))");
+
+            entity.HasIndex(e => e.ServiceName, "idx_servicepackage_servicename");
+
+            entity.HasIndex(e => e.Status, "idx_servicepackage_status");
+
             entity.Property(e => e.Id)
                 .HasDefaultValueSql("(newid())")
                 .HasColumnName("id");
@@ -577,6 +739,16 @@ public partial class MyDbContext : DbContext
         modelBuilder.Entity<SetupPackage>(entity =>
         {
             entity.ToTable("SetupPackage");
+
+            entity.HasIndex(e => e.CreateDate, "idx_setuppackage_createdate");
+
+            entity.HasIndex(e => e.IsDelete, "idx_setuppackage_isdelete").HasFilter("([isDelete]=(0))");
+
+            entity.HasIndex(e => e.ModifyDate, "idx_setuppackage_modifydate");
+
+            entity.HasIndex(e => e.Status, "idx_setuppackage_status");
+
+            entity.HasIndex(e => e.Userid, "idx_setuppackage_userid");
 
             entity.Property(e => e.Id)
                 .HasDefaultValueSql("(newid())")
@@ -632,48 +804,19 @@ public partial class MyDbContext : DbContext
                 .HasConstraintName("FK_SetupPackageDetail_SetupPackage");
         });
 
-        modelBuilder.Entity<Shipment>(entity =>
-        {
-            entity.HasKey(e => e.Id).HasName("PK__Shipment__3213E83FF6F447A2");
-
-            entity.ToTable("Shipment");
-
-            entity.Property(e => e.Id)
-                .HasDefaultValueSql("(newid())")
-                .HasColumnName("id");
-            entity.Property(e => e.DeliveryAt)
-                .HasMaxLength(100)
-                .HasColumnName("deliveryAt");
-            entity.Property(e => e.DeliveryDate)
-                .HasColumnType("datetime")
-                .HasColumnName("deliveryDate");
-            entity.Property(e => e.DeliveryStatus)
-                .HasMaxLength(50)
-                .IsUnicode(false)
-                .HasColumnName("deliveryStatus");
-            entity.Property(e => e.OrderId).HasColumnName("orderId");
-            entity.Property(e => e.ShippingAddress)
-                .HasMaxLength(255)
-                .HasColumnName("shippingAddress");
-            entity.Property(e => e.ShippingFee)
-                .HasColumnType("decimal(10, 2)")
-                .HasColumnName("shippingFee");
-            entity.Property(e => e.TrackingNumber)
-                .HasMaxLength(100)
-                .IsUnicode(false)
-                .HasColumnName("trackingNumber");
-
-            entity.HasOne(d => d.Order).WithMany(p => p.Shipments)
-                .HasForeignKey(d => d.OrderId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK__Shipment__orderI__1BC821DD");
-        });
-
         modelBuilder.Entity<Solution>(entity =>
         {
             entity.HasKey(e => e.Id).HasName("PK__Solution__3213E83FE0CC4A1A");
 
             entity.ToTable("Solution");
+
+            entity.HasIndex(e => e.CreateDate, "idx_solution_createdate");
+
+            entity.HasIndex(e => e.IsDelete, "idx_solution_isdelete").HasFilter("([isDelete]=(0))");
+
+            entity.HasIndex(e => e.ModifiedDate, "idx_solution_modifieddate");
+
+            entity.HasIndex(e => e.SolutionName, "idx_solution_solutionname");
 
             entity.Property(e => e.Id)
                 .HasDefaultValueSql("(newid())")
@@ -705,6 +848,14 @@ public partial class MyDbContext : DbContext
 
             entity.ToTable("SolutionProduct");
 
+            entity.HasIndex(e => e.CreateDate, "idx_solutionproduct_createdate");
+
+            entity.HasIndex(e => e.ModifyDate, "idx_solutionproduct_modifydate");
+
+            entity.HasIndex(e => e.ProductId, "idx_solutionproduct_productid");
+
+            entity.HasIndex(e => e.SolutionId, "idx_solutionproduct_solutionid");
+
             entity.Property(e => e.Id).HasDefaultValueSql("(newid())");
             entity.Property(e => e.CreateDate)
                 .HasDefaultValueSql("(getdate())")
@@ -725,6 +876,14 @@ public partial class MyDbContext : DbContext
             entity.HasKey(e => e.Id).HasName("PK__SubCateg__3213E83F011365E6");
 
             entity.ToTable("SubCategory");
+
+            entity.HasIndex(e => e.CreateDate, "idx_subcategory_createdate");
+
+            entity.HasIndex(e => e.IsDelete, "idx_subcategory_isdelete").HasFilter("([isDelete]=(0))");
+
+            entity.HasIndex(e => e.ModifyDate, "idx_subcategory_modifydate");
+
+            entity.HasIndex(e => e.SubCategoryName, "idx_subcategory_subcategoryname");
 
             entity.Property(e => e.Id)
                 .HasDefaultValueSql("(newid())")
@@ -755,6 +914,18 @@ public partial class MyDbContext : DbContext
             entity.HasKey(e => e.Id).HasName("PK__User__3213E83FF34271D4");
 
             entity.ToTable("User");
+
+            entity.HasIndex(e => e.CreateDate, "idx_user_createdate");
+
+            entity.HasIndex(e => e.IsDelete, "idx_user_isdelete").HasFilter("([isDelete]=(0))");
+
+            entity.HasIndex(e => e.ModifyDate, "idx_user_modifydate");
+
+            entity.HasIndex(e => e.Role, "idx_user_role");
+
+            entity.HasIndex(e => e.Status, "idx_user_status");
+
+            entity.HasIndex(e => e.UserName, "idx_user_username").IsUnique();
 
             entity.Property(e => e.Id)
                 .HasDefaultValueSql("(newid())")
@@ -815,6 +986,18 @@ public partial class MyDbContext : DbContext
             entity.HasKey(e => e.Id).HasName("PK__Voucher__3213E83F2B4BD0F3");
 
             entity.ToTable("Voucher");
+
+            entity.HasIndex(e => e.CreateDate, "idx_voucher_createdate");
+
+            entity.HasIndex(e => e.ExpiryDate, "idx_voucher_expirydate");
+
+            entity.HasIndex(e => e.IsDelete, "idx_voucher_isdelete").HasFilter("([isDelete]=(0))");
+
+            entity.HasIndex(e => e.ModifyDate, "idx_voucher_modifydate");
+
+            entity.HasIndex(e => e.Status, "idx_voucher_status");
+
+            entity.HasIndex(e => e.VoucherCode, "idx_voucher_vouchercode").IsUnique();
 
             entity.Property(e => e.Id)
                 .HasDefaultValueSql("(newid())")

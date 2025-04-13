@@ -9,11 +9,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
 
-namespace FTSS_Model.Entities
+namespace FTSS_Model.Context
 {
     [DbContext(typeof(MyDbContext))]
-    [Migration("20241222094353_add Gender")]
-    partial class addGender
+    [Migration("20250412085321_AddCartItemIndexes")]
+    partial class AddCartItemIndexes
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -24,6 +24,104 @@ namespace FTSS_Model.Entities
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
+
+            modelBuilder.Entity("FTSS_Model.Entities.Booking", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("id")
+                        .HasDefaultValueSql("(newid())");
+
+                    b.Property<string>("Address")
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)")
+                        .HasColumnName("address");
+
+                    b.Property<string>("BookingCode")
+                        .HasMaxLength(10)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(10)")
+                        .HasColumnName("bookingCode");
+
+                    b.Property<string>("FullName")
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)")
+                        .HasColumnName("fullName");
+
+                    b.Property<bool?>("IsAssigned")
+                        .HasColumnType("bit")
+                        .HasColumnName("isAssigned");
+
+                    b.Property<Guid?>("OrderId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("orderId");
+
+                    b.Property<string>("PhoneNumber")
+                        .HasMaxLength(15)
+                        .HasColumnType("nvarchar(15)")
+                        .HasColumnName("phoneNumber");
+
+                    b.Property<DateTime?>("ScheduleDate")
+                        .HasColumnType("datetime")
+                        .HasColumnName("scheduleDate");
+
+                    b.Property<string>("Status")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)")
+                        .HasColumnName("status");
+
+                    b.Property<decimal?>("TotalPrice")
+                        .HasColumnType("decimal(18, 2)")
+                        .HasColumnName("totalPrice");
+
+                    b.Property<Guid?>("UserId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("userId");
+
+                    b.HasKey("Id")
+                        .HasName("PK__Maintena__3213E83F2B701192");
+
+                    b.HasIndex(new[] { "BookingCode" }, "idx_booking_bookingcode")
+                        .IsUnique()
+                        .HasFilter("[bookingCode] IS NOT NULL");
+
+                    b.HasIndex(new[] { "OrderId" }, "idx_booking_orderid");
+
+                    b.HasIndex(new[] { "ScheduleDate" }, "idx_booking_scheduledate");
+
+                    b.HasIndex(new[] { "Status" }, "idx_booking_status");
+
+                    b.HasIndex(new[] { "UserId" }, "idx_booking_userid");
+
+                    b.ToTable("Booking", (string)null);
+                });
+
+            modelBuilder.Entity("FTSS_Model.Entities.BookingDetail", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("id")
+                        .HasDefaultValueSql("(newid())");
+
+                    b.Property<Guid>("BookingId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("bookingId");
+
+                    b.Property<Guid>("ServicePackageId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("servicePackageId");
+
+                    b.HasKey("Id")
+                        .HasName("PK__BookingD__3213E83F8426CEBB");
+
+                    b.HasIndex(new[] { "BookingId" }, "idx_bookingdetail_bookingid");
+
+                    b.HasIndex(new[] { "ServicePackageId" }, "idx_bookingdetail_servicepackageid");
+
+                    b.ToTable("BookingDetail", (string)null);
+                });
 
             modelBuilder.Entity("FTSS_Model.Entities.Cart", b =>
                 {
@@ -58,9 +156,18 @@ namespace FTSS_Model.Entities
                         .HasColumnName("userId");
 
                     b.HasKey("Id")
-                        .HasName("PK__Cart__3213E83F0C62F6B8");
+                        .HasName("PK__Cart__3213E83F39ED5C43");
 
-                    b.HasIndex("UserId");
+                    b.HasIndex(new[] { "CreateDate" }, "idx_cart_createdate");
+
+                    b.HasIndex(new[] { "IsDelete" }, "idx_cart_isdelete")
+                        .HasFilter("isDelete = 0");
+
+                    b.HasIndex(new[] { "ModifyDate" }, "idx_cart_modifydate");
+
+                    b.HasIndex(new[] { "Status" }, "idx_cart_status");
+
+                    b.HasIndex(new[] { "UserId" }, "idx_cart_userid");
 
                     b.ToTable("Cart", (string)null);
                 });
@@ -106,11 +213,25 @@ namespace FTSS_Model.Entities
                         .HasColumnName("status");
 
                     b.HasKey("Id")
-                        .HasName("PK__CartItem__3213E83F1D197DF2");
+                        .HasName("PK__CartItem__3213E83F04624BAE");
 
-                    b.HasIndex("CartId");
+                    b.HasIndex("CartId")
+                        .HasDatabaseName("IX_CartItem_CartId");
 
-                    b.HasIndex("ProductId");
+                    b.HasIndex("CreateDate")
+                        .HasDatabaseName("IX_CartItem_CreateDate");
+
+                    b.HasIndex("IsDelete")
+                        .HasDatabaseName("IX_CartItem_IsDelete");
+
+                    b.HasIndex("ProductId")
+                        .HasDatabaseName("IX_CartItem_ProductId");
+
+                    b.HasIndex("Status")
+                        .HasDatabaseName("IX_CartItem_Status");
+
+                    b.HasIndex("CartId", "IsDelete", "Status")
+                        .HasDatabaseName("IX_CartItem_CartId_IsDelete_Status");
 
                     b.ToTable("CartItem", (string)null);
                 });
@@ -143,12 +264,30 @@ namespace FTSS_Model.Entities
                         .HasDefaultValue(false)
                         .HasColumnName("isDelete");
 
+                    b.Property<string>("LinkImage")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(255)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(255)")
+                        .HasDefaultValue("default_image_link")
+                        .HasColumnName("linkImage");
+
                     b.Property<DateTime?>("ModifyDate")
                         .HasColumnType("datetime")
                         .HasColumnName("modifyDate");
 
                     b.HasKey("Id")
-                        .HasName("PK__Category__3213E83FABBB5B7D");
+                        .HasName("PK__Category__3213E83F328E5121");
+
+                    b.HasIndex(new[] { "CategoryName" }, "idx_category_categoryname");
+
+                    b.HasIndex(new[] { "CreateDate" }, "idx_category_createdate");
+
+                    b.HasIndex(new[] { "IsDelete" }, "idx_category_isdelete")
+                        .HasFilter("isDelete = 0");
+
+                    b.HasIndex(new[] { "ModifyDate" }, "idx_category_modifydate");
 
                     b.ToTable("Category", (string)null);
                 });
@@ -192,9 +331,18 @@ namespace FTSS_Model.Entities
                         .HasColumnName("status");
 
                     b.HasKey("Id")
-                        .HasName("PK__Image__3213E83F93AF64CE");
+                        .HasName("PK__Image__3213E83F222143F7");
 
-                    b.HasIndex("ProductId");
+                    b.HasIndex(new[] { "CreateDate" }, "idx_image_createdate");
+
+                    b.HasIndex(new[] { "IsDelete" }, "idx_image_isdelete")
+                        .HasFilter("isDelete = 0");
+
+                    b.HasIndex(new[] { "ModifyDate" }, "idx_image_modifydate");
+
+                    b.HasIndex(new[] { "ProductId" }, "idx_image_productid");
+
+                    b.HasIndex(new[] { "Status" }, "idx_image_status");
 
                     b.ToTable("Image", (string)null);
                 });
@@ -227,10 +375,20 @@ namespace FTSS_Model.Entities
                         .HasColumnType("uniqueidentifier")
                         .HasColumnName("issueCategoryId");
 
+                    b.Property<string>("IssueImage")
+                        .HasMaxLength(255)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(255)")
+                        .HasColumnName("issueImage");
+
                     b.Property<string>("IssueName")
                         .HasMaxLength(255)
                         .HasColumnType("nvarchar(255)")
                         .HasColumnName("issueName");
+
+                    b.Property<DateTime?>("ModifiedDate")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("modifiedDate");
 
                     b.Property<string>("Title")
                         .IsRequired()
@@ -239,9 +397,18 @@ namespace FTSS_Model.Entities
                         .HasColumnName("title");
 
                     b.HasKey("Id")
-                        .HasName("PK__Issue__3213E83F6570BFB4");
+                        .HasName("PK__tmp_ms_x__3213E83F8331A313");
 
-                    b.HasIndex("IssueCategoryId");
+                    b.HasIndex(new[] { "CreateDate" }, "idx_issue_createdate");
+
+                    b.HasIndex(new[] { "IsDelete" }, "idx_issue_isdelete")
+                        .HasFilter("isDelete = 0");
+
+                    b.HasIndex(new[] { "IssueCategoryId" }, "idx_issue_issuecategoryid");
+
+                    b.HasIndex(new[] { "IssueName" }, "idx_issue_issuename");
+
+                    b.HasIndex(new[] { "ModifiedDate" }, "idx_issue_modifieddate");
 
                     b.ToTable("Issue", (string)null);
                 });
@@ -279,12 +446,21 @@ namespace FTSS_Model.Entities
                         .HasColumnName("modifyDate");
 
                     b.HasKey("Id")
-                        .HasName("PK__IssueCat__3213E83FC72972A7");
+                        .HasName("PK__IssueCat__3213E83F148E615E");
+
+                    b.HasIndex(new[] { "CreateDate" }, "idx_issuecategory_createdate");
+
+                    b.HasIndex(new[] { "IsDelete" }, "idx_issuecategory_isdelete")
+                        .HasFilter("isDelete = 0");
+
+                    b.HasIndex(new[] { "ModifyDate" }, "idx_issuecategory_modifydate");
+
+                    b.HasIndex(new[] { "IssueCategoryName" }, "idx_issuecategory_name");
 
                     b.ToTable("IssueCategory", (string)null);
                 });
 
-            modelBuilder.Entity("FTSS_Model.Entities.IssueProduct", b =>
+            modelBuilder.Entity("FTSS_Model.Entities.Mission", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -292,77 +468,14 @@ namespace FTSS_Model.Entities
                         .HasColumnName("id")
                         .HasDefaultValueSql("(newid())");
 
-                    b.Property<DateTime?>("CreateDate")
-                        .HasColumnType("datetime")
-                        .HasColumnName("createDate");
-
-                    b.Property<string>("Description")
-                        .HasColumnType("nvarchar(max)")
-                        .HasColumnName("description");
-
-                    b.Property<Guid>("IssueId")
-                        .HasColumnType("uniqueidentifier")
-                        .HasColumnName("issueId");
-
-                    b.Property<DateTime?>("ModifyDate")
-                        .HasColumnType("datetime")
-                        .HasColumnName("modifyDate");
-
-                    b.Property<Guid>("ProductId")
-                        .HasColumnType("uniqueidentifier")
-                        .HasColumnName("productId");
-
-                    b.HasKey("Id")
-                        .HasName("PK__IssuePro__3213E83F57A60470");
-
-                    b.HasIndex("IssueId");
-
-                    b.HasIndex("ProductId");
-
-                    b.ToTable("IssueProduct", (string)null);
-                });
-
-            modelBuilder.Entity("FTSS_Model.Entities.MaintenanceSchedule", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier")
-                        .HasColumnName("id")
-                        .HasDefaultValueSql("(newid())");
-
-                    b.Property<DateTime?>("ScheduleDate")
-                        .HasColumnType("datetime")
-                        .HasColumnName("scheduleDate");
-
-                    b.Property<string>("Status")
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)")
-                        .HasColumnName("status");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uniqueidentifier")
-                        .HasColumnName("userId");
-
-                    b.HasKey("Id")
-                        .HasName("PK__Maintena__3213E83FC4839623");
-
-                    b.HasIndex("UserId");
-
-                    b.ToTable("MaintenanceSchedule", (string)null);
-                });
-
-            modelBuilder.Entity("FTSS_Model.Entities.MaintenanceTask", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier")
-                        .HasColumnName("id")
-                        .HasDefaultValueSql("(newid())");
-
-                    b.Property<string>("AssignedTo")
+                    b.Property<string>("Address")
                         .HasMaxLength(255)
                         .HasColumnType("nvarchar(255)")
-                        .HasColumnName("assignedTo");
+                        .HasColumnName("address");
+
+                    b.Property<Guid?>("BookingId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("bookingId");
 
                     b.Property<bool?>("IsDelete")
                         .ValueGeneratedOnAdd()
@@ -370,9 +483,28 @@ namespace FTSS_Model.Entities
                         .HasDefaultValue(false)
                         .HasColumnName("isDelete");
 
-                    b.Property<Guid>("MaintenanceScheduleId")
+                    b.Property<string>("MissionDescription")
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("missionDescription");
+
+                    b.Property<string>("MissionName")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)")
+                        .HasColumnName("missionName");
+
+                    b.Property<DateTime?>("MissionSchedule")
+                        .HasColumnType("datetime")
+                        .HasColumnName("missionSchedule");
+
+                    b.Property<Guid?>("OrderId")
                         .HasColumnType("uniqueidentifier")
-                        .HasColumnName("maintenanceScheduleId");
+                        .HasColumnName("orderId");
+
+                    b.Property<string>("PhoneNumber")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)")
+                        .HasColumnName("phoneNumber");
 
                     b.Property<string>("Status")
                         .HasMaxLength(50)
@@ -380,56 +512,27 @@ namespace FTSS_Model.Entities
                         .HasColumnType("varchar(50)")
                         .HasColumnName("status");
 
-                    b.Property<string>("TaskDescription")
-                        .HasColumnType("nvarchar(max)")
-                        .HasColumnName("taskDescription");
-
-                    b.Property<string>("TaskName")
-                        .IsRequired()
-                        .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)")
-                        .HasColumnName("taskName");
-
-                    b.HasKey("Id")
-                        .HasName("PK__Maintena__3213E83FCE21436C");
-
-                    b.HasIndex("MaintenanceScheduleId");
-
-                    b.ToTable("MaintenanceTask", (string)null);
-                });
-
-            modelBuilder.Entity("FTSS_Model.Entities.Model3D", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
+                    b.Property<Guid?>("Userid")
                         .HasColumnType("uniqueidentifier")
-                        .HasColumnName("id")
-                        .HasDefaultValueSql("(newid())");
-
-                    b.Property<DateTime?>("CreateDate")
-                        .HasColumnType("datetime")
-                        .HasColumnName("createDate");
-
-                    b.Property<bool?>("IsDelete")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bit")
-                        .HasDefaultValue(false)
-                        .HasColumnName("isDelete");
-
-                    b.Property<string>("Link")
-                        .IsRequired()
-                        .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)")
-                        .HasColumnName("link");
-
-                    b.Property<DateTime?>("ModifyDate")
-                        .HasColumnType("datetime")
-                        .HasColumnName("modifyDate");
+                        .HasColumnName("userid");
 
                     b.HasKey("Id")
-                        .HasName("PK__Model3D__3213E83F2A782F71");
+                        .HasName("PK__Maintena__3213E83F3561400D");
 
-                    b.ToTable("Model3D", (string)null);
+                    b.HasIndex(new[] { "BookingId" }, "idx_mission_bookingid");
+
+                    b.HasIndex(new[] { "IsDelete" }, "idx_mission_isdelete")
+                        .HasFilter("isDelete = 0");
+
+                    b.HasIndex(new[] { "MissionSchedule" }, "idx_mission_missionschedule");
+
+                    b.HasIndex(new[] { "OrderId" }, "idx_mission_orderid");
+
+                    b.HasIndex(new[] { "Status" }, "idx_mission_status");
+
+                    b.HasIndex(new[] { "Userid" }, "idx_mission_userid");
+
+                    b.ToTable("Mission", (string)null);
                 });
 
             modelBuilder.Entity("FTSS_Model.Entities.Order", b =>
@@ -440,9 +543,18 @@ namespace FTSS_Model.Entities
                         .HasColumnName("id")
                         .HasDefaultValueSql("(newid())");
 
+                    b.Property<string>("Address")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)")
+                        .HasColumnName("address");
+
                     b.Property<DateTime?>("CreateDate")
                         .HasColumnType("datetime")
                         .HasColumnName("createDate");
+
+                    b.Property<bool?>("IsAssigned")
+                        .HasColumnType("bit")
+                        .HasColumnName("isAssigned");
 
                     b.Property<bool?>("IsDelete")
                         .ValueGeneratedOnAdd()
@@ -450,9 +562,40 @@ namespace FTSS_Model.Entities
                         .HasDefaultValue(false)
                         .HasColumnName("isDelete");
 
+                    b.Property<bool?>("IsEligible")
+                        .HasColumnType("bit")
+                        .HasColumnName("isEligible");
+
                     b.Property<DateTime?>("ModifyDate")
                         .HasColumnType("datetime")
                         .HasColumnName("modifyDate");
+
+                    b.Property<string>("OrderCode")
+                        .HasMaxLength(10)
+                        .IsUnicode(false)
+                        .HasColumnType("char(10)")
+                        .HasColumnName("orderCode")
+                        .IsFixedLength();
+
+                    b.Property<string>("PhoneNumber")
+                        .HasMaxLength(50)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(50)")
+                        .HasColumnName("phoneNumber");
+
+                    b.Property<string>("RecipientName")
+                        .HasMaxLength(50)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(50)")
+                        .HasColumnName("recipientName");
+
+                    b.Property<Guid?>("SetupPackageId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("setupPackageId");
+
+                    b.Property<decimal?>("Shipcost")
+                        .HasColumnType("decimal(10, 2)")
+                        .HasColumnName("shipcost");
 
                     b.Property<string>("Status")
                         .HasMaxLength(50)
@@ -464,7 +607,7 @@ namespace FTSS_Model.Entities
                         .HasColumnType("decimal(10, 2)")
                         .HasColumnName("totalPrice");
 
-                    b.Property<Guid>("UserId")
+                    b.Property<Guid?>("UserId")
                         .HasColumnType("uniqueidentifier")
                         .HasColumnName("userId");
 
@@ -473,11 +616,28 @@ namespace FTSS_Model.Entities
                         .HasColumnName("voucherId");
 
                     b.HasKey("Id")
-                        .HasName("PK__Order__3213E83F92D6C47E");
+                        .HasName("PK__Order__3213E83F7F61BE3E");
 
-                    b.HasIndex("UserId");
+                    b.HasIndex(new[] { "CreateDate" }, "idx_order_createdate");
 
-                    b.HasIndex("VoucherId");
+                    b.HasIndex(new[] { "IsDelete" }, "idx_order_isdelete")
+                        .HasFilter("IsDelete = 0");
+
+                    b.HasIndex(new[] { "ModifyDate" }, "idx_order_modifydate");
+
+                    b.HasIndex(new[] { "OrderCode" }, "idx_order_ordercode")
+                        .IsUnique()
+                        .HasFilter("[orderCode] IS NOT NULL");
+
+                    b.HasIndex(new[] { "SetupPackageId" }, "idx_order_setuppackageid");
+
+                    b.HasIndex(new[] { "Status" }, "idx_order_status");
+
+                    b.HasIndex(new[] { "UserId" }, "idx_order_userid");
+
+                    b.HasIndex(new[] { "UserId", "Status" }, "idx_order_userid_status");
+
+                    b.HasIndex(new[] { "VoucherId" }, "idx_order_voucherid");
 
                     b.ToTable("Order", (string)null);
                 });
@@ -507,13 +667,41 @@ namespace FTSS_Model.Entities
                         .HasColumnName("quantity");
 
                     b.HasKey("Id")
-                        .HasName("PK__OrderDet__3213E83FEA9FE343");
+                        .HasName("PK__OrderDet__3213E83FB633A48D");
 
-                    b.HasIndex("OrderId");
+                    b.HasIndex(new[] { "OrderId" }, "idx_orderdetail_orderid");
 
-                    b.HasIndex("ProductId");
+                    b.HasIndex(new[] { "ProductId" }, "idx_orderdetail_productid");
 
                     b.ToTable("OrderDetail", (string)null);
+                });
+
+            modelBuilder.Entity("FTSS_Model.Entities.Otp", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreateDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsValid")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("OtpCode")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex(new[] { "UserId" }, "IX_Otps_UserId");
+
+                    b.ToTable("Otps");
                 });
 
             modelBuilder.Entity("FTSS_Model.Entities.Payment", b =>
@@ -528,7 +716,31 @@ namespace FTSS_Model.Entities
                         .HasColumnType("decimal(10, 2)")
                         .HasColumnName("amountPaid");
 
-                    b.Property<Guid>("OrderId")
+                    b.Property<string>("BankHolder")
+                        .HasMaxLength(50)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(50)")
+                        .HasColumnName("bankHolder");
+
+                    b.Property<string>("BankName")
+                        .HasMaxLength(50)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(50)")
+                        .HasColumnName("bankName");
+
+                    b.Property<string>("BankNumber")
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("bankNumber");
+
+                    b.Property<Guid?>("BookingId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("bookingId");
+
+                    b.Property<long?>("OrderCode")
+                        .HasColumnType("bigint")
+                        .HasColumnName("orderCode");
+
+                    b.Property<Guid?>("OrderId")
                         .HasColumnType("uniqueidentifier")
                         .HasColumnName("orderId");
 
@@ -548,9 +760,17 @@ namespace FTSS_Model.Entities
                         .HasColumnName("paymentStatus");
 
                     b.HasKey("Id")
-                        .HasName("PK__Payment__3213E83F303D8858");
+                        .HasName("PK__Payment__3213E83F00EF1B30");
 
-                    b.HasIndex("OrderId");
+                    b.HasIndex(new[] { "BookingId" }, "idx_payment_bookingid");
+
+                    b.HasIndex(new[] { "OrderCode" }, "idx_payment_ordercode");
+
+                    b.HasIndex(new[] { "OrderId" }, "idx_payment_orderid");
+
+                    b.HasIndex(new[] { "PaymentDate" }, "idx_payment_paymentdate");
+
+                    b.HasIndex(new[] { "PaymentStatus" }, "idx_payment_paymentstatus");
 
                     b.ToTable("Payment", (string)null);
                 });
@@ -563,15 +783,12 @@ namespace FTSS_Model.Entities
                         .HasColumnName("id")
                         .HasDefaultValueSql("(newid())");
 
-                    b.Property<Guid>("CategoryId")
-                        .HasColumnType("uniqueidentifier")
-                        .HasColumnName("categoryId");
-
                     b.Property<DateTime?>("CreateDate")
                         .HasColumnType("datetime")
                         .HasColumnName("createDate");
 
                     b.Property<string>("Description")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)")
                         .HasColumnName("description");
 
@@ -581,13 +798,13 @@ namespace FTSS_Model.Entities
                         .HasDefaultValue(false)
                         .HasColumnName("isDelete");
 
-                    b.Property<Guid?>("Model3Did")
-                        .HasColumnType("uniqueidentifier")
-                        .HasColumnName("model3DId");
-
                     b.Property<DateTime?>("ModifyDate")
                         .HasColumnType("datetime")
                         .HasColumnName("modifyDate");
+
+                    b.Property<decimal>("Price")
+                        .HasColumnType("decimal(18, 0)")
+                        .HasColumnName("price");
 
                     b.Property<string>("ProductName")
                         .IsRequired()
@@ -609,14 +826,85 @@ namespace FTSS_Model.Entities
                         .HasColumnType("nvarchar(50)")
                         .HasColumnName("status");
 
+                    b.Property<Guid?>("SubCategoryId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("SubCategoryID");
+
                     b.HasKey("Id")
-                        .HasName("PK__Product__3213E83F7FF555F8");
+                        .HasName("PK__Product__3213E83F4D0F84D3");
 
-                    b.HasIndex("CategoryId");
+                    b.HasIndex(new[] { "CreateDate" }, "IX_Product_CreateDate");
 
-                    b.HasIndex("Model3Did");
+                    b.HasIndex(new[] { "IsDelete" }, "IX_Product_IsDelete");
+
+                    b.HasIndex(new[] { "Price" }, "IX_Product_Price");
+
+                    b.HasIndex(new[] { "ProductName" }, "IX_Product_ProductName");
+
+                    b.HasIndex(new[] { "Status" }, "IX_Product_Status");
+
+                    b.HasIndex(new[] { "SubCategoryId" }, "IX_Product_SubCategoryId");
+
+                    b.HasIndex(new[] { "CreateDate" }, "idx_product_createdate");
+
+                    b.HasIndex(new[] { "IsDelete" }, "idx_product_isdelete")
+                        .HasFilter("isDelete = 0");
+
+                    b.HasIndex(new[] { "ModifyDate" }, "idx_product_modifydate");
+
+                    b.HasIndex(new[] { "ProductName" }, "idx_product_productname");
+
+                    b.HasIndex(new[] { "Status" }, "idx_product_status");
+
+                    b.HasIndex(new[] { "SubCategoryId" }, "idx_product_subcategoryid");
 
                     b.ToTable("Product", (string)null);
+                });
+
+            modelBuilder.Entity("FTSS_Model.Entities.ServicePackage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("id")
+                        .HasDefaultValueSql("(newid())");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("description");
+
+                    b.Property<bool?>("IsDelete")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false)
+                        .HasColumnName("isDelete");
+
+                    b.Property<decimal>("Price")
+                        .HasColumnType("decimal(18, 2)")
+                        .HasColumnName("price");
+
+                    b.Property<string>("ServiceName")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)")
+                        .HasColumnName("serviceName");
+
+                    b.Property<string>("Status")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)")
+                        .HasColumnName("status");
+
+                    b.HasKey("Id")
+                        .HasName("PK__ServiceP__3213E83FA4E5AED8");
+
+                    b.HasIndex(new[] { "IsDelete" }, "idx_servicepackage_isdelete")
+                        .HasFilter("isDelete = 0");
+
+                    b.HasIndex(new[] { "ServiceName" }, "idx_servicepackage_servicename");
+
+                    b.HasIndex(new[] { "Status" }, "idx_servicepackage_status");
+
+                    b.ToTable("ServicePackage", (string)null);
                 });
 
             modelBuilder.Entity("FTSS_Model.Entities.SetupPackage", b =>
@@ -636,6 +924,10 @@ namespace FTSS_Model.Entities
                     b.Property<string>("Description")
                         .HasColumnType("nvarchar(max)")
                         .HasColumnName("description");
+
+                    b.Property<string>("Image")
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("image");
 
                     b.Property<bool?>("IsDelete")
                         .ValueGeneratedOnAdd()
@@ -657,8 +949,27 @@ namespace FTSS_Model.Entities
                         .HasColumnType("nvarchar(255)")
                         .HasColumnName("setupName");
 
-                    b.HasKey("Id")
-                        .HasName("PK__SetupPac__3213E83FD295E5F3");
+                    b.Property<string>("Status")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)")
+                        .HasColumnName("status");
+
+                    b.Property<Guid?>("Userid")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("userid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex(new[] { "CreateDate" }, "idx_setuppackage_createdate");
+
+                    b.HasIndex(new[] { "IsDelete" }, "idx_setuppackage_isdelete")
+                        .HasFilter("isDelete = 0");
+
+                    b.HasIndex(new[] { "ModifyDate" }, "idx_setuppackage_modifydate");
+
+                    b.HasIndex(new[] { "Status" }, "idx_setuppackage_status");
+
+                    b.HasIndex(new[] { "Userid" }, "idx_setuppackage_userid");
 
                     b.ToTable("SetupPackage", (string)null);
                 });
@@ -683,68 +994,18 @@ namespace FTSS_Model.Entities
                         .HasColumnType("int")
                         .HasColumnName("quantity");
 
-                    b.Property<Guid>("SetupPackageId")
+                    b.Property<Guid?>("SetupPackageId")
                         .HasColumnType("uniqueidentifier")
                         .HasColumnName("setupPackageId");
 
                     b.HasKey("Id")
-                        .HasName("PK__SetupPac__3213E83F96E32B1D");
+                        .HasName("PK__SetupPac__3213E83F9D52720B");
 
-                    b.HasIndex("ProductId");
+                    b.HasIndex(new[] { "ProductId" }, "idx_setuppackagedetail_productid");
 
-                    b.HasIndex("SetupPackageId");
+                    b.HasIndex(new[] { "SetupPackageId" }, "idx_setuppackagedetail_setuppackageid");
 
                     b.ToTable("SetupPackageDetail", (string)null);
-                });
-
-            modelBuilder.Entity("FTSS_Model.Entities.Shipment", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier")
-                        .HasColumnName("id")
-                        .HasDefaultValueSql("(newid())");
-
-                    b.Property<string>("DeliveryAt")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)")
-                        .HasColumnName("deliveryAt");
-
-                    b.Property<DateTime?>("DeliveryDate")
-                        .HasColumnType("datetime")
-                        .HasColumnName("deliveryDate");
-
-                    b.Property<string>("DeliveryStatus")
-                        .HasMaxLength(50)
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(50)")
-                        .HasColumnName("deliveryStatus");
-
-                    b.Property<Guid>("OrderId")
-                        .HasColumnType("uniqueidentifier")
-                        .HasColumnName("orderId");
-
-                    b.Property<string>("ShippingAddress")
-                        .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)")
-                        .HasColumnName("shippingAddress");
-
-                    b.Property<decimal?>("ShippingFee")
-                        .HasColumnType("decimal(10, 2)")
-                        .HasColumnName("shippingFee");
-
-                    b.Property<string>("TrackingNumber")
-                        .HasMaxLength(100)
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(100)")
-                        .HasColumnName("trackingNumber");
-
-                    b.HasKey("Id")
-                        .HasName("PK__Shipment__3213E83F5C6D460A");
-
-                    b.HasIndex("OrderId");
-
-                    b.ToTable("Shipment", (string)null);
                 });
 
             modelBuilder.Entity("FTSS_Model.Entities.Solution", b =>
@@ -784,11 +1045,55 @@ namespace FTSS_Model.Entities
                         .HasColumnName("solutionName");
 
                     b.HasKey("Id")
-                        .HasName("PK__Solution__3213E83FC9A9C4B7");
+                        .HasName("PK__Solution__3213E83FE0CC4A1A");
 
-                    b.HasIndex("IssueId");
+                    b.HasIndex(new[] { "CreateDate" }, "idx_solution_createdate");
+
+                    b.HasIndex(new[] { "IsDelete" }, "idx_solution_isdelete")
+                        .HasFilter("isDelete = 0");
+
+                    b.HasIndex(new[] { "IssueId" }, "idx_solution_issueid");
+
+                    b.HasIndex(new[] { "ModifiedDate" }, "idx_solution_modifieddate");
+
+                    b.HasIndex(new[] { "SolutionName" }, "idx_solution_solutionname");
 
                     b.ToTable("Solution", (string)null);
+                });
+
+            modelBuilder.Entity("FTSS_Model.Entities.SolutionProduct", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier")
+                        .HasDefaultValueSql("(newid())");
+
+                    b.Property<DateTime?>("CreateDate")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime")
+                        .HasDefaultValueSql("(getdate())");
+
+                    b.Property<DateTime?>("ModifyDate")
+                        .HasColumnType("datetime");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("SolutionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id")
+                        .HasName("PK__Solution__3214EC07976FE61E");
+
+                    b.HasIndex(new[] { "CreateDate" }, "idx_solutionproduct_createdate");
+
+                    b.HasIndex(new[] { "ModifyDate" }, "idx_solutionproduct_modifydate");
+
+                    b.HasIndex(new[] { "ProductId" }, "idx_solutionproduct_productid");
+
+                    b.HasIndex(new[] { "SolutionId" }, "idx_solutionproduct_solutionid");
+
+                    b.ToTable("SolutionProduct", (string)null);
                 });
 
             modelBuilder.Entity("FTSS_Model.Entities.SubCategory", b =>
@@ -828,9 +1133,18 @@ namespace FTSS_Model.Entities
                         .HasColumnName("subCategoryName");
 
                     b.HasKey("Id")
-                        .HasName("PK__SubCateg__3213E83FA2ADCBD7");
+                        .HasName("PK__SubCateg__3213E83F011365E6");
 
-                    b.HasIndex("CategoryId");
+                    b.HasIndex(new[] { "CategoryId" }, "idx_subcategory_categoryid");
+
+                    b.HasIndex(new[] { "CreateDate" }, "idx_subcategory_createdate");
+
+                    b.HasIndex(new[] { "IsDelete" }, "idx_subcategory_isdelete")
+                        .HasFilter("isDelete = 0");
+
+                    b.HasIndex(new[] { "ModifyDate" }, "idx_subcategory_modifydate");
+
+                    b.HasIndex(new[] { "SubCategoryName" }, "idx_subcategory_subcategoryname");
 
                     b.ToTable("SubCategory", (string)null);
                 });
@@ -848,11 +1162,21 @@ namespace FTSS_Model.Entities
                         .HasColumnType("nvarchar(255)")
                         .HasColumnName("address");
 
+                    b.Property<string>("CityId")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)")
+                        .HasColumnName("cityId");
+
                     b.Property<DateTime?>("CreateDate")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("datetime")
                         .HasColumnName("createDate")
                         .HasDefaultValueSql("(getdate())");
+
+                    b.Property<string>("DistrictId")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)")
+                        .HasColumnName("districtId");
 
                     b.Property<string>("Email")
                         .IsRequired()
@@ -863,11 +1187,17 @@ namespace FTSS_Model.Entities
 
                     b.Property<string>("FullName")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("nvarchar(max)")
+                        .HasDefaultValue("")
+                        .HasColumnName("fullName");
 
                     b.Property<string>("Gender")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("nvarchar(max)")
+                        .HasDefaultValue("")
+                        .HasColumnName("gender");
 
                     b.Property<bool?>("IsDelete")
                         .ValueGeneratedOnAdd()
@@ -914,7 +1244,21 @@ namespace FTSS_Model.Entities
                     b.HasKey("Id")
                         .HasName("PK__User__3213E83FF34271D4");
 
-                    b.HasIndex(new[] { "Email" }, "UQ__User__AB6E6164211BC737")
+                    b.HasIndex(new[] { "CreateDate" }, "idx_user_createdate");
+
+                    b.HasIndex(new[] { "Email" }, "idx_user_email")
+                        .IsUnique();
+
+                    b.HasIndex(new[] { "IsDelete" }, "idx_user_isdelete")
+                        .HasFilter("isDelete = 0");
+
+                    b.HasIndex(new[] { "ModifyDate" }, "idx_user_modifydate");
+
+                    b.HasIndex(new[] { "Role" }, "idx_user_role");
+
+                    b.HasIndex(new[] { "Status" }, "idx_user_status");
+
+                    b.HasIndex(new[] { "UserName" }, "idx_user_username")
                         .IsUnique();
 
                     b.ToTable("User", (string)null);
@@ -932,19 +1276,43 @@ namespace FTSS_Model.Entities
                         .HasColumnType("datetime")
                         .HasColumnName("createDate");
 
+                    b.Property<string>("Description")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)")
+                        .HasDefaultValue("No description");
+
+                    b.Property<decimal>("Discount")
+                        .HasColumnType("decimal(10, 2)")
+                        .HasColumnName("discount");
+
+                    b.Property<string>("DiscountType")
+                        .HasMaxLength(10)
+                        .HasColumnType("nchar(10)")
+                        .HasColumnName("discountType")
+                        .IsFixedLength();
+
+                    b.Property<DateTime?>("ExpiryDate")
+                        .HasColumnType("datetime")
+                        .HasColumnName("expiryDate");
+
                     b.Property<bool?>("IsDelete")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("bit")
                         .HasDefaultValue(false)
                         .HasColumnName("isDelete");
 
+                    b.Property<decimal?>("MaximumOrderValue")
+                        .HasColumnType("decimal(18, 0)")
+                        .HasColumnName("maximumOrderValue");
+
                     b.Property<DateTime?>("ModifyDate")
                         .HasColumnType("datetime")
                         .HasColumnName("modifyDate");
 
-                    b.Property<decimal?>("Price")
-                        .HasColumnType("decimal(10, 2)")
-                        .HasColumnName("price");
+                    b.Property<int?>("Quantity")
+                        .HasColumnType("int")
+                        .HasColumnName("quantity");
 
                     b.Property<string>("Status")
                         .HasMaxLength(50)
@@ -959,9 +1327,59 @@ namespace FTSS_Model.Entities
                         .HasColumnName("voucherCode");
 
                     b.HasKey("Id")
-                        .HasName("PK__Voucher__3213E83F7951091C");
+                        .HasName("PK__Voucher__3213E83F2B4BD0F3");
+
+                    b.HasIndex(new[] { "CreateDate" }, "idx_voucher_createdate");
+
+                    b.HasIndex(new[] { "ExpiryDate" }, "idx_voucher_expirydate");
+
+                    b.HasIndex(new[] { "IsDelete" }, "idx_voucher_isdelete")
+                        .HasFilter("isDelete = 0");
+
+                    b.HasIndex(new[] { "ModifyDate" }, "idx_voucher_modifydate");
+
+                    b.HasIndex(new[] { "Status" }, "idx_voucher_status");
+
+                    b.HasIndex(new[] { "VoucherCode" }, "idx_voucher_vouchercode")
+                        .IsUnique();
 
                     b.ToTable("Voucher", (string)null);
+                });
+
+            modelBuilder.Entity("FTSS_Model.Entities.Booking", b =>
+                {
+                    b.HasOne("FTSS_Model.Entities.Order", "Order")
+                        .WithMany("Bookings")
+                        .HasForeignKey("OrderId")
+                        .HasConstraintName("FK_Booking_Order");
+
+                    b.HasOne("FTSS_Model.Entities.User", "User")
+                        .WithMany("Bookings")
+                        .HasForeignKey("UserId")
+                        .HasConstraintName("FK_Booking_User");
+
+                    b.Navigation("Order");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("FTSS_Model.Entities.BookingDetail", b =>
+                {
+                    b.HasOne("FTSS_Model.Entities.Booking", "Booking")
+                        .WithMany("BookingDetails")
+                        .HasForeignKey("BookingId")
+                        .IsRequired()
+                        .HasConstraintName("FK_BookingDetail_Booking");
+
+                    b.HasOne("FTSS_Model.Entities.ServicePackage", "ServicePackage")
+                        .WithMany("BookingDetails")
+                        .HasForeignKey("ServicePackageId")
+                        .IsRequired()
+                        .HasConstraintName("FK_BookingDetail_ServicePackage");
+
+                    b.Navigation("Booking");
+
+                    b.Navigation("ServicePackage");
                 });
 
             modelBuilder.Entity("FTSS_Model.Entities.Cart", b =>
@@ -981,13 +1399,13 @@ namespace FTSS_Model.Entities
                         .WithMany("CartItems")
                         .HasForeignKey("CartId")
                         .IsRequired()
-                        .HasConstraintName("FK__CartItem__cartId__5EBF139D");
+                        .HasConstraintName("FK__CartItem__cartId__1DB06A4F");
 
                     b.HasOne("FTSS_Model.Entities.Product", "Product")
                         .WithMany("CartItems")
                         .HasForeignKey("ProductId")
                         .IsRequired()
-                        .HasConstraintName("FK__CartItem__produc__5DCAEF64");
+                        .HasConstraintName("FK__CartItem__produc__0B91BA14");
 
                     b.Navigation("Cart");
 
@@ -1000,7 +1418,7 @@ namespace FTSS_Model.Entities
                         .WithMany("Images")
                         .HasForeignKey("ProductId")
                         .IsRequired()
-                        .HasConstraintName("FK__Image__productId__6D0D32F4");
+                        .HasConstraintName("FK__Image__productId__0C85DE4D");
 
                     b.Navigation("Product");
                 });
@@ -1015,59 +1433,48 @@ namespace FTSS_Model.Entities
                     b.Navigation("IssueCategory");
                 });
 
-            modelBuilder.Entity("FTSS_Model.Entities.IssueProduct", b =>
+            modelBuilder.Entity("FTSS_Model.Entities.Mission", b =>
                 {
-                    b.HasOne("FTSS_Model.Entities.Issue", "Issue")
-                        .WithMany("IssueProducts")
-                        .HasForeignKey("IssueId")
-                        .IsRequired()
-                        .HasConstraintName("FK__IssueProd__issue__05D8E0BE");
+                    b.HasOne("FTSS_Model.Entities.Booking", "Booking")
+                        .WithMany("Missions")
+                        .HasForeignKey("BookingId")
+                        .HasConstraintName("FK_Mission_Booking");
 
-                    b.HasOne("FTSS_Model.Entities.Product", "Product")
-                        .WithMany("IssueProducts")
-                        .HasForeignKey("ProductId")
-                        .IsRequired()
-                        .HasConstraintName("FK__IssueProd__produ__04E4BC85");
+                    b.HasOne("FTSS_Model.Entities.Order", "Order")
+                        .WithMany("Missions")
+                        .HasForeignKey("OrderId")
+                        .HasConstraintName("FK_Mission_Order");
 
-                    b.Navigation("Issue");
-
-                    b.Navigation("Product");
-                });
-
-            modelBuilder.Entity("FTSS_Model.Entities.MaintenanceSchedule", b =>
-                {
                     b.HasOne("FTSS_Model.Entities.User", "User")
-                        .WithMany("MaintenanceSchedules")
-                        .HasForeignKey("UserId")
-                        .IsRequired()
-                        .HasConstraintName("FK__Maintenan__userI__3E52440B");
+                        .WithMany("Missions")
+                        .HasForeignKey("Userid")
+                        .HasConstraintName("FK_MaintenanceTask_User");
+
+                    b.Navigation("Booking");
+
+                    b.Navigation("Order");
 
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("FTSS_Model.Entities.MaintenanceTask", b =>
-                {
-                    b.HasOne("FTSS_Model.Entities.MaintenanceSchedule", "MaintenanceSchedule")
-                        .WithMany("MaintenanceTasks")
-                        .HasForeignKey("MaintenanceScheduleId")
-                        .IsRequired()
-                        .HasConstraintName("FK__Maintenan__maint__4316F928");
-
-                    b.Navigation("MaintenanceSchedule");
-                });
-
             modelBuilder.Entity("FTSS_Model.Entities.Order", b =>
                 {
+                    b.HasOne("FTSS_Model.Entities.SetupPackage", "SetupPackage")
+                        .WithMany("Orders")
+                        .HasForeignKey("SetupPackageId")
+                        .HasConstraintName("FK_Order_SetupPackage");
+
                     b.HasOne("FTSS_Model.Entities.User", "User")
                         .WithMany("Orders")
                         .HasForeignKey("UserId")
-                        .IsRequired()
                         .HasConstraintName("FK__Order__userId__6383C8BA");
 
                     b.HasOne("FTSS_Model.Entities.Voucher", "Voucher")
                         .WithMany("Orders")
                         .HasForeignKey("VoucherId")
                         .HasConstraintName("FK_Order_Voucher");
+
+                    b.Navigation("SetupPackage");
 
                     b.Navigation("User");
 
@@ -1080,46 +1487,65 @@ namespace FTSS_Model.Entities
                         .WithMany("OrderDetails")
                         .HasForeignKey("OrderId")
                         .IsRequired()
-                        .HasConstraintName("FK__OrderDeta__order__6754599E");
+                        .HasConstraintName("FK__OrderDeta__order__14270015");
 
                     b.HasOne("FTSS_Model.Entities.Product", "Product")
                         .WithMany("OrderDetails")
                         .HasForeignKey("ProductId")
                         .IsRequired()
-                        .HasConstraintName("FK__OrderDeta__produ__68487DD7");
+                        .HasConstraintName("FK__OrderDeta__produ__151B244E");
 
                     b.Navigation("Order");
 
                     b.Navigation("Product");
                 });
 
+            modelBuilder.Entity("FTSS_Model.Entities.Otp", b =>
+                {
+                    b.HasOne("FTSS_Model.Entities.User", "User")
+                        .WithMany("Otps")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("FTSS_Model.Entities.Payment", b =>
                 {
+                    b.HasOne("FTSS_Model.Entities.Booking", "Booking")
+                        .WithMany("Payments")
+                        .HasForeignKey("BookingId")
+                        .HasConstraintName("FK_Payment_Booking");
+
                     b.HasOne("FTSS_Model.Entities.Order", "Order")
                         .WithMany("Payments")
                         .HasForeignKey("OrderId")
-                        .IsRequired()
-                        .HasConstraintName("FK__Payment__orderId__787EE5A0");
+                        .HasConstraintName("FK__Payment__orderId__17036CC0");
+
+                    b.Navigation("Booking");
 
                     b.Navigation("Order");
                 });
 
             modelBuilder.Entity("FTSS_Model.Entities.Product", b =>
                 {
-                    b.HasOne("FTSS_Model.Entities.Category", "Category")
+                    b.HasOne("FTSS_Model.Entities.SubCategory", "SubCategory")
                         .WithMany("Products")
-                        .HasForeignKey("CategoryId")
-                        .IsRequired()
-                        .HasConstraintName("FK__Product__categor__5070F446");
+                        .HasForeignKey("SubCategoryId")
+                        .HasConstraintName("FK_Product_SubCategory");
 
-                    b.HasOne("FTSS_Model.Entities.Model3D", "Model3D")
-                        .WithMany("Products")
-                        .HasForeignKey("Model3Did")
-                        .HasConstraintName("FK_Product_Model3D");
+                    b.Navigation("SubCategory");
+                });
 
-                    b.Navigation("Category");
+            modelBuilder.Entity("FTSS_Model.Entities.SetupPackage", b =>
+                {
+                    b.HasOne("FTSS_Model.Entities.User", "User")
+                        .WithMany("SetupPackages")
+                        .HasForeignKey("Userid")
+                        .HasConstraintName("FK_SetupPackage_User");
 
-                    b.Navigation("Model3D");
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("FTSS_Model.Entities.SetupPackageDetail", b =>
@@ -1128,28 +1554,16 @@ namespace FTSS_Model.Entities
                         .WithMany("SetupPackageDetails")
                         .HasForeignKey("ProductId")
                         .IsRequired()
-                        .HasConstraintName("FK__SetupPack__produ__1332DBDC");
+                        .HasConstraintName("FK__SetupPack__produ__19DFD96B");
 
                     b.HasOne("FTSS_Model.Entities.SetupPackage", "SetupPackage")
                         .WithMany("SetupPackageDetails")
                         .HasForeignKey("SetupPackageId")
-                        .IsRequired()
-                        .HasConstraintName("FK__SetupPack__setup__14270015");
+                        .HasConstraintName("FK_SetupPackageDetail_SetupPackage");
 
                     b.Navigation("Product");
 
                     b.Navigation("SetupPackage");
-                });
-
-            modelBuilder.Entity("FTSS_Model.Entities.Shipment", b =>
-                {
-                    b.HasOne("FTSS_Model.Entities.Order", "Order")
-                        .WithMany("Shipments")
-                        .HasForeignKey("OrderId")
-                        .IsRequired()
-                        .HasConstraintName("FK__Shipment__orderI__74AE54BC");
-
-                    b.Navigation("Order");
                 });
 
             modelBuilder.Entity("FTSS_Model.Entities.Solution", b =>
@@ -1158,9 +1572,30 @@ namespace FTSS_Model.Entities
                         .WithMany("Solutions")
                         .HasForeignKey("IssueId")
                         .IsRequired()
-                        .HasConstraintName("FK__Solution__issueI__0A9D95DB");
+                        .HasConstraintName("FK__Solution__issueI__6BAEFA67");
 
                     b.Navigation("Issue");
+                });
+
+            modelBuilder.Entity("FTSS_Model.Entities.SolutionProduct", b =>
+                {
+                    b.HasOne("FTSS_Model.Entities.Product", "Product")
+                        .WithMany("SolutionProducts")
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("FK__SolutionP__Produ__7DCDAAA2");
+
+                    b.HasOne("FTSS_Model.Entities.Solution", "Solution")
+                        .WithMany("SolutionProducts")
+                        .HasForeignKey("SolutionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("FK__SolutionP__Solut__7CD98669");
+
+                    b.Navigation("Product");
+
+                    b.Navigation("Solution");
                 });
 
             modelBuilder.Entity("FTSS_Model.Entities.SubCategory", b =>
@@ -1169,9 +1604,18 @@ namespace FTSS_Model.Entities
                         .WithMany("SubCategories")
                         .HasForeignKey("CategoryId")
                         .IsRequired()
-                        .HasConstraintName("FK__SubCatego__categ__4BAC3F29");
+                        .HasConstraintName("FK_SubCategory_Category");
 
                     b.Navigation("Category");
+                });
+
+            modelBuilder.Entity("FTSS_Model.Entities.Booking", b =>
+                {
+                    b.Navigation("BookingDetails");
+
+                    b.Navigation("Missions");
+
+                    b.Navigation("Payments");
                 });
 
             modelBuilder.Entity("FTSS_Model.Entities.Cart", b =>
@@ -1181,15 +1625,11 @@ namespace FTSS_Model.Entities
 
             modelBuilder.Entity("FTSS_Model.Entities.Category", b =>
                 {
-                    b.Navigation("Products");
-
                     b.Navigation("SubCategories");
                 });
 
             modelBuilder.Entity("FTSS_Model.Entities.Issue", b =>
                 {
-                    b.Navigation("IssueProducts");
-
                     b.Navigation("Solutions");
                 });
 
@@ -1198,23 +1638,15 @@ namespace FTSS_Model.Entities
                     b.Navigation("Issues");
                 });
 
-            modelBuilder.Entity("FTSS_Model.Entities.MaintenanceSchedule", b =>
-                {
-                    b.Navigation("MaintenanceTasks");
-                });
-
-            modelBuilder.Entity("FTSS_Model.Entities.Model3D", b =>
-                {
-                    b.Navigation("Products");
-                });
-
             modelBuilder.Entity("FTSS_Model.Entities.Order", b =>
                 {
+                    b.Navigation("Bookings");
+
+                    b.Navigation("Missions");
+
                     b.Navigation("OrderDetails");
 
                     b.Navigation("Payments");
-
-                    b.Navigation("Shipments");
                 });
 
             modelBuilder.Entity("FTSS_Model.Entities.Product", b =>
@@ -1223,25 +1655,48 @@ namespace FTSS_Model.Entities
 
                     b.Navigation("Images");
 
-                    b.Navigation("IssueProducts");
-
                     b.Navigation("OrderDetails");
 
                     b.Navigation("SetupPackageDetails");
+
+                    b.Navigation("SolutionProducts");
+                });
+
+            modelBuilder.Entity("FTSS_Model.Entities.ServicePackage", b =>
+                {
+                    b.Navigation("BookingDetails");
                 });
 
             modelBuilder.Entity("FTSS_Model.Entities.SetupPackage", b =>
                 {
+                    b.Navigation("Orders");
+
                     b.Navigation("SetupPackageDetails");
+                });
+
+            modelBuilder.Entity("FTSS_Model.Entities.Solution", b =>
+                {
+                    b.Navigation("SolutionProducts");
+                });
+
+            modelBuilder.Entity("FTSS_Model.Entities.SubCategory", b =>
+                {
+                    b.Navigation("Products");
                 });
 
             modelBuilder.Entity("FTSS_Model.Entities.User", b =>
                 {
+                    b.Navigation("Bookings");
+
                     b.Navigation("Carts");
 
-                    b.Navigation("MaintenanceSchedules");
+                    b.Navigation("Missions");
 
                     b.Navigation("Orders");
+
+                    b.Navigation("Otps");
+
+                    b.Navigation("SetupPackages");
                 });
 
             modelBuilder.Entity("FTSS_Model.Entities.Voucher", b =>

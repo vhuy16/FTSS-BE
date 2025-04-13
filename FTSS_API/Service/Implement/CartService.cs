@@ -16,7 +16,8 @@ namespace FTSS_API.Service.Implement
 {
     public class CartService : BaseService<Cart>, ICartService
     {
-        public CartService(IUnitOfWork<MyDbContext> unitOfWork, ILogger<Cart> logger, IMapper mapper, IHttpContextAccessor httpContextAccessor) : base(unitOfWork, logger, mapper, httpContextAccessor)
+        public CartService(IUnitOfWork<MyDbContext> unitOfWork, ILogger<Cart> logger, IMapper mapper,
+            IHttpContextAccessor httpContextAccessor) : base(unitOfWork, logger, mapper, httpContextAccessor)
         {
         }
 
@@ -26,7 +27,8 @@ namespace FTSS_API.Service.Implement
             Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
             var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
                 predicate: u => u.Id.Equals(userId) &&
-                                u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) && u.IsDelete == false &&
+                                u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) &&
+                                u.IsDelete == false &&
                                 (u.Role == RoleEnum.Customer.GetDescriptionFromEnum()));
 
             if (user == null)
@@ -48,7 +50,7 @@ namespace FTSS_API.Service.Implement
                     data = null
                 };
             }
-         
+
             var cart = await _unitOfWork.GetRepository<Cart>().SingleOrDefaultAsync(
                 predicate: c => c.UserId.Equals(userId));
 
@@ -66,7 +68,8 @@ namespace FTSS_API.Service.Implement
 
             foreach (var item in addCartItemRequest)
             {
-                if (!Enum.TryParse(item.Status, out CartItemEnum cartStatus) || (cartStatus != CartItemEnum.Odd && cartStatus != CartItemEnum.Setup))
+                if (!Enum.TryParse(item.Status, out CartItemEnum cartStatus) ||
+                    (cartStatus != CartItemEnum.Odd && cartStatus != CartItemEnum.Setup))
                 {
                     return new ApiResponse()
                     {
@@ -77,7 +80,9 @@ namespace FTSS_API.Service.Implement
                 }
 
                 var product = await _unitOfWork.GetRepository<Product>().SingleOrDefaultAsync(
-                    predicate: p => p.Id.Equals(item.ProductId) && p.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()));
+                    predicate: p =>
+                        p.Id.Equals(item.ProductId) &&
+                        p.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()));
 
                 if (product == null)
                 {
@@ -100,7 +105,9 @@ namespace FTSS_API.Service.Implement
                 }
 
                 var existingCartItem = await _unitOfWork.GetRepository<CartItem>().SingleOrDefaultAsync(
-                    predicate: ci => ci.CartId.Equals(cart.Id) && ci.ProductId.Equals(product.Id) && ci.Status == CartItemEnum.Odd.ToString() && ci.IsDelete == false);
+                    predicate: ci =>
+                        ci.CartId.Equals(cart.Id) && ci.ProductId.Equals(product.Id) &&
+                        ci.Status == CartItemEnum.Odd.ToString() && ci.IsDelete == false);
 
                 if (existingCartItem != null)
                 {
@@ -161,12 +168,13 @@ namespace FTSS_API.Service.Implement
 
             return new ApiResponse()
             {
-                status = isSuccessfully ? StatusCodes.Status200OK.ToString() : StatusCodes.Status500InternalServerError.ToString(),
+                status = isSuccessfully
+                    ? StatusCodes.Status200OK.ToString()
+                    : StatusCodes.Status500InternalServerError.ToString(),
                 message = isSuccessfully ? "Add cart items successful" : "Failed to add cart items",
                 data = cartItemResponses
             };
         }
-
 
 
         //public async Task<ApiResponse> AddCartItem(AddCartItemRequest addCartItemRequest)
@@ -272,169 +280,171 @@ namespace FTSS_API.Service.Implement
         //}
 
 
-public async Task<ApiResponse> AddSetupPackageToCart(Guid setupPackageId)
-{
-    // Lấy UserId từ HttpContext
-    Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
-    var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
-        predicate: u => u.Id.Equals(userId) &&
-                        u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) &&
-                        u.IsDelete != true && u.Role == RoleEnum.Customer.GetDescriptionFromEnum());
-
-    if (user == null)
-    {
-        return new ApiResponse()
+        public async Task<ApiResponse> AddSetupPackageToCart(Guid setupPackageId)
         {
-            status = StatusCodes.Status401Unauthorized.ToString(),
-            message = "Unauthorized: Token is missing or expired.",
-            data = null
-        };
-    }
+            // Lấy UserId từ HttpContext
+            Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
+            var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
+                predicate: u => u.Id.Equals(userId) &&
+                                u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) &&
+                                u.IsDelete != true && u.Role == RoleEnum.Customer.GetDescriptionFromEnum());
 
-    var cart = await _unitOfWork.GetRepository<Cart>().SingleOrDefaultAsync(predicate: c => c.UserId.Equals(userId));
-
-    if (cart == null)
-    {
-        return new ApiResponse()
-        {
-            status = StatusCodes.Status404NotFound.ToString(),
-            message = "Cart not found",
-            data = null
-        };
-    }
-
-    // Lấy danh sách sản phẩm từ setupPackageId
-    var packageProducts = await _unitOfWork.GetRepository<SetupPackageDetail>()
-        .GetListAsync(predicate: spd => spd.SetupPackageId.Equals(setupPackageId));
-
-    if (packageProducts == null || !packageProducts.Any())
-    {
-        return new ApiResponse()
-        {
-            status = StatusCodes.Status404NotFound.ToString(),
-            message = "Setup package not found or contains no products",
-            data = null
-        };
-    }
-
-    // Lấy thông tin gói setup
-    var setupPackage = await _unitOfWork.GetRepository<SetupPackage>().SingleOrDefaultAsync(
-        predicate: sp => sp.Id.Equals(setupPackageId));
-
-    if (setupPackage == null)
-    {
-        return new ApiResponse()
-        {
-            status = StatusCodes.Status404NotFound.ToString(),
-            message = "Setup package not found",
-            data = null
-        };
-    }
-
-    List<AddCartItemResponse> cartItemResponses = new List<AddCartItemResponse>();
-
-    foreach (var packageItem in packageProducts)
-    {
-        var product = await _unitOfWork.GetRepository<Product>().SingleOrDefaultAsync(
-            include: x => x.Include(x => x.Images),
-            predicate: p => p.Id.Equals(packageItem.ProductId) &&
-                            p.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()));
-
-        if (product == null)
-        {
-            return new ApiResponse()
-            {
-                status = StatusCodes.Status404NotFound.ToString(),
-                message = $"Product {packageItem.ProductId} does not exist or is unavailable",
-                data = null
-            };
-        }
-
-        if (packageItem.Quantity <= 0)
-        {
-            return new ApiResponse()
-            {
-                status = StatusCodes.Status400BadRequest.ToString(),
-                message = "Invalid product quantity in setup package",
-                data = null
-            };
-        }
-
-        var existingCartItem = await _unitOfWork.GetRepository<CartItem>().SingleOrDefaultAsync(
-            predicate: ci => ci.CartId.Equals(cart.Id) && ci.ProductId.Equals(product.Id) &&
-                             ci.Status == CartItemEnum.Odd.ToString() && ci.IsDelete != true);
-
-        if (existingCartItem != null)
-        {
-            // Nếu sản phẩm đã tồn tại trong giỏ hàng với trạng thái Odd, cộng thêm số lượng
-            int? newQuantity = existingCartItem.Quantity + packageItem.Quantity;
-
-            if (newQuantity > product.Quantity)
+            if (user == null)
             {
                 return new ApiResponse()
                 {
-                    status = StatusCodes.Status400BadRequest.ToString(),
-                    message = $"Not enough stock for product {product.ProductName}",
+                    status = StatusCodes.Status401Unauthorized.ToString(),
+                    message = "Unauthorized: Token is missing or expired.",
                     data = null
                 };
             }
 
-            existingCartItem.Quantity = (int)newQuantity;
-            existingCartItem.ModifyDate = TimeUtils.GetCurrentSEATime();
-            _unitOfWork.GetRepository<CartItem>().UpdateAsync(existingCartItem);
-        }
-        else
-        {
-            // Nếu sản phẩm chưa có trong giỏ hàng, thêm mới
-            if (packageItem.Quantity > product.Quantity)
+            var cart = await _unitOfWork.GetRepository<Cart>()
+                .SingleOrDefaultAsync(predicate: c => c.UserId.Equals(userId));
+
+            if (cart == null)
             {
                 return new ApiResponse()
                 {
-                    status = StatusCodes.Status400BadRequest.ToString(),
-                    message = $"Not enough stock for product {product.ProductName}",
+                    status = StatusCodes.Status404NotFound.ToString(),
+                    message = "Cart not found",
                     data = null
                 };
             }
 
-            var cartItem = new CartItem()
+            // Lấy danh sách sản phẩm từ setupPackageId
+            var packageProducts = await _unitOfWork.GetRepository<SetupPackageDetail>()
+                .GetListAsync(predicate: spd => spd.SetupPackageId.Equals(setupPackageId));
+
+            if (packageProducts == null || !packageProducts.Any())
             {
-                Id = Guid.NewGuid(),
-                CartId = cart.Id,
-                ProductId = product.Id,
-                Quantity = (int)packageItem.Quantity,
-                Status = CartItemEnum.Setup.ToString(),
-                CreateDate = TimeUtils.GetCurrentSEATime(),
-                ModifyDate = TimeUtils.GetCurrentSEATime()
+                return new ApiResponse()
+                {
+                    status = StatusCodes.Status404NotFound.ToString(),
+                    message = "Setup package not found or contains no products",
+                    data = null
+                };
+            }
+
+            // Lấy thông tin gói setup
+            var setupPackage = await _unitOfWork.GetRepository<SetupPackage>().SingleOrDefaultAsync(
+                predicate: sp => sp.Id.Equals(setupPackageId));
+
+            if (setupPackage == null)
+            {
+                return new ApiResponse()
+                {
+                    status = StatusCodes.Status404NotFound.ToString(),
+                    message = "Setup package not found",
+                    data = null
+                };
+            }
+
+            List<AddCartItemResponse> cartItemResponses = new List<AddCartItemResponse>();
+
+            foreach (var packageItem in packageProducts)
+            {
+                var product = await _unitOfWork.GetRepository<Product>().SingleOrDefaultAsync(
+                    include: x => x.Include(x => x.Images),
+                    predicate: p => p.Id.Equals(packageItem.ProductId) &&
+                                    p.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()));
+
+                if (product == null)
+                {
+                    return new ApiResponse()
+                    {
+                        status = StatusCodes.Status404NotFound.ToString(),
+                        message = $"Product {packageItem.ProductId} does not exist or is unavailable",
+                        data = null
+                    };
+                }
+
+                if (packageItem.Quantity <= 0)
+                {
+                    return new ApiResponse()
+                    {
+                        status = StatusCodes.Status400BadRequest.ToString(),
+                        message = "Invalid product quantity in setup package",
+                        data = null
+                    };
+                }
+
+                var existingCartItem = await _unitOfWork.GetRepository<CartItem>().SingleOrDefaultAsync(
+                    predicate: ci => ci.CartId.Equals(cart.Id) && ci.ProductId.Equals(product.Id) &&
+                                     ci.Status == CartItemEnum.Odd.ToString() && ci.IsDelete != true);
+
+                if (existingCartItem != null)
+                {
+                    // Nếu sản phẩm đã tồn tại trong giỏ hàng với trạng thái Odd, cộng thêm số lượng
+                    int? newQuantity = existingCartItem.Quantity + packageItem.Quantity;
+
+                    if (newQuantity > product.Quantity)
+                    {
+                        return new ApiResponse()
+                        {
+                            status = StatusCodes.Status400BadRequest.ToString(),
+                            message = $"Not enough stock for product {product.ProductName}",
+                            data = null
+                        };
+                    }
+
+                    existingCartItem.Quantity = (int)newQuantity;
+                    existingCartItem.ModifyDate = TimeUtils.GetCurrentSEATime();
+                    _unitOfWork.GetRepository<CartItem>().UpdateAsync(existingCartItem);
+                }
+                else
+                {
+                    // Nếu sản phẩm chưa có trong giỏ hàng, thêm mới
+                    if (packageItem.Quantity > product.Quantity)
+                    {
+                        return new ApiResponse()
+                        {
+                            status = StatusCodes.Status400BadRequest.ToString(),
+                            message = $"Not enough stock for product {product.ProductName}",
+                            data = null
+                        };
+                    }
+
+                    var cartItem = new CartItem()
+                    {
+                        Id = Guid.NewGuid(),
+                        CartId = cart.Id,
+                        ProductId = product.Id,
+                        Quantity = (int)packageItem.Quantity,
+                        Status = CartItemEnum.Setup.ToString(),
+                        CreateDate = TimeUtils.GetCurrentSEATime(),
+                        ModifyDate = TimeUtils.GetCurrentSEATime()
+                    };
+                }
+
+                cartItemResponses.Add(new AddCartItemResponse()
+                {
+                    CartItemId = existingCartItem?.Id ?? Guid.NewGuid(),
+                    ProductId = product.Id,
+                    ProductName = product.ProductName,
+                    Price = product.Price * packageItem.Quantity,
+                    Quantity = (int)packageItem.Quantity,
+                    UnitPrice = product.Price,
+                    LinkImage = product.Images.FirstOrDefault()?.LinkImage
+                });
+            }
+
+            bool isSuccessfully = await _unitOfWork.CommitAsync() > 0;
+
+            return new ApiResponse()
+            {
+                status = isSuccessfully
+                    ? StatusCodes.Status200OK.ToString()
+                    : StatusCodes.Status500InternalServerError.ToString(),
+                message = isSuccessfully ? "Setup package added to cart successfully" : "Failed to add setup package",
+                data = new
+                {
+                    SetupId = setupPackage.Id,
+                    SetupName = setupPackage.SetupName,
+                    CartItems = cartItemResponses
+                }
             };
-
-            
         }
-
-        cartItemResponses.Add(new AddCartItemResponse()
-        {
-            CartItemId = existingCartItem?.Id ?? Guid.NewGuid(),
-            ProductId = product.Id,
-            ProductName = product.ProductName,
-            Price = product.Price * packageItem.Quantity,
-            Quantity = (int)packageItem.Quantity,
-            UnitPrice = product.Price,
-            LinkImage = product.Images.FirstOrDefault()?.LinkImage
-        });
-    }
-    bool isSuccessfully = await _unitOfWork.CommitAsync() > 0;
-
-    return new ApiResponse()
-    {
-        status = isSuccessfully ? StatusCodes.Status200OK.ToString() : StatusCodes.Status500InternalServerError.ToString(),
-        message = isSuccessfully ? "Setup package added to cart successfully" : "Failed to add setup package",
-        data = new
-        {
-            SetupId = setupPackage.Id,
-            SetupName = setupPackage.SetupName,
-            CartItems = cartItemResponses
-        }
-    };
-}
 
 
         public async Task<ApiResponse> ClearCart()
@@ -443,7 +453,8 @@ public async Task<ApiResponse> AddSetupPackageToCart(Guid setupPackageId)
             Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
             var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
                 predicate: u => u.Id.Equals(userId) &&
-                                u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) && u.IsDelete == false &&
+                                u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) &&
+                                u.IsDelete == false &&
                                 (u.Role == RoleEnum.Customer.GetDescriptionFromEnum()));
 
             if (user == null)
@@ -488,7 +499,8 @@ public async Task<ApiResponse> AddSetupPackageToCart(Guid setupPackageId)
             Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
             var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
                 predicate: u => u.Id.Equals(userId) &&
-                                u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) && u.IsDelete == false &&
+                                u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) &&
+                                u.IsDelete == false &&
                                 (u.Role == RoleEnum.Customer.GetDescriptionFromEnum()));
 
             if (user == null)
@@ -534,10 +546,13 @@ public async Task<ApiResponse> AddSetupPackageToCart(Guid setupPackageId)
         {
             // Lấy UserId từ HttpContext
             Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
+
+            // Lấy thông tin người dùng
             var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
                 predicate: u => u.Id.Equals(userId) &&
-                                u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) && u.IsDelete == false &&
-                                (u.Role == RoleEnum.Customer.GetDescriptionFromEnum()));
+                                u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) &&
+                                u.IsDelete == false &&
+                                u.Role == RoleEnum.Customer.GetDescriptionFromEnum());
 
             if (user == null)
             {
@@ -549,14 +564,26 @@ public async Task<ApiResponse> AddSetupPackageToCart(Guid setupPackageId)
                 };
             }
 
+            // Lấy giỏ hàng của user
             var cart = await _unitOfWork.GetRepository<Cart>().SingleOrDefaultAsync(
                 predicate: c => c.UserId.Equals(userId));
 
+            if (cart == null)
+            {
+                return new ApiResponse()
+                {
+                    status = StatusCodes.Status200OK.ToString(),
+                    message = "Cart not found",
+                    data = new List<GetAllCartItemResponse>()
+                };
+            }
+
+            // Lấy tất cả CartItems thuộc Cart và các thông tin sản phẩm liên quan
             var cartItems = await _unitOfWork.GetRepository<CartItem>().GetListAsync(
                 predicate: c => c.CartId.Equals(cart.Id) &&
                                 c.IsDelete.Equals(false) &&
-                                c.Product.Status.Equals(ProductStatusEnum.Available.GetDescriptionFromEnum()), // Kiểm tra Status của Product
-                include: c => c.Include(c => c.Product),
+                                c.Product.Status.Equals(ProductStatusEnum.Available.GetDescriptionFromEnum()),
+                include: c => c.Include(ci => ci.Product),
                 orderBy: c => c.OrderByDescending(o => o.CreateDate));
 
             if (cartItems == null || !cartItems.Any())
@@ -564,34 +591,36 @@ public async Task<ApiResponse> AddSetupPackageToCart(Guid setupPackageId)
                 return new ApiResponse()
                 {
                     status = StatusCodes.Status200OK.ToString(),
-                    message = "CartItem list",
-                    data = new LinkedList<CartItem>()
+                    message = "No items in the cart",
+                    data = new List<GetAllCartItemResponse>()
                 };
             }
 
-            // Tạo response bao gồm LinkImage
-            var response = new List<GetAllCartItemResponse>();
+            // Lấy toàn bộ ProductId từ cartItems
+            var productIds = cartItems.Select(ci => ci.ProductId).Distinct().ToList();
 
-            foreach (var cartItem in cartItems)
+            // Lấy image cho toàn bộ ProductId trong cartItems chỉ trong 1 query
+            var images = await _unitOfWork.GetRepository<Image>().GetListAsync(
+                predicate: img => productIds.Contains(img.ProductId) && img.IsDelete == false,
+                orderBy: img => img.OrderBy(i => i.CreateDate));
+
+            // Tạo response bao gồm thông tin từ cartItems và link image
+            var response = cartItems.Select(cartItem =>
             {
-                // Lấy LinkImage từ bảng Image theo ProductId
-                var image = await _unitOfWork.GetRepository<Image>().SingleOrDefaultAsync(
-                    predicate: img => img.ProductId.Equals(cartItem.ProductId) && img.IsDelete == false,
-                    orderBy: img => img.OrderBy(i => i.CreateDate));
+                var image = images.FirstOrDefault(img => img.ProductId == cartItem.ProductId);
 
-                response.Add(new GetAllCartItemResponse
+                return new GetAllCartItemResponse
                 {
-                    Status = cartItem.Status.ToString(),
+                    Status = cartItem.Status,
                     CartItemId = cartItem.Id,
                     ProductId = cartItem.ProductId,
                     ProductName = cartItem.Product.ProductName,
                     Quantity = cartItem.Quantity,
                     UnitPrice = cartItem.Product.Price,
-                    
                     Price = cartItem.Product.Price * cartItem.Quantity,
-                    LinkImage = image?.LinkImage // Sử dụng LinkImage nếu tồn tại, nếu không để null
-                });
-            }
+                    LinkImage = image?.LinkImage
+                };
+            }).ToList();
 
             return new ApiResponse()
             {
@@ -602,14 +631,14 @@ public async Task<ApiResponse> AddSetupPackageToCart(Guid setupPackageId)
         }
 
 
-
         public async Task<ApiResponse> GetCartSummary()
         {
             // Lấy UserId từ HttpContext
             Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
             var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
                 predicate: u => u.Id.Equals(userId) &&
-                                u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) && u.IsDelete == false &&
+                                u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) &&
+                                u.IsDelete == false &&
                                 (u.Role == RoleEnum.Customer.GetDescriptionFromEnum()));
 
             if (user == null)
@@ -627,11 +656,12 @@ public async Task<ApiResponse> AddSetupPackageToCart(Guid setupPackageId)
 
 
             var cartItems = await _unitOfWork.GetRepository<CartItem>().GetListAsync(
-                    predicate: c => c.CartId.Equals(cart.Id) &&
-                    c.IsDelete.Equals(false) &&
-                    c.Product.Status.Equals(ProductStatusEnum.Available.GetDescriptionFromEnum()), // Thêm điều kiện lọc Product
-                    include: c => c.Include(c => c.Product), // Bao gồm Product để sử dụng các thuộc tính của nó
-                    orderBy: c => c.OrderByDescending(o => o.CreateDate));
+                predicate: c => c.CartId.Equals(cart.Id) &&
+                                c.IsDelete.Equals(false) &&
+                                c.Product.Status.Equals(ProductStatusEnum.Available
+                                    .GetDescriptionFromEnum()), // Thêm điều kiện lọc Product
+                include: c => c.Include(c => c.Product), // Bao gồm Product để sử dụng các thuộc tính của nó
+                orderBy: c => c.OrderByDescending(o => o.CreateDate));
 
 
             if (cartItems == null || !cartItems.Any())
@@ -679,7 +709,8 @@ public async Task<ApiResponse> AddSetupPackageToCart(Guid setupPackageId)
             Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
             var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
                 predicate: u => u.Id.Equals(userId) &&
-                                u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) && u.IsDelete == false &&
+                                u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) &&
+                                u.IsDelete == false &&
                                 (u.Role == RoleEnum.Customer.GetDescriptionFromEnum()));
 
             if (user == null)
@@ -697,7 +728,7 @@ public async Task<ApiResponse> AddSetupPackageToCart(Guid setupPackageId)
 
             var existingCartItem = await _unitOfWork.GetRepository<CartItem>().SingleOrDefaultAsync(
                 predicate: ci => ci.Id.Equals(id) && ci.CartId.Equals(cart.Id)
-                && ci.IsDelete.Equals(false));
+                                                  && ci.IsDelete.Equals(false));
 
             if (existingCartItem == null)
             {
@@ -744,8 +775,8 @@ public async Task<ApiResponse> AddSetupPackageToCart(Guid setupPackageId)
             }
 
 
-
-            existingCartItem.Quantity = updateCartItemRequest.Quantity.HasValue ? updateCartItemRequest.Quantity.Value
+            existingCartItem.Quantity = updateCartItemRequest.Quantity.HasValue
+                ? updateCartItemRequest.Quantity.Value
                 : existingCartItem.Quantity;
             existingCartItem.ModifyDate = TimeUtils.GetCurrentSEATime();
             _unitOfWork.GetRepository<CartItem>().UpdateAsync(existingCartItem);
@@ -763,6 +794,7 @@ public async Task<ApiResponse> AddSetupPackageToCart(Guid setupPackageId)
                     Price = product.Price * updateCartItemRequest.Quantity,
                 };
             }
+
             return new ApiResponse()
             {
                 status = StatusCodes.Status200OK.ToString(),

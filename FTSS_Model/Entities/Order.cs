@@ -47,8 +47,6 @@ public partial class Order
 
     public virtual SetupPackage? SetupPackage { get; set; }
 
-    public virtual ICollection<Shipment> Shipments { get; set; } = new List<Shipment>();
-
     public virtual User? User { get; set; }
 
     public virtual Voucher? Voucher { get; set; }

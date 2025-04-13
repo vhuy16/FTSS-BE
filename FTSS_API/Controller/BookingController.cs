@@ -11,6 +11,7 @@ using FTSS_Model.Paginate;
 using FTSS_API.Payload.Request.Book;
 using Azure;
 using System.Drawing;
+using Supabase;
 
 namespace FTSS_API.Controller
 {
@@ -202,9 +203,9 @@ namespace FTSS_API.Controller
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
         [ProducesErrorResponseType(typeof(ProblemDetails))]
-        public async Task<IActionResult> UpdateMission(Guid missionid, [FromForm] UpdateMissionRequest request)
+        public async Task<IActionResult> UpdateMission(Guid missionid, [FromForm] UpdateMissionRequest request, Client client)
         {
-            var response = await _bookingService.UpdateMission(missionid, request);
+            var response = await _bookingService.UpdateMission(missionid, request, client);
             return StatusCode(int.Parse(response.status), response);
         }
         /// <summary>
