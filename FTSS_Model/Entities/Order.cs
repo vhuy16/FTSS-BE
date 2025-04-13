@@ -37,6 +37,8 @@ public partial class Order
 
     public string? OrderCode { get; set; }
 
+    public DateTime? InstallationDate { get; set; }
+
     public virtual ICollection<Booking> Bookings { get; set; } = new List<Booking>();
 
     public virtual ICollection<Mission> Missions { get; set; } = new List<Mission>();
