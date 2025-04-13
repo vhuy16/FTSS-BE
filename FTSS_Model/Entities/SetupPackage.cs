@@ -1,13 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
-using Microsoft.EntityFrameworkCore;
 
 namespace FTSS_Model.Entities;
-[Index(nameof(Userid), IsUnique = false, Name = "idx_setuppackage_userid")]
-[Index(nameof(Status), IsUnique = false, Name = "idx_setuppackage_status")]
-[Index(nameof(CreateDate), IsUnique = false, Name = "idx_setuppackage_createdate")]
-[Index(nameof(ModifyDate), IsUnique = false, Name = "idx_setuppackage_modifydate")]
-[Index(nameof(IsDelete), IsUnique = false, Name = "idx_setuppackage_isdelete")]
+
 public partial class SetupPackage
 {
     public Guid Id { get; set; }
