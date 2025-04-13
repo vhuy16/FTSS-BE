@@ -11,6 +11,6 @@
         public string? Address { get; set; }
 
         public string? PhoneNumber { get; set; }
-        public List<IFormFile>? ImageLinks { get; set; } = new List<IFormFile>();
+       
     }
 }

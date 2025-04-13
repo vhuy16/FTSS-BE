@@ -23,6 +23,7 @@ namespace FTSS_API.Payload.Response.Book
         public decimal? TotalPrice { get; set; }
         
         public string? BookingCode { get; set; }
+        public List<string>? ImageLinks { get; set; } = new();
         public Guid? OrderId { get; set; }
      
         public bool? IsAssigned { get; set; }

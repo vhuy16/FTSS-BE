@@ -22,7 +22,9 @@ namespace FTSS_API.Service.Interface
         Task<ApiResponse> GetServicePackage(int pageNumber, int pageSize, bool? isAscending);
         Task<ApiResponse> UpdateBooking(Guid bookingid, UpdateBookingRequest request);
         Task<ApiResponse> UpdateBookingStatus(Guid bookingid);
-        Task<ApiResponse> UpdateMission(Guid missionId, UpdateMissionRequest request, Supabase.Client client);
-        Task<ApiResponse> UpdateStatusMission(Guid id, string status);
+        Task<ApiResponse> UpdateMission(Guid missionId, UpdateMissionRequest request);
+
+        Task<ApiResponse> UpdateStatusMission(Guid missionId, string status, Supabase.Client client,
+            List<IFormFile>? ImageLinks, string? reason = null);
     }
 }
