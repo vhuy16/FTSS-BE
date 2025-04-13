@@ -27,6 +27,8 @@ public partial class Mission
 
     public Guid? OrderId { get; set; }
 
+    public string? CancelReason { get; set; }
+
     public virtual Booking? Booking { get; set; }
 
     public virtual ICollection<MissionImage> MissionImages { get; set; } = new List<MissionImage>();

@@ -66,9 +66,9 @@ namespace FTSS_API.Controller
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
         [ProducesErrorResponseType(typeof(ProblemDetails))]
-        public async Task<IActionResult> UpdateStatusMission(Guid id, string status)
+        public async Task<IActionResult> UpdateStatusMission(Guid id, string status, [FromForm] List<IFormFile>? ImageLinks, Client client,  string? reason = null )
         {
-            var response = await _bookingService.UpdateStatusMission(id, status);
+            var response = await _bookingService.UpdateStatusMission(id, status, client, ImageLinks, reason);
             return StatusCode(int.Parse(response.status), response);
         }
         /// <summary>
@@ -203,9 +203,9 @@ namespace FTSS_API.Controller
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
         [ProducesErrorResponseType(typeof(ProblemDetails))]
-        public async Task<IActionResult> UpdateMission(Guid missionid, [FromForm] UpdateMissionRequest request, Client client)
+        public async Task<IActionResult> UpdateMission(Guid missionid, [FromForm] UpdateMissionRequest request)
         {
-            var response = await _bookingService.UpdateMission(missionid, request, client);
+            var response = await _bookingService.UpdateMission(missionid, request);
             return StatusCode(int.Parse(response.status), response);
         }
         /// <summary>
