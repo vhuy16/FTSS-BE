@@ -16,4 +16,5 @@ public interface IOrderService
     Task<ApiResponse> CancelOrder(Guid id);
     Task<ApiResponse> UpdateOrder(Guid orderId, UpdateOrderRequest updateOrderRequest);
     Task<ApiResponse> CreateReturnRequest(CreateReturnRequest request, Supabase.Client client);
+    Task<ApiResponse> GetReturnRequest(Guid? returnRequestId, Supabase.Client client, int page = 1, int pageSize = 10);
 }

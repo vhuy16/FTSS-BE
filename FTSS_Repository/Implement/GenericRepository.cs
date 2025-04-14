@@ -15,7 +15,10 @@ public class GenericRepository<T> : IGenericRepository<T> where T : class
         _dbContext = context;
         _dbSet = context.Set<T>();
     }
-
+    public virtual IQueryable<T> GetQueryable()
+    {
+        return _dbSet.AsQueryable();
+    }
     public void Dispose()
     {
         _dbContext?.Dispose();

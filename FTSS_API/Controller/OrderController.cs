@@ -176,6 +176,39 @@ public class OrderController : BaseController<OrderController>
         var response = await _orderService.CreateReturnRequest(request, client);
         return StatusCode(int.Parse(response.status), response);
     }
+    /// <summary>
+    /// API lấy thông tin yêu cầu hoàn trả theo ReturnRequestId với phân trang
+    /// </summary>
+    [HttpGet(ApiEndPointConstant.Order.GetReturnRequest)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
+    [ProducesErrorResponseType(typeof(ProblemDetails))]
+    public async Task<IActionResult> GetReturnRequest(
+        [FromQuery] Guid? returnRequestId, 
+        [FromQuery] int page,  // Không gán giá trị mặc định ở đây
+        [FromQuery] int pageSize, 
+        Client client)
+    {
+        // Kiểm tra và điều chỉnh giá trị của `page` nếu cần thiết
+        page = page < 1 ? 1 : page;
+
+        // Gọi service để lấy thông tin yêu cầu hoàn trả
+        var response = await _orderService.GetReturnRequest(returnRequestId, client, page, pageSize);
+
+        if (response == null || response.data == null)
+        {
+            return NotFound(new ApiResponse
+            {
+                data = null,
+                message = "Không tìm thấy yêu cầu hoàn trả",
+                status = StatusCodes.Status404NotFound.ToString()
+            });
+        }
+
+        return StatusCode(int.Parse(response.status), response);
+    }
+
+
 }
 
 
