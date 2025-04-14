@@ -6,6 +6,7 @@ namespace FTSS_Repository.Interface;
 
 public interface IGenericRepository<T> : IDisposable where T : class
 {
+    IQueryable<T> GetQueryable();
     #region Get Async
 
     Task<T> SingleOrDefaultAsync(
