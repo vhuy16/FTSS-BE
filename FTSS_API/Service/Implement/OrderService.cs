@@ -536,7 +536,7 @@ public class OrderService : BaseService<OrderService>, IOrderService
                     var email = order.User.Email;
                     await _emailSender.SendRefundNotificationEmailAsync(email, emailBody);
                 }
-                else if (updateOrderRequest.Status == "returnAccepted")
+                else if (updateOrderRequest.Status == OrderStatus.RETURN_ACCEPTED.ToString())
                 {
                     string returnEmailBody = EmailTemplatesUtils.ReturnAcceptedEmailTemplate(order.Id, order.OrderCode);
                     var customerEmail = order.User.Email;
@@ -900,6 +900,8 @@ public async Task<ApiResponse> GetAllOrder(int page, int size, string status, st
                 .Include(o => o.User)
                 .Include(o => o.Voucher)
                 .Include(o => o.Payments)
+                .Include(o => o.ReturnRequests)
+                .ThenInclude(rr => rr.ReturnRequestMedia)
                 .Include(o => o.OrderDetails)
                 .ThenInclude(od => od.Product)
                 .ThenInclude(p => p.SubCategory) // Bao gồm SubCategory
@@ -1015,6 +1017,20 @@ public async Task<ApiResponse> GetAllOrder(int page, int size, string status, st
                     Email = order.User?.Email,
                     PhoneNumber = order.User?.PhoneNumber
                 },
+                ReturnRequests  = order.ReturnRequests?.Where(rr => rr.IsDelete == false).Select(rr => new GetOrderResponse.ReturnRequestResponse
+                {
+                    Id = rr.Id,
+                    Reason = rr.Reason,
+                    Status = rr.Status,
+                    CreatedAt = rr.CreatedAt,
+                    MediaFiles = rr.ReturnRequestMedia?.Where(m => m.IsDelete == false).Select(m => new GetOrderResponse.ReturnRequestMediaResponse
+                    {
+                        Id = m.Id,
+                        MediaLink = m.MediaLink,
+                        MediaType = m.MediaType
+                    }).ToList() ?? new List<GetOrderResponse.ReturnRequestMediaResponse>()
+                }).ToList() ?? new List<GetOrderResponse.ReturnRequestResponse>(),
+
                 OrderDetails = order.OrderDetails.Select(od => new GetOrderResponse.OrderDetailCreateResponse
                 {
                     ProductName = od.Product.ProductName,
@@ -1233,7 +1249,8 @@ public async Task<ApiResponse> CreateReturnRequest(CreateReturnRequest request, 
         }
 
         await _unitOfWork.GetRepository<ReturnRequest>().InsertAsync(returnRequest);
-
+        order.Status = OrderStatus.RETURNING.ToString();
+         _unitOfWork.GetRepository<Order>().UpdateAsync(order);
         // Lưu thay đổi
         bool isSuccess = await _unitOfWork.CommitAsync() > 0;
         if (!isSuccess)
