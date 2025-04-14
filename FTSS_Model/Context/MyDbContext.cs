@@ -46,6 +46,10 @@ public partial class MyDbContext : DbContext
 
     public virtual DbSet<Product> Products { get; set; }
 
+    public virtual DbSet<ReturnRequest> ReturnRequests { get; set; }
+
+    public virtual DbSet<ReturnRequestMedia> ReturnRequestMedia { get; set; }
+
     public virtual DbSet<ServicePackage> ServicePackages { get; set; }
 
     public virtual DbSet<SetupPackage> SetupPackages { get; set; }
@@ -418,6 +422,9 @@ public partial class MyDbContext : DbContext
                 .HasMaxLength(255)
                 .HasColumnName("address");
             entity.Property(e => e.BookingId).HasColumnName("bookingId");
+            entity.Property(e => e.EndMissionSchedule)
+                .HasColumnType("datetime")
+                .HasColumnName("endMissionSchedule");
             entity.Property(e => e.IsDelete)
                 .HasDefaultValue(false)
                 .HasColumnName("isDelete");
@@ -507,6 +514,9 @@ public partial class MyDbContext : DbContext
             entity.Property(e => e.CreateDate)
                 .HasColumnType("datetime")
                 .HasColumnName("createDate");
+            entity.Property(e => e.InstallationDate)
+                .HasColumnType("datetime")
+                .HasColumnName("installationDate");
             entity.Property(e => e.IsAssigned).HasColumnName("isAssigned");
             entity.Property(e => e.IsDelete)
                 .HasDefaultValue(false)
@@ -704,6 +714,47 @@ public partial class MyDbContext : DbContext
             entity.HasOne(d => d.SubCategory).WithMany(p => p.Products)
                 .HasForeignKey(d => d.SubCategoryId)
                 .HasConstraintName("FK_Product_SubCategory");
+        });
+
+        modelBuilder.Entity<ReturnRequest>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PK__ReturnRe__3214EC07B6838DC5");
+
+            entity.ToTable("ReturnRequest");
+
+            entity.HasIndex(e => e.OrderId, "IX_ReturnRequest_OrderId");
+
+            entity.HasIndex(e => e.UserId, "IX_ReturnRequest_UserId");
+
+            entity.Property(e => e.Id).HasDefaultValueSql("(newid())");
+            entity.Property(e => e.CreatedAt).HasColumnType("datetime");
+            entity.Property(e => e.Reason).HasMaxLength(500);
+            entity.Property(e => e.Status).HasMaxLength(50);
+            entity.Property(e => e.UpdatedAt).HasColumnType("datetime");
+
+            entity.HasOne(d => d.Order).WithMany(p => p.ReturnRequests)
+                .HasForeignKey(d => d.OrderId)
+                .HasConstraintName("FK_ReturnRequest_Order");
+
+            entity.HasOne(d => d.User).WithMany(p => p.ReturnRequests)
+                .HasForeignKey(d => d.UserId)
+                .HasConstraintName("FK_ReturnRequest_User");
+        });
+
+        modelBuilder.Entity<ReturnRequestMedia>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PK__ReturnRe__3214EC07FA170968");
+
+            entity.HasIndex(e => e.ReturnRequestId, "IX_ReturnRequestMedia_ReturnRequestId");
+
+            entity.Property(e => e.Id).HasDefaultValueSql("(newid())");
+            entity.Property(e => e.CreatedAt).HasColumnType("datetime");
+            entity.Property(e => e.MediaLink).HasMaxLength(255);
+            entity.Property(e => e.MediaType).HasMaxLength(50);
+
+            entity.HasOne(d => d.ReturnRequest).WithMany(p => p.ReturnRequestMedia)
+                .HasForeignKey(d => d.ReturnRequestId)
+                .HasConstraintName("FK_ReturnRequestMedia_ReturnRequest");
         });
 
         modelBuilder.Entity<ServicePackage>(entity =>

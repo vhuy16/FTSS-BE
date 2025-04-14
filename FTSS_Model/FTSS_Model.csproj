@@ -36,4 +36,8 @@
       <PackageReference Include="VNPAY.NET" Version="8.5.0" />
     </ItemGroup>
 
+    <ItemGroup>
+      <Folder Include="Migration\" />
+    </ItemGroup>
+
 </Project>
