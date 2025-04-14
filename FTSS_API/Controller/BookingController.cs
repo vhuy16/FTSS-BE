@@ -246,19 +246,6 @@ namespace FTSS_API.Controller
             return StatusCode(int.Parse(response.status), response);
         }
         /// <summary>
-        /// API update booking status REFUNDED cho manager.
-        /// </summary>
-        [HttpPut(ApiEndPointConstant.Booking.UpdateBookingStatus)]
-        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
-        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
-        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
-        [ProducesErrorResponseType(typeof(ProblemDetails))]
-        public async Task<IActionResult> UpdateBookingStatus(Guid bookingid)
-        {
-            var response = await _bookingService.UpdateBookingStatus(bookingid);
-            return StatusCode(int.Parse(response.status), response);
-        }
-        /// <summary>
         /// API lịch sử bảo trì của order.
         /// </summary>
         [HttpGet(ApiEndPointConstant.Booking.GetHistoryOrder)]

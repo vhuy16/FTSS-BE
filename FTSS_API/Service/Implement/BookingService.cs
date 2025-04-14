@@ -1137,9 +1137,11 @@ namespace FTSS_API.Service.Implement
                                      predicate: t => t.Userid == userId &&
                                                      (string.IsNullOrEmpty(status) || t.Status == status) &&
                                                      t.IsDelete == false,
-                                     include: t => t.Include(x => x.User)
-                                                    .Include(x => x.Booking)
-                                                    .Include(x => x.Order)
+                                     include: m => m.Include(x => x.User)
+               .Include(x => x.Order)
+               .Include(x => x.Booking)
+                   .ThenInclude(b => b.BookingDetails)
+                       .ThenInclude(bd => bd.ServicePackage)
                                  );
 
             var taskList = await query;
@@ -1291,197 +1293,125 @@ namespace FTSS_API.Service.Implement
             };
         }
 
-     public async Task<ApiResponse> UpdateMission(Guid missionId, UpdateMissionRequest request)
-{
-    try
-    {
-        var mission = await _unitOfWork.GetRepository<Mission>().SingleOrDefaultAsync(
-            predicate: m => m.Id.Equals(missionId) && m.IsDelete == false);
-
-        if (mission == null)
+        public async Task<ApiResponse> UpdateMission(Guid missionId, UpdateMissionRequest request)
         {
-            return new ApiResponse
+            try
             {
-                status = StatusCodes.Status404NotFound.ToString(),
-                message = "Không tìm thấy nhiệm vụ.",
-                data = null
-            };
-        }
+                var mission = await _unitOfWork.GetRepository<Mission>().SingleOrDefaultAsync(
+                    predicate: m => m.Id.Equals(missionId) && m.IsDelete == false);
 
-        // Validate MissionName
-        if (!string.IsNullOrWhiteSpace(request.MissionName) && request.MissionName.Length < 3)
-        {
-            return new ApiResponse
-            {
-                status = StatusCodes.Status400BadRequest.ToString(),
-                message = "Tên nhiệm vụ phải có ít nhất 3 ký tự.",
-                data = null
-            };
-        }
-
-        // Validate MissionDescription
-        if (!string.IsNullOrWhiteSpace(request.MissionDescription) && request.MissionDescription.Length < 10)
-        {
-            return new ApiResponse
-            {
-                status = StatusCodes.Status400BadRequest.ToString(),
-                message = "Mô tả nhiệm vụ phải có ít nhất 10 ký tự.",
-                data = null
-            };
-        }
-
-        // Validate MissionSchedule
-        if (request.MissionSchedule.HasValue)
-        {
-            var currentSEATime = TimeUtils.GetCurrentSEATime();
-            if (request.MissionSchedule <= currentSEATime)
-            {
-                return new ApiResponse
+                if (mission == null)
                 {
-                    status = StatusCodes.Status400BadRequest.ToString(),
-                    message = "Lịch trình nhiệm vụ phải sau thời gian hiện tại.",
-                    data = null
-                };
-            }
-        }
+                    return new ApiResponse
+                    {
+                        status = StatusCodes.Status404NotFound.ToString(),
+                        message = "Không tìm thấy nhiệm vụ.",
+                        data = null
+                    };
+                }
 
-        // Validate Address
-        if (!string.IsNullOrWhiteSpace(request.Address) && !request.Address.Contains("Hồ Chí Minh", StringComparison.OrdinalIgnoreCase))
-        {
-            return new ApiResponse
-            {
-                status = StatusCodes.Status400BadRequest.ToString(),
-                message = "Chỉ cho phép nhiệm vụ ở khu vực Hồ Chí Minh.",
-                data = null
-            };
-        }
-
-        // Validate PhoneNumber
-        if (!string.IsNullOrWhiteSpace(request.PhoneNumber) && request.PhoneNumber.Length < 10)
-        {
-            return new ApiResponse
-            {
-                status = StatusCodes.Status400BadRequest.ToString(),
-                message = "Số điện thoại phải có ít nhất 10 chữ số.",
-                data = null
-            };
-        }
-
-        // Validate ImageLinks
-      
-
-        // Validate Technician and Schedule
-        bool isTechnicianChanged = request.TechnicianId.HasValue && request.TechnicianId.Value != mission.Userid;
-        bool isScheduleChanged = request.MissionSchedule.HasValue && request.MissionSchedule.Value.Date != mission.MissionSchedule.Value.Date;
-
-        if (isTechnicianChanged)
-        {
-            var technician = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
-                predicate: t => t.Id.Equals(request.TechnicianId.Value) &&
-                                t.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) &&
-                                t.IsDelete == false &&
-                                t.Role.Equals(RoleEnum.Technician.GetDescriptionFromEnum()));
-
-            if (technician == null)
-            {
-                return new ApiResponse
-                {
-                    status = StatusCodes.Status400BadRequest.ToString(),
-                    message = "Kỹ thuật viên không hợp lệ, không tồn tại hoặc không phải là kỹ thuật viên.",
-                    data = null
-                };
-            }
-
-            if (!isScheduleChanged)
-            {
-                var existingMissionForNewTech = await _unitOfWork.GetRepository<Mission>().SingleOrDefaultAsync(
-                    predicate: m => m.Userid.Equals(request.TechnicianId) &&
-                                    m.MissionSchedule.Value.Date == mission.MissionSchedule.Value.Date &&
-                                    m.IsDelete == false);
-
-                if (existingMissionForNewTech != null)
+                // Validate MissionName
+                if (!string.IsNullOrWhiteSpace(request.MissionName) && request.MissionName.Length < 3)
                 {
                     return new ApiResponse
                     {
                         status = StatusCodes.Status400BadRequest.ToString(),
-                        message = $"Kỹ thuật viên đã được phân công nhiệm vụ vào ngày {mission.MissionSchedule.Value.Date:dd/MM/yyyy}.",
+                        message = "Tên nhiệm vụ phải có ít nhất 3 ký tự.",
                         data = null
                     };
                 }
+
+                // Validate MissionDescription
+                if (!string.IsNullOrWhiteSpace(request.MissionDescription) && request.MissionDescription.Length < 10)
+                {
+                    return new ApiResponse
+                    {
+                        status = StatusCodes.Status400BadRequest.ToString(),
+                        message = "Mô tả nhiệm vụ phải có ít nhất 10 ký tự.",
+                        data = null
+                    };
+                }
+
+                // So sánh các trường truyền vào với dữ liệu hiện tại để kiểm tra trùng
+                bool isSameName = string.IsNullOrWhiteSpace(request.MissionName) || request.MissionName == mission.MissionName;
+                bool isSameDesc = string.IsNullOrWhiteSpace(request.MissionDescription) || request.MissionDescription == mission.MissionDescription;
+                bool isSameTech = !request.TechnicianId.HasValue || request.TechnicianId.Value == mission.Userid;
+
+                if (isSameName && isSameDesc && isSameTech)
+                {
+                    return new ApiResponse
+                    {
+                        status = StatusCodes.Status400BadRequest.ToString(),
+                        message = "Vui lòng thay đổi thông tin để cập nhật.",
+                        data = null
+                    };
+                }
+
+                // Validate và xử lý TechnicianId nếu có truyền
+                if (request.TechnicianId.HasValue && request.TechnicianId.Value != mission.Userid)
+                {
+                    var technician = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
+                        predicate: t => t.Id.Equals(request.TechnicianId.Value) &&
+                                        t.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) &&
+                                        t.IsDelete == false &&
+                                        t.Role.Equals(RoleEnum.Technician.GetDescriptionFromEnum()));
+
+                    if (technician == null)
+                    {
+                        return new ApiResponse
+                        {
+                            status = StatusCodes.Status400BadRequest.ToString(),
+                            message = "Kỹ thuật viên không hợp lệ, không tồn tại hoặc không phải là kỹ thuật viên.",
+                            data = null
+                        };
+                    }
+
+                    var existingMission = await _unitOfWork.GetRepository<Mission>().SingleOrDefaultAsync(
+                        predicate: m => m.Userid.Equals(request.TechnicianId) &&
+                                        m.MissionSchedule.Value.Date == mission.MissionSchedule.Value.Date &&
+                                        m.IsDelete == false);
+
+                    if (existingMission != null)
+                    {
+                        return new ApiResponse
+                        {
+                            status = StatusCodes.Status400BadRequest.ToString(),
+                            message = $"Kỹ thuật viên đã có nhiệm vụ vào ngày {mission.MissionSchedule.Value.Date:dd/MM/yyyy}.",
+                            data = null
+                        };
+                    }
+
+                    mission.Userid = request.TechnicianId;
+                }
+
+                // Cập nhật các field được phép
+                mission.MissionName = !string.IsNullOrWhiteSpace(request.MissionName) ? request.MissionName : mission.MissionName;
+                mission.MissionDescription = !string.IsNullOrWhiteSpace(request.MissionDescription) ? request.MissionDescription : mission.MissionDescription;
+
+                // Cập nhật mission
+                _unitOfWork.GetRepository<Mission>().UpdateAsync(mission);
+                await _unitOfWork.CommitAsync();
+
+                return new ApiResponse
+                {
+                    status = StatusCodes.Status200OK.ToString(),
+                    message = "Cập nhật nhiệm vụ thành công.",
+                    data = null
+                };
             }
-
-            mission.Userid = request.TechnicianId;
-        }
-
-        if (isScheduleChanged && !isTechnicianChanged)
-        {
-            var existingMissionForOldTech = await _unitOfWork.GetRepository<Mission>().SingleOrDefaultAsync(
-                predicate: m => m.Userid.Equals(mission.Userid) &&
-                                m.MissionSchedule.Value.Date == request.MissionSchedule.Value.Date &&
-                                m.IsDelete == false);
-
-            if (existingMissionForOldTech != null)
+            catch (Exception ex)
             {
                 return new ApiResponse
                 {
-                    status = StatusCodes.Status400BadRequest.ToString(),
-                    message = $"Kỹ thuật viên đã được phân công nhiệm vụ vào ngày {request.MissionSchedule.Value.Date:dd/MM/yyyy}.",
-                    data = null
+                    status = StatusCodes.Status500InternalServerError.ToString(),
+                    message = "Đã xảy ra lỗi khi cập nhật nhiệm vụ.",
+                    data = ex.Message
                 };
             }
         }
 
-        if (isTechnicianChanged && isScheduleChanged)
-        {
-            var existingMissionForNewTech = await _unitOfWork.GetRepository<Mission>().SingleOrDefaultAsync(
-                predicate: m => m.Userid.Equals(request.TechnicianId) &&
-                                m.MissionSchedule.Value.Date == request.MissionSchedule.Value.Date &&
-                                m.IsDelete == false);
 
-            if (existingMissionForNewTech != null)
-            {
-                return new ApiResponse
-                {
-                    status = StatusCodes.Status400BadRequest.ToString(),
-                    message = $"Kỹ thuật viên đã được phân công nhiệm vụ vào ngày {request.MissionSchedule.Value.Date:dd/MM/yyyy}.",
-                    data = null
-                };
-            }
-
-            mission.Userid = request.TechnicianId;
-        }
-
-        // Update mission fields
-        mission.MissionName = !string.IsNullOrWhiteSpace(request.MissionName) ? request.MissionName : mission.MissionName;
-        mission.MissionDescription = !string.IsNullOrWhiteSpace(request.MissionDescription) ? request.MissionDescription : mission.MissionDescription;
-        mission.MissionSchedule = request.MissionSchedule ?? mission.MissionSchedule;
-        mission.Address = !string.IsNullOrWhiteSpace(request.Address) ? request.Address : mission.Address;
-        mission.PhoneNumber = !string.IsNullOrWhiteSpace(request.PhoneNumber) ? request.PhoneNumber : mission.PhoneNumber;
-
-
-        // Update mission
-        _unitOfWork.GetRepository<Mission>().UpdateAsync(mission);
-        await _unitOfWork.CommitAsync();
-
-        return new ApiResponse
-        {
-            status = StatusCodes.Status200OK.ToString(),
-            message = "Cập nhật nhiệm vụ thành công.",
-            data = null
-        };
-    }
-    catch (Exception ex)
-    {
-        return new ApiResponse
-        {
-            status = StatusCodes.Status500InternalServerError.ToString(),
-            message = "Đã xảy ra lỗi khi cập nhật nhiệm vụ.",
-            data = ex.Message
-        };
-    }
-}
-
-       public async Task<ApiResponse> UpdateStatusMission(Guid missionId, string status, Supabase.Client client, List<IFormFile>? ImageLinks, string? reason = null)
+        public async Task<ApiResponse> UpdateStatusMission(Guid missionId, string status, Supabase.Client client, List<IFormFile>? ImageLinks, string? reason = null)
 {
     try
     {
@@ -1791,37 +1721,50 @@ namespace FTSS_API.Service.Implement
                 var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
                     predicate: u => u.Id.Equals(userId) &&
                                     u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) &&
-                                    u.IsDelete == false &&
-                                    u.Role.Equals(RoleEnum.Customer.GetDescriptionFromEnum()));
+                                    u.IsDelete == false);
 
                 if (user == null)
                 {
-                    throw new BadHttpRequestException("Bạn không có quyền thực hiện thao tác này.");
+                    throw new BadHttpRequestException("Tài khoản không hợp lệ.");
                 }
+
                 var bookingRepo = _unitOfWork.GetRepository<Booking>();
-                var bookingDetailRepo = _unitOfWork.GetRepository<BookingDetail>();
-                var serviceRepo = _unitOfWork.GetRepository<ServicePackage>();
 
                 var booking = await bookingRepo.SingleOrDefaultAsync(
-                    predicate: b => b.Id == bookingId && b.IsAssigned == false);
+                    predicate: b => b.Id == bookingId);
 
                 if (booking == null)
                 {
                     return new ApiResponse
                     {
                         status = StatusCodes.Status404NotFound.ToString(),
-                        message = "Không tìm thấy booking hoặc booking đã được phân công.",
+                        message = "Không tìm thấy booking.",
                         data = null
                     };
                 }
-                if (booking.UserId != userId)
+
+                // Nếu là Customer thì chỉ được cập nhật booking của mình và chưa phân công
+                if (user.Role == RoleEnum.Customer.GetDescriptionFromEnum())
                 {
-                    return new ApiResponse
+                    if (booking.UserId != userId)
                     {
-                        status = StatusCodes.Status403Forbidden.ToString(),
-                        message = "Bạn không có quyền cập nhật booking này.",
-                        data = null
-                    };
+                        return new ApiResponse
+                        {
+                            status = StatusCodes.Status403Forbidden.ToString(),
+                            message = "Bạn không có quyền cập nhật booking này.",
+                            data = null
+                        };
+                    }
+
+                    if (booking.IsAssigned == true)
+                    {
+                        return new ApiResponse
+                        {
+                            status = StatusCodes.Status403Forbidden.ToString(),
+                            message = "Booking đã được phân công. Không thể cập nhật.",
+                            data = null
+                        };
+                    }
                 }
 
                 // Cập nhật các trường nếu được truyền
