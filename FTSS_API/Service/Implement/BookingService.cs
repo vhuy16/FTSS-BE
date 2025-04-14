@@ -1991,7 +1991,7 @@ namespace FTSS_API.Service.Implement
                 {
                     return new ApiResponse
                     {
-                        status = StatusCodes.Status404NotFound.ToString(),
+                        status = StatusCodes.Status200OK.ToString(),
                         message = "Không tìm thấy lịch sử đặt lịch cho đơn hàng này.",
                         data = null
                     };
