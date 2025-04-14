@@ -1,9 +1,11 @@
 ﻿using FTSS_API.Constant;
 using FTSS_API.Payload;
 using FTSS_API.Payload.Request;
+using FTSS_API.Payload.Request.Return;
 using FTSS_API.Service.Interface;
 using FTSS_Model.Paginate;
 using Microsoft.AspNetCore.Mvc;
+using Supabase;
 
 namespace FTSS_API.Controller;
 
@@ -165,7 +167,15 @@ public class OrderController : BaseController<OrderController>
         var response = await _orderService.CancelOrder(id);
         return StatusCode(int.Parse(response.status), response);
     }
-    
+    [HttpPost(ApiEndPointConstant.Order.CreateReturnRequest)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
+    [ProducesErrorResponseType(typeof(ProblemDetails))]
+    public async Task<IActionResult> CreateReturnRequest([FromForm] CreateReturnRequest request, Client client)
+    {
+        var response = await _orderService.CreateReturnRequest(request, client);
+        return StatusCode(int.Parse(response.status), response);
+    }
 }
 
 

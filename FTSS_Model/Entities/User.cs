@@ -45,5 +45,7 @@ public partial class User
 
     public virtual ICollection<Otp> Otps { get; set; } = new List<Otp>();
 
+    public virtual ICollection<ReturnRequest> ReturnRequests { get; set; } = new List<ReturnRequest>();
+
     public virtual ICollection<SetupPackage> SetupPackages { get; set; } = new List<SetupPackage>();
 }

@@ -37,6 +37,8 @@ public partial class Order
 
     public string? OrderCode { get; set; }
 
+    public DateTime? InstallationDate { get; set; }
+
     public virtual ICollection<Booking> Bookings { get; set; } = new List<Booking>();
 
     public virtual ICollection<Mission> Missions { get; set; } = new List<Mission>();
@@ -44,6 +46,8 @@ public partial class Order
     public virtual ICollection<OrderDetail> OrderDetails { get; set; } = new List<OrderDetail>();
 
     public virtual ICollection<Payment> Payments { get; set; } = new List<Payment>();
+
+    public virtual ICollection<ReturnRequest> ReturnRequests { get; set; } = new List<ReturnRequest>();
 
     public virtual SetupPackage? SetupPackage { get; set; }
 
