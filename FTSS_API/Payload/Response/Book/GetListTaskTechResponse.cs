@@ -1,4 +1,6 @@
-﻿namespace FTSS_API.Payload.Response.Book
+﻿using FTSS_API.Payload.Response.SetupPackage;
+
+namespace FTSS_API.Payload.Response.Book
 {
     public class GetListTaskTechResponse
     {
@@ -18,5 +20,6 @@
         public string? Address { get; set; }
 
         public string? PhoneNumber { get; set; }
+        public SetupPackageResponse SetupPackage { get; set; }
     }
 }
