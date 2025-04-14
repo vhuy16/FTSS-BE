@@ -23,6 +23,7 @@ namespace FTSS_API.Payload.Response.Order
         public PaymentResponse Payment { get; set; } = new PaymentResponse();
         public VoucherResponse Voucher { get; set; } = new VoucherResponse();
         public SetupPackageResponse? SetupPackage { get; set; } = new SetupPackageResponse();
+        public List<ReturnRequestResponse> ReturnRequests { get; set; }
         public class OrderDetailCreateResponse
         {
             public string? ProductName { get; set; }
@@ -47,6 +48,21 @@ namespace FTSS_API.Payload.Response.Order
             public string Name { get; set; }
             public string Email { get; set; }
             public string? PhoneNumber { get; set; }
+        }
+        public class ReturnRequestResponse
+        {
+            public Guid Id { get; set; }
+            public string Reason { get; set; }
+            public string Status { get; set; }
+            public DateTime CreatedAt { get; set; }
+            public List<ReturnRequestMediaResponse> MediaFiles { get; set; }
+        }
+
+        public class ReturnRequestMediaResponse
+        {
+            public Guid Id { get; set; }
+            public string MediaLink { get; set; }
+            public string MediaType { get; set; }
         }
 
         public class PaymentResponse

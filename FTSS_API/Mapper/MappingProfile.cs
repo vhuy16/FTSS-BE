@@ -11,6 +11,7 @@ public class MappingProfile : Profile
     {
         CreateMap<Order, GetOrderResponse>()
             .ForMember(dest => dest.OderCode, opt => opt.MapFrom(src => src.OrderCode))
+            .ForMember(dest => dest.ModifyDate  , opt => opt.MapFrom(src => src.ModifyDate))
             .ForMember(dest => dest.BuyerName, opt => opt.MapFrom(src => src.RecipientName))
             // Map từ Order.Payments sang GetOrderResponse.Payment
             .ForMember(dest => dest.Payment, opt => opt.MapFrom(src => 
