@@ -220,7 +220,7 @@ namespace FTSS_API.Controller
             return StatusCode(int.Parse(response.status), response);
         }
         /// <summary>
-        /// API cập nhật thông tin mission cho user.
+        /// API cập nhật thông tin booking cho user.
         /// </summary>
         [HttpPut(ApiEndPointConstant.Booking.UpdateBooking)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
@@ -246,16 +246,14 @@ namespace FTSS_API.Controller
             return StatusCode(int.Parse(response.status), response);
         }
         /// <summary>
-        /// API update booking status REFUNDED cho manager.
+        /// API lịch sử bảo trì của order.
         /// </summary>
-        [HttpPut(ApiEndPointConstant.Booking.UpdateBookingStatus)]
-        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
-        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
-        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
+        [HttpGet(ApiEndPointConstant.Booking.GetHistoryOrder)]
+        [ProducesResponseType(typeof(IPaginate<ApiResponse>), StatusCodes.Status200OK)]
         [ProducesErrorResponseType(typeof(ProblemDetails))]
-        public async Task<IActionResult> UpdateBookingStatus(Guid bookingid)
+        public async Task<IActionResult> GetHistoryOrder(Guid orderid)
         {
-            var response = await _bookingService.UpdateBookingStatus(bookingid);
+            var response = await _bookingService.GetHistoryOrder(orderid);
             return StatusCode(int.Parse(response.status), response);
         }
     }

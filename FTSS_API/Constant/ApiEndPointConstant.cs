@@ -183,5 +183,6 @@ public static class ApiEndPointConstant
         public const string UpdateBooking = BookingEndPoint + "/update-booking/{bookingid}";
         public const string CancelBooking = BookingEndPoint + "/cancel-booking/{bookingid}";
         public const string UpdateBookingStatus = BookingEndPoint + "/update-booking-status/{bookingid}";
+        public const string GetHistoryOrder = BookingEndPoint + "/get-history-order/{orderid}";
     }
 }
