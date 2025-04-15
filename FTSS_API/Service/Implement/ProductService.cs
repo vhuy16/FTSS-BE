@@ -37,16 +37,16 @@ public class ProductService : BaseService<ProductService>, IProductService
     public async Task<ApiResponse> CreateProduct(CreateProductRequest createProductRequest, Supabase.Client client)
     {
         // Lấy UserId từ HttpContext
-        Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
-        var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
-            predicate: u => u.Id.Equals(userId) &&
-                            u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) && u.IsDelete == false &&
-                            (u.Role == RoleEnum.Admin.GetDescriptionFromEnum() || u.Role == RoleEnum.Manager.GetDescriptionFromEnum()));
-
-        if (user == null)
-        {
-            throw new BadHttpRequestException("You don't have permission to do this.");
-        }
+        // Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
+        // var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
+        //     predicate: u => u.Id.Equals(userId) &&
+        //                     u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) && u.IsDelete == false &&
+        //                     (u.Role == RoleEnum.Admin.GetDescriptionFromEnum() || u.Role == RoleEnum.Manager.GetDescriptionFromEnum()));
+        //
+        // if (user == null)
+        // {
+        //     throw new BadHttpRequestException("You don't have permission to do this.");
+        // }
         // Check SubCategory ID
         var subCategory = await _unitOfWork.GetRepository<SubCategory>()
             .SingleOrDefaultAsync(predicate: sc => sc.Id.Equals(createProductRequest.SubCategoryId),
