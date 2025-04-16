@@ -48,7 +48,7 @@ public partial class MyDbContext : DbContext
 
     public virtual DbSet<ReturnRequest> ReturnRequests { get; set; }
 
-    public virtual DbSet<ReturnRequestMedia> ReturnRequestMedia { get; set; }
+    public virtual DbSet<ReturnRequestMedium> ReturnRequestMedia { get; set; }
 
     public virtual DbSet<ServicePackage> ServicePackages { get; set; }
 
@@ -270,6 +270,12 @@ public partial class MyDbContext : DbContext
             entity.Property(e => e.IsDelete)
                 .HasDefaultValue(false)
                 .HasColumnName("isDelete");
+            entity.Property(e => e.IsFishTank)
+                .HasDefaultValue(false)
+                .HasColumnName("isFishTank");
+            entity.Property(e => e.IsObligatory)
+                .HasDefaultValue(false)
+                .HasColumnName("isObligatory");
             entity.Property(e => e.LinkImage)
                 .HasMaxLength(255)
                 .IsUnicode(false)
@@ -741,7 +747,7 @@ public partial class MyDbContext : DbContext
                 .HasConstraintName("FK_ReturnRequest_User");
         });
 
-        modelBuilder.Entity<ReturnRequestMedia>(entity =>
+        modelBuilder.Entity<ReturnRequestMedium>(entity =>
         {
             entity.HasKey(e => e.Id).HasName("PK__ReturnRe__3214EC07FA170968");
 
