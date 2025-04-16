@@ -10,27 +10,26 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    # 1. Lấy mã nguồn từ repository.
-    - name: Checkout repository
-      uses: actions/checkout@v3
+      # 1. Lấy mã nguồn từ repository.
+      - name: Checkout repository
+        uses: actions/checkout@v3
 
-    # 2. Cài đặt .NET SDK
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v3
-      with:
-        dotnet-version: 8.0 # Thay đổi phiên bản .NET nếu cần
+      # 2. Cài đặt .NET SDK
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: 8.0 # Thay đổi phiên bản .NET nếu cần
 
-    # 3. Build dự án .NET và tạo tài liệu Swagger XML
-    - name: Build project
-      run: dotnet publish -c Release -o ./publish /p:DocumentationFile=./publish/FTSS_API.xml
+      # 3. Build dự án .NET và tạo tài liệu Swagger XML
+      - name: Build project
+        run: dotnet publish -c Release -o ./publish /p:DocumentationFile=./publish/FTSS_API.xml
 
-    # 4. Triển khai mã nguồn qua FTP
-    - name: Deploy via SFTP
-      uses: wlixcc/SFTP-Deploy-Action@v1.0
-      with:
-        server: 14.225.220.28
-        username: ftpdeploy
-        password: ftss@admin123
-        local_path: ./publish/
-        remote_path: /
-     
+      # 4. Triển khai mã nguồn qua FTP
+      - name: Deploy via FTP
+        uses: SamKirkland/FTP-Deploy-Action@4.3.0
+        with:
+          server: 14.225.220.28
+          username: ftss-server
+          password: ftss12345
+          local-dir: ./publish/
+          server-dir: /ftss-publish/
