@@ -25,14 +25,12 @@ jobs:
       run: dotnet publish -c Release -o ./publish /p:DocumentationFile=./publish/FTSS_API.xml
 
     # 4. Triển khai mã nguồn qua FTP
-    - name: Deploy via FTP
-      uses: SamKirkland/FTP-Deploy-Action@4.3.0
+    - name: Deploy via SFTP
+      uses: wlixcc/SFTP-Deploy-Action@v1.0
       with:
         server: 14.225.220.28
         username: ftpdeploy
         password: ftss@admin123
-        protocol: ftps  # Thêm dòng này
-        secure: true    # Bật chế độ bảo mật
-        local-dir: ./publish/
-        server-dir: /
+        local_path: ./publish/
+        remote_path: /
      
