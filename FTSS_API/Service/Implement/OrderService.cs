@@ -88,6 +88,7 @@ public class OrderService : BaseService<OrderService>, IOrderService
                 RecipientName = createOrderRequest.RecipientName,
                 VoucherId = createOrderRequest.VoucherId,
                 SetupPackageId = createOrderRequest.SetupPackageId,
+                InstallationDate = createOrderRequest.InstallationDate,
                 IsEligible = false,
                 IsAssigned = false,
                 OrderCode = GenerateOrderCode().Trim()

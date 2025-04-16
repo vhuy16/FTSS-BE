@@ -9,5 +9,6 @@ public class CreateOrderRequest
     public string PaymentMethod { get; set; }
     public string? PhoneNumber { get; set; }
     public string? RecipientName { get; set; }
+    public DateTime? InstallationDate { get; set; }
     public Guid? SetupPackageId   { get; set; }
 }
