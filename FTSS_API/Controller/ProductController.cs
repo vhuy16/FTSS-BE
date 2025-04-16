@@ -254,10 +254,22 @@ public class ProductController : BaseController<ProductController>
         try
         {
             using var httpClient = new HttpClient();
-            var imageBytes = await httpClient.GetByteArrayAsync(url);
+            httpClient.Timeout = TimeSpan.FromSeconds(30);
 
-            // Optional: lấy mime type nếu muốn, hoặc default về image/jpeg
-            var contentType = "image/jpeg";
+            var request = new HttpRequestMessage(HttpMethod.Get, url);
+            request.Headers.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64)");
+            request.Headers.Referrer = new Uri("https://thuysinhtim.vn");
+
+            var response = await httpClient.SendAsync(request);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogWarning("Failed to fetch image from url {Url} - Status code: {StatusCode}", url, response.StatusCode);
+                return Problem($"Cannot fetch image from url: {url}");
+            }
+
+            var contentType = response.Content.Headers.ContentType?.ToString() ?? "application/octet-stream";
+            var imageBytes = await response.Content.ReadAsByteArrayAsync();
 
             return File(imageBytes, contentType);
         }
