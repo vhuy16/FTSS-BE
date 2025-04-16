@@ -30,6 +30,7 @@ jobs:
         with:
           server: 14.225.220.28
           username: ftss-server
-          password: ftss12345
+          password: ${{ secrets.FTP_PASSWORD }} # Dùng secret nếu đã thiết lập
           local-dir: ./publish/
           server-dir: /ftss-publish/
+          ftp-passive: true # Bật passive mode
