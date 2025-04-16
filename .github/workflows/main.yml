@@ -32,7 +32,7 @@ jobs:
          username: ${{ secrets.FTP_USERNAME }} # Tên người dùng FTP
          password: ${{ secrets.FTP_PASSWORD }} # Mật khẩu FTP
          local-dir: ./publish/
-         server-dir: /ftss.id.vn/ # Thư mục đích trên server
+         server-dir: / # Thư mục đích trên server
          exclude: |
           **/*.pdb   # Loại trừ file PDB (debug)
           **/*.config # Nếu không muốn upload config file
