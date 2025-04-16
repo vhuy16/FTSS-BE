@@ -2069,10 +2069,6 @@ namespace FTSS_API.Service.Implement
                     booking.PhoneNumber = request.PhoneNumber;
                 }
 
-                if (!string.IsNullOrWhiteSpace(request.FullName))
-                {
-                    booking.FullName = request.FullName;
-                }
 
                 bookingRepo.UpdateAsync(booking);
                 await _unitOfWork.CommitAsync();
