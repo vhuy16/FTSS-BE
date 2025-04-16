@@ -29,6 +29,7 @@ namespace FTSS_API.Payload.Response.Book
         public bool? IsAssigned { get; set; }
         public List<ServicePackageResponse> Services { get; set; } = new();
         public PaymentResponse Payment { get; set; } = new PaymentResponse();
+        public SetupPackageResponse? SetupPackage { get; set; } = new SetupPackageResponse();
     }
     public class ServicePackageResponse
     {
