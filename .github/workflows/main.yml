@@ -28,12 +28,10 @@ jobs:
     - name: Deploy via FTP
       uses: SamKirkland/FTP-Deploy-Action@4.3.0
       with:
-         server: ${{ secrets.FTP_HOST }} # Địa chỉ FTP
-         username: ${{ secrets.FTP_USERNAME }} # Tên người dùng FTP
-         password: ${{ secrets.FTP_PASSWORD }} # Mật khẩu FTP
-         local-dir: ./publish/
-         server-dir: / # Thư mục đích trên server
-         exclude: |
-          **/*.pdb   # Loại trừ file PDB (debug)
-          **/*.config # Nếu không muốn upload config file
-         log-level: verbose
+            server: ${{ secrets.FTP_HOST }}
+            username: ${{ secrets.FTP_USER }}
+            password: ${{ secrets.FTP_PASSWORD }}
+            secure: true  # Enable FTPS
+            local-dir: ./publish
+            server-dir: / # Thư mục đích trên server
+        
