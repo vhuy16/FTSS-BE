@@ -19,5 +19,9 @@ public partial class Category
 
     public string LinkImage { get; set; } = null!;
 
+    public bool? IsFishTank { get; set; }
+
+    public bool? IsObligatory { get; set; }
+
     public virtual ICollection<SubCategory> SubCategories { get; set; } = new List<SubCategory>();
 }

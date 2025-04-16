@@ -1229,7 +1229,7 @@ public async Task<ApiResponse> CreateReturnRequest(CreateReturnRequest request, 
             Status = ReturnRequestStatusEnum.PENDING.ToString(),
             CreatedAt = TimeUtils.GetCurrentSEATime(),
             IsDelete = false,
-            ReturnRequestMedia = new List<ReturnRequestMedia>()
+            ReturnRequestMedia = new List<ReturnRequestMedium>()
         };
 
         // Tạo danh sách media
@@ -1239,7 +1239,7 @@ public async Task<ApiResponse> CreateReturnRequest(CreateReturnRequest request, 
             var fileExtension = Path.GetExtension(file.FileName).ToLower();
             var mediaType = allowedImageExtensions.Contains(fileExtension) ? MediaType.IMAGE.ToString() : MediaType.VIDEO.ToString();
 
-            returnRequest.ReturnRequestMedia.Add(new ReturnRequestMedia
+            returnRequest.ReturnRequestMedia.Add(new ReturnRequestMedium
             {
                 Id = Guid.NewGuid(),
                 ReturnRequestId = returnRequest.Id,
