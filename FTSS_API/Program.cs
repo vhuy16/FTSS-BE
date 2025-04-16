@@ -65,7 +65,7 @@ builder.Services.AddCors(options =>
     options.AddPolicy(name: CorsConstant.PolicyName,
         policy =>
         {
-            policy.WithOrigins("http://localhost:3000", "https://localhost:44346", "https://ftss-fe.vercel.app")
+            policy.WithOrigins("http://localhost:3000", "https://localhost:44346", "https://ftss-fe.vercel.app", "https://ftss.id.vn")
                 .AllowAnyHeader()
                 .AllowAnyMethod()
                 .AllowCredentials();
@@ -125,22 +125,14 @@ builder.Services.AddAutoMapper(typeof(Program).Assembly);
 var app = builder.Build();
 
 // Configure the HTTP request pipeline
-if (app.Environment.IsDevelopment())
+if (app.Environment.IsDevelopment() || app.Environment.IsProduction() || app.Environment.IsStaging())
 {
-
+    app.UseSwagger();
     app.UseSwaggerUI();
-}
-else
-{
-    app.UseSwaggerUI(c =>
-    {
-        c.SwaggerEndpoint("/swagger/v1/swagger.json", "My API V1");
-        c.RoutePrefix = string.Empty;
-    });
 }
 
 app.UseMiddleware<ExceptionHandlingMiddleware>();
-app.UseSwagger();
+
 app.UseCors(CorsConstant.PolicyName);
 app.UseAuthentication();
 app.UseHttpsRedirection();
