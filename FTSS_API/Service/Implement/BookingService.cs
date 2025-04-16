@@ -416,17 +416,6 @@ namespace FTSS_API.Service.Implement
                     };
                 }
 
-                var currentSEATime = TimeUtils.GetCurrentSEATime();
-                if (request.ScheduleDate <= currentSEATime)
-                {
-                    return new ApiResponse
-                    {
-                        status = StatusCodes.Status400BadRequest.ToString(),
-                        message = "Ngày lịch trình phải sau thời gian hiện tại.",
-                        data = null
-                    };
-                }
-
                 // Kiểm tra đơn hàng có tồn tại và có trạng thái COMPLETED không
                 var order = await _unitOfWork.GetRepository<Order>().SingleOrDefaultAsync(
                     predicate: o => o.Id.Equals(request.OrderId) &&
@@ -463,6 +452,25 @@ namespace FTSS_API.Service.Implement
                     {
                         status = StatusCodes.Status400BadRequest.ToString(),
                         message = "Đơn hàng đã có thanh toán cho booking vào ngày này.",
+                        data = null
+                    };
+                }
+                // ✅ Không cho phép đặt mới nếu đã có booking với OrderId này mà chưa ở trạng thái DONE, CANCELLED hoặc MISSED
+                var existingBookings = await _unitOfWork.GetRepository<Booking>().GetListAsync(
+                    predicate: b => b.OrderId == request.OrderId &&
+                                    !new[] {
+                        BookingStatusEnum.DONE.ToString(),
+                        BookingStatusEnum.CANCELLED.ToString(),
+                        BookingStatusEnum.MISSED.ToString()
+                                    }.Contains(b.Status)
+                );
+
+                if (existingBookings.Any())
+                {
+                    return new ApiResponse
+                    {
+                        status = StatusCodes.Status400BadRequest.ToString(),
+                        message = "Bạn chỉ có thể đặt một lịch duy nhất cho mỗi đơn hàng. Vui lòng chờ đến khi lịch trình hiện tại hoàn tất hoặc bị hủy.",
                         data = null
                     };
                 }
@@ -921,15 +929,33 @@ namespace FTSS_API.Service.Implement
         {
             try
             {
-                var unavailableDates = await _unitOfWork.GetRepository<Mission>()
+                // Lấy số lượng kỹ thuật viên đang sẵn sàng (Available)
+                var technicianCount = await _unitOfWork.GetRepository<User>()
+                    .GetQueryable()
+                    .Where(u => u.Role == RoleEnum.Technician.ToString()
+                             && u.IsDelete == false
+                             && u.Status == UserStatusEnum.Available.GetDescriptionFromEnum())
+                    .CountAsync();
+
+                // Trạng thái booking cần lọc
+                var validStatuses = new[]
+                {
+            BookingStatusEnum.NOTASSIGN.ToString(),
+            BookingStatusEnum.ASSIGNED.ToString(),
+            BookingStatusEnum.PROCESSING.ToString()
+        };
+
+                // Lấy danh sách ngày từ các booking hợp lệ
+                var unavailableDates = await _unitOfWork.GetRepository<Booking>()
                     .GetListAsync(
-                        predicate: m => m.MissionSchedule != null && (m.IsDelete == false || m.IsDelete == null),
-                        selector: m => m.MissionSchedule.Value.Date
+                        predicate: b => b.ScheduleDate != null && validStatuses.Contains(b.Status),
+                        selector: b => b.ScheduleDate.Value.Date
                     );
 
+                // Nhóm theo ngày và lọc ra những ngày có số lượng lịch đặt >= số kỹ thuật viên
                 var groupedUnavailableDates = unavailableDates
                     .GroupBy(date => date)
-                    .Where(group => group.Count() >= 5)
+                    .Where(group => group.Count() >= technicianCount)
                     .Select(group => new GetDateUnavailableResponse { ScheduleDate = group.Key })
                     .ToList();
 
@@ -950,7 +976,6 @@ namespace FTSS_API.Service.Implement
                 };
             }
         }
-
         public async Task<ApiResponse> GetListBookingForManager(int pageNumber, int pageSize, string? status, string? paymentstatus, string? bookingcode, bool? isAscending, bool? isAssigned)
         {
             try
@@ -1291,17 +1316,28 @@ namespace FTSS_API.Service.Implement
                 SetupPackageResponse? setupPackage = null;
                 Guid? setupPackageId = null;
 
-                if (t.OrderId.HasValue && !t.BookingId.HasValue)
+                Guid? finalOrderId = t.OrderId;
+                string? orderCode = t.Order?.OrderCode;
+                DateTime? installationDate = t.Order?.InstallationDate;
+
+                if (t.BookingId.HasValue && !t.OrderId.HasValue)
                 {
-                    setupPackageId = t.Order?.SetupPackageId;
-                }
-                else if (t.BookingId.HasValue && !t.OrderId.HasValue)
-                {
-                    var booking = await _unitOfWork.GetRepository<Booking>().SingleOrDefaultAsync(
+                    var bookingWithOrder = await _unitOfWork.GetRepository<Booking>().SingleOrDefaultAsync(
                         predicate: b => b.Id == t.BookingId,
                         include: b => b.Include(bk => bk.Order)
                     );
-                    setupPackageId = booking?.Order?.SetupPackageId;
+
+                    if (bookingWithOrder?.Order != null)
+                    {
+                        finalOrderId = bookingWithOrder.Order.Id;
+                        orderCode = bookingWithOrder.Order.OrderCode;
+                        installationDate = bookingWithOrder.Order.InstallationDate;
+                        setupPackageId = bookingWithOrder.Order.SetupPackageId;
+                    }
+                }
+                else if (t.OrderId.HasValue)
+                {
+                    setupPackageId = t.Order?.SetupPackageId;
                 }
 
                 if (setupPackageId.HasValue)
@@ -1336,10 +1372,10 @@ namespace FTSS_API.Service.Implement
                                 IsDelete = spd.Product.IsDelete,
                                 CategoryName = spd.Product.SubCategory?.SubCategoryName ?? "Không rõ",
                                 images = spd.Product?.Images?
-                        .Where(img => img.IsDelete == false)
-                        .OrderBy(img => img.CreateDate)
-                        .Select(img => img.LinkImage)
-                        .FirstOrDefault() ?? "NoImageAvailable"
+                                    .Where(img => img.IsDelete == false)
+                                    .OrderBy(img => img.CreateDate)
+                                    .Select(img => img.LinkImage)
+                                    .FirstOrDefault() ?? "NoImageAvailable"
                             }).ToList()
                         };
                     }
@@ -1359,13 +1395,13 @@ namespace FTSS_API.Service.Implement
                     Address = t.Address,
                     PhoneNumber = t.PhoneNumber,
                     BookingId = t.BookingId,
-                    OrderId = t.OrderId,
+                    OrderId = finalOrderId, // ✅ Dữ liệu từ Order nếu có hoặc từ Booking nếu không có
                     BookingCode = t.Booking?.BookingCode,
                     BookingImage = t.Booking?.BookingImage,
-                    OrderCode = t.Order?.OrderCode,
-                    InstallationDate = t.Order?.InstallationDate,
+                    OrderCode = orderCode, // ✅
+                    InstallationDate = installationDate, // ✅
                     Services = servicePackages,
-                    SetupPackage = setupPackage!
+                    SetupPackage = setupPackage
                 });
             }
 
@@ -1618,27 +1654,28 @@ namespace FTSS_API.Service.Implement
             };
         }
 
-        // Validate reason khi trạng thái là Cancel
-        if (missionStatus == MissionStatusEnum.Cancel)
-        {
-            if (string.IsNullOrWhiteSpace(reason))
-            {
-                return new ApiResponse
+                // Validate reason khi trạng thái là Cancel và NotDone
+                if (missionStatus == MissionStatusEnum.Cancel || missionStatus == MissionStatusEnum.NotDone)
                 {
-                    status = StatusCodes.Status400BadRequest.ToString(),
-                    message = "Lý do hủy nhiệm vụ là bắt buộc khi trạng thái là Cancel.",
-                    data = null
-                };
-            }
-            mission.CancelReason = reason; // Lưu lý do hủy
-        }
-        else
-        {
-            mission.CancelReason = null; // Xóa lý do nếu trạng thái không phải Cancel
-        }
+                    if (string.IsNullOrWhiteSpace(reason))
+                    {
+                        return new ApiResponse
+                        {
+                            status = StatusCodes.Status400BadRequest.ToString(),
+                            message = "Lý do là bắt buộc khi trạng thái là Cancel hoặc NotDone.",
+                            data = null
+                        };
+                    }
+                    mission.CancelReason = reason;
+                }
+                else
+                {
+                    mission.CancelReason = null;
+                }
 
-        // Update images (logic giống UpdateProduct)
-        if (ImageLinks != null && ImageLinks.Any())
+
+                // Update images (logic giống UpdateProduct)
+                if (ImageLinks != null && ImageLinks.Any())
         {
             // Validate file ảnh
             if (ImageLinks.Any(file => file == null || file.Length == 0))
@@ -1692,6 +1729,7 @@ namespace FTSS_API.Service.Implement
                 MissionStatusEnum.Processing => OrderStatus.PENDING_DELIVERY.ToString(),
                 MissionStatusEnum.Done => OrderStatus.COMPLETED.ToString(),
                 MissionStatusEnum.Cancel => OrderStatus.CANCELLED.ToString(),
+                MissionStatusEnum.NotDone => OrderStatus.NOTDONE.ToString(),
                 _ => null
             };
 
@@ -1717,6 +1755,7 @@ namespace FTSS_API.Service.Implement
                 MissionStatusEnum.Processing => BookingStatusEnum.PROCESSING.ToString(),
                 MissionStatusEnum.Done => BookingStatusEnum.DONE.ToString(),
                 MissionStatusEnum.Cancel => BookingStatusEnum.MISSED.ToString(),
+                MissionStatusEnum.NotDone => BookingStatusEnum.NOTDONE.ToString(),
                 _ => null
             };
 
@@ -1817,11 +1856,12 @@ namespace FTSS_API.Service.Implement
 
                 // Chuẩn bị biến chứa SetupPackageResponse
                 SetupPackageResponse setupPackageResponse = null;
+                Order? orderInfo = null;
 
-                // Trường hợp 1: Có OrderId, không có BookingId → lấy setup từ Order trực tiếp
+                // Trường hợp 1: Có OrderId, không có BookingId → lấy Order trực tiếp
                 if (mission.OrderId.HasValue && !mission.BookingId.HasValue)
                 {
-                    var order = await _unitOfWork.GetRepository<Order>().SingleOrDefaultAsync(
+                    orderInfo = await _unitOfWork.GetRepository<Order>().SingleOrDefaultAsync(
                         predicate: o => o.Id == mission.OrderId,
                         include: o => o.Include(ord => ord.SetupPackage)
                                        .ThenInclude(sp => sp.SetupPackageDetails)
@@ -1833,9 +1873,9 @@ namespace FTSS_API.Service.Implement
                                                    .ThenInclude(sc => sc.Category)
                     );
 
-                    setupPackageResponse = GenerateSetupPackageResponse(order?.SetupPackage);
+                    setupPackageResponse = GenerateSetupPackageResponse(orderInfo?.SetupPackage);
                 }
-                // Trường hợp 2: Có BookingId, không có OrderId → lấy OrderId từ Booking
+                // Trường hợp 2: Có BookingId, không có OrderId → lấy Order từ Booking
                 else if (mission.BookingId.HasValue && !mission.OrderId.HasValue)
                 {
                     var booking = await _unitOfWork.GetRepository<Booking>().SingleOrDefaultAsync(
@@ -1852,7 +1892,8 @@ namespace FTSS_API.Service.Implement
                                                        .ThenInclude(sc => sc.Category)
                     );
 
-                    setupPackageResponse = GenerateSetupPackageResponse(booking?.Order?.SetupPackage);
+                    orderInfo = booking?.Order;
+                    setupPackageResponse = GenerateSetupPackageResponse(orderInfo?.SetupPackage);
                 }
 
                 // Lấy danh sách dịch vụ nếu có Booking
@@ -1885,9 +1926,11 @@ namespace FTSS_API.Service.Implement
                     Address = mission.Address,
                     PhoneNumber = mission.PhoneNumber,
                     BookingId = mission.BookingId,
-                    OrderId = mission.OrderId,
+                    OrderId = mission.OrderId ?? orderInfo?.Id,
                     BookingCode = mission.Booking?.BookingCode,
                     BookingImage = mission.Booking?.BookingImage,
+                    OrderCode = orderInfo?.OrderCode,
+                    InstallationDate = orderInfo?.InstallationDate,
                     Services = servicePackages,
                     SetupPackage = setupPackageResponse
                 };
@@ -2003,15 +2046,6 @@ namespace FTSS_API.Service.Implement
                 // Cập nhật các trường nếu được truyền
                 if (request.ScheduleDate.HasValue)
                 {
-                    if (request.ScheduleDate <= TimeUtils.GetCurrentSEATime())
-                    {
-                        return new ApiResponse
-                        {
-                            status = StatusCodes.Status400BadRequest.ToString(),
-                            message = "Ngày lịch trình phải sau thời gian hiện tại.",
-                            data = null
-                        };
-                    }
                     booking.ScheduleDate = request.ScheduleDate;
                 }
 
@@ -2035,10 +2069,6 @@ namespace FTSS_API.Service.Implement
                     booking.PhoneNumber = request.PhoneNumber;
                 }
 
-                if (!string.IsNullOrWhiteSpace(request.FullName))
-                {
-                    booking.FullName = request.FullName;
-                }
 
                 bookingRepo.UpdateAsync(booking);
                 await _unitOfWork.CommitAsync();
