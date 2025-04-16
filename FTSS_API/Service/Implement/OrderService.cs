@@ -659,6 +659,7 @@ public class OrderService : BaseService<OrderService>, IOrderService
                 ModifyDate = order.ModifyDate,
                 PhoneNumber = order.PhoneNumber,
                 BuyerName = order.RecipientName,
+                InstallationDate = order.InstallationDate,
 
                 SetupPackage = order.SetupPackage != null
                     ? new SetupPackageResponse()
@@ -964,6 +965,7 @@ public async Task<ApiResponse> GetAllOrder(int page, int size, string status, st
                 ModifyDate = order.ModifyDate,
                 PhoneNumber = order.PhoneNumber,
                 BuyerName = order.RecipientName,
+                InstallationDate = order.InstallationDate,
               
                 Voucher = order.Voucher != null ? new GetOrderResponse.VoucherResponse()
                 {

@@ -16,8 +16,9 @@ namespace FTSS_API.Payload.Response.Order
         public string? Address { get; set; }
         public string? PhoneNumber { get; set; }
         public string? BuyerName { get; set; }
-        
-  
+        public DateTime? InstallationDate { get; set; }
+
+
         public UserResponse userResponse { get; set; } // Fixed property declaration and removed invalid initialization
         public List<OrderDetailCreateResponse> OrderDetails { get; set; } = new List<OrderDetailCreateResponse>();
         public PaymentResponse Payment { get; set; } = new PaymentResponse();
