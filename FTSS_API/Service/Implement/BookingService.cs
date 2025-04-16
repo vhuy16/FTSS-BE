@@ -18,6 +18,7 @@ using System.Text.RegularExpressions;
 using FTSS_API.Payload.Request.Pay;
 using FTSS_API.Payload.Response.Pay.Payment;
 using Azure;
+using FTSS_API.Payload.Response.SetupPackage;
 using static FTSS_API.Payload.Response.Order.GetOrderResponse;
 
 namespace FTSS_API.Service.Implement
@@ -1616,102 +1617,151 @@ namespace FTSS_API.Service.Implement
                 .ToArray());
         }
 
-        public async Task<ApiResponse> GetMissionById(Guid missionid)
+    public async Task<ApiResponse> GetMissionById(Guid missionid)
+{
+    try
+    {
+        // Lấy mission với tất cả dữ liệu liên quan
+        var mission = await _unitOfWork.GetRepository<Mission>().SingleOrDefaultAsync(
+            predicate: m => m.Id == missionid && (m.IsDelete == false || m.IsDelete == null),
+            include: m => m.Include(x => x.Booking)
+                           .ThenInclude(b => b.BookingDetails)
+                           .ThenInclude(bd => bd.ServicePackage)
+                           .Include(x => x.Order)
+                           .ThenInclude(o => o.SetupPackage)
+                           .ThenInclude(sp => sp.SetupPackageDetails)
+                           .ThenInclude(spd => spd.Product)
+                           .ThenInclude(p => p.SubCategory)
+                           .ThenInclude(sc => sc.Category)
+                           .Include(x => x.Order)
+                           .ThenInclude(o => o.SetupPackage)
+                           .ThenInclude(sp => sp.SetupPackageDetails)
+                           .ThenInclude(spd => spd.Product)
+                           .ThenInclude(p => p.Images)
+                           .Include(x => x.User)
+        );
+
+        if (mission == null)
         {
-            try
+            return new ApiResponse
             {
-                // Tìm mission theo ID, include tất cả các dữ liệu liên quan
-                var mission = await _unitOfWork.GetRepository<Mission>().SingleOrDefaultAsync(
-                    predicate: m => m.Id == missionid && (m.IsDelete == false || m.IsDelete == null),
-                    include: m => m.Include(x => x.Booking)
-                                   .ThenInclude(b => b.BookingDetails)
-                                       .ThenInclude(d => d.ServicePackage)
-                                   .Include(x => x.Order)
-                                   .Include(x => x.User)
-                );
+                status = StatusCodes.Status404NotFound.ToString(),
+                message = "Không tìm thấy nhiệm vụ.",
+                data = null
+            };
+        }
 
-                if (mission == null)
-                {
-                    return new ApiResponse
-                    {
-                        status = StatusCodes.Status404NotFound.ToString(),
-                        message = "Không tìm thấy nhiệm vụ.",
-                        data = null
-                    };
-                }
+        // Xác định FullName
+        string fullName = "Không xác định";
+        if (mission.BookingId.HasValue && !mission.OrderId.HasValue)
+        {
+            var bookingUser = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
+                predicate: u => u.Id == mission.Booking!.UserId
+            );
+            fullName = bookingUser?.FullName ?? fullName;
+        }
+        else if (mission.OrderId.HasValue && !mission.BookingId.HasValue)
+        {
+            fullName = mission.Order?.RecipientName ?? fullName;
+        }
+        else if (mission.User != null)
+        {
+            fullName = mission.User.FullName;
+        }
 
-                // Lấy full name từ Booking, Order hoặc Mission.User
-                string fullName = "Không xác định";
-                if (mission.BookingId.HasValue && !mission.OrderId.HasValue)
-                {
-                    var bookingUser = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
-                        predicate: u => u.Id == mission.Booking!.UserId
-                    );
-                    fullName = bookingUser?.FullName ?? fullName;
-                }
-                else if (mission.OrderId.HasValue && !mission.BookingId.HasValue)
-                {
-                    fullName = mission.Order?.RecipientName ?? fullName;
-                }
-                else if (mission.User != null)
-                {
-                    fullName = mission.User.FullName;
-                }
-
-                // Lấy danh sách dịch vụ từ Booking
-                var servicePackages = new List<ServicePackageResponse>();
-                if (mission.Booking != null)
-                {
-                    foreach (var detail in mission.Booking.BookingDetails)
-                    {
-                        servicePackages.Add(new ServicePackageResponse
-                        {
-                            Id = detail.ServicePackage.Id,
-                            ServiceName = detail.ServicePackage.ServiceName,
-                            Price = detail.ServicePackage.Price
-                        });
-                    }
-                }
-
-                var response = new GetListTaskTechResponse
-                {
-                    Id = mission.Id,
-                    MissionName = mission.MissionName,
-                    MissionDescription = mission.MissionDescription,
-                    Status = mission.Status,
-                    IsDelete = mission.IsDelete,
-                    MissionSchedule = mission.MissionSchedule,
-                    EndMissionSchedule = mission.EndMissionSchedule,
-                    CancelReason = mission.CancelReason,
-                    FullName = fullName,
-                    Address = mission.Address,
-                    PhoneNumber = mission.PhoneNumber,
-                    BookingId = mission.BookingId,
-                    OrderId = mission.OrderId,
-                    BookingCode = mission.Booking?.BookingCode,
-                    BookingImage = mission.Booking?.BookingImage,
-                    OrderCode = mission.Order?.OrderCode,
-                    InstallationDate = mission.Order?.InstallationDate,
-                    Services = servicePackages
-                };
-
-                return new ApiResponse
-                {
-                    status = StatusCodes.Status200OK.ToString(),
-                    message = "Lấy thông tin nhiệm vụ thành công.",
-                    data = response
-                };
-            }
-            catch (Exception ex)
+        // Tạo SetupPackageResponse nếu Order tồn tại
+        SetupPackageResponse setupPackageResponse = null;
+        if (mission.OrderId.HasValue && mission.Order?.SetupPackage != null)
+        {
+            var setupPackage = mission.Order.SetupPackage;
+            setupPackageResponse = new SetupPackageResponse
             {
-                return new ApiResponse
+                SetupPackageId = setupPackage.Id,
+                SetupName = setupPackage.SetupName,
+                ModifyDate = setupPackage.ModifyDate,
+                Size = setupPackage.SetupPackageDetails?
+                    .Where(spd => spd.Product?.SubCategory?.Category?.CategoryName == "Bể")
+                    .Select(spd => spd.Product?.Size)
+                    .FirstOrDefault(),
+                CreateDate = setupPackage.CreateDate,
+                TotalPrice = setupPackage.Price ?? 0,
+                Description = setupPackage.Description ?? "N/A",
+                IsDelete = setupPackage.IsDelete ?? false,
+                Products = setupPackage.SetupPackageDetails?.Select(spd => new ProductResponse
                 {
-                    status = StatusCodes.Status500InternalServerError.ToString(),
-                    message = "Đã xảy ra lỗi khi lấy thông tin nhiệm vụ.",
-                    data = ex.Message
-                };
+                    Id = spd.Product?.Id ?? Guid.Empty,
+                    ProductName = spd.Product?.ProductName ?? "Unknown",
+                    Quantity = spd.Quantity,
+                    Price = spd.Product?.Price ?? 0,
+                    InventoryQuantity = spd.Product?.Quantity ?? 0,
+                    Status = spd.Product != null ? spd.Product.Status : "false",
+                    IsDelete = setupPackage.IsDelete ?? false,
+                    CategoryName = spd.Product?.SubCategory?.Category?.CategoryName ?? "Unknown",
+                    images = spd.Product?.Images?
+                        .Where(img => img.IsDelete == false)
+                        .OrderBy(img => img.CreateDate)
+                        .Select(img => img.LinkImage)
+                        .FirstOrDefault() ?? "NoImageAvailable"
+                }).ToList() ?? new List<ProductResponse>()
+            };
+        }
+
+        // Lấy danh sách dịch vụ từ Booking nếu có
+        var servicePackages = new List<ServicePackageResponse>();
+        if (mission.Booking != null)
+        {
+            foreach (var detail in mission.Booking.BookingDetails)
+            {
+                servicePackages.Add(new ServicePackageResponse
+                {
+                    Id = detail.ServicePackage.Id,
+                    ServiceName = detail.ServicePackage.ServiceName,
+                    Price = detail.ServicePackage.Price
+                });
             }
         }
+
+        // Tạo phản hồi với đầy đủ thông tin
+        var response = new GetListTaskTechResponse
+        {
+            Id = mission.Id,
+            MissionName = mission.MissionName,
+            MissionDescription = mission.MissionDescription,
+            Status = mission.Status,
+            IsDelete = mission.IsDelete,
+            MissionSchedule = mission.MissionSchedule,
+            EndMissionSchedule = mission.EndMissionSchedule,
+            CancelReason = mission.CancelReason,
+            FullName = fullName,
+            Address = mission.Address,
+            PhoneNumber = mission.PhoneNumber,
+            BookingId = mission.BookingId,
+            OrderId = mission.OrderId,
+            BookingCode = mission.Booking?.BookingCode,
+            BookingImage = mission.Booking?.BookingImage,
+            OrderCode = mission.Order?.OrderCode,
+            InstallationDate = mission.Order?.InstallationDate,
+            Services = servicePackages,
+            SetupPackage = setupPackageResponse
+        };
+
+        return new ApiResponse
+        {
+            status = StatusCodes.Status200OK.ToString(),
+            message = "Lấy thông tin nhiệm vụ thành công.",
+            data = response
+        };
+    }
+    catch (Exception ex)
+    {
+        return new ApiResponse
+        {
+            status = StatusCodes.Status500InternalServerError.ToString(),
+            message = "Đã xảy ra lỗi khi lấy thông tin nhiệm vụ.",
+            data = ex.Message
+        };
+    }
+}
         public async Task<ApiResponse> UpdateBooking(Guid bookingId, UpdateBookingRequest request)
         {
             try

@@ -47,6 +47,8 @@ public partial class Order
 
     public virtual ICollection<Payment> Payments { get; set; } = new List<Payment>();
 
+    public virtual ICollection<ReturnRequest> ReturnRequests { get; set; } = new List<ReturnRequest>();
+
     public virtual SetupPackage? SetupPackage { get; set; }
 
     public virtual User? User { get; set; }

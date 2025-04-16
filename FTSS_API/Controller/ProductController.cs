@@ -212,7 +212,7 @@ public class ProductController : BaseController<ProductController>
     /// </summary>
     /// <param name="id">ID sản phẩm cần xóa.</param>
     /// <returns>Kết quả xóa sản phẩm.</returns>
-    [HttpDelete(ApiEndPointConstant.Product.UpdateProduct)]
+    [HttpDelete(ApiEndPointConstant.Product.DeleteProduct)]
     [ProducesResponseType(typeof(bool), StatusCodes.Status200OK)]
     [ProducesErrorResponseType(typeof(ProblemDetails))]
     public async Task<IActionResult> DeleteProduct([FromRoute] Guid id)
@@ -246,4 +246,26 @@ public class ProductController : BaseController<ProductController>
 
         return StatusCode(int.Parse(response.status), response);
     }
+    [HttpGet("proxy-image")]
+    [ProducesResponseType(typeof(FileResult), StatusCodes.Status200OK)]
+    [ProducesErrorResponseType(typeof(ProblemDetails))]
+    public async Task<IActionResult> ProxyImage([FromQuery] string url)
+    {
+        try
+        {
+            using var httpClient = new HttpClient();
+            var imageBytes = await httpClient.GetByteArrayAsync(url);
+
+            // Optional: lấy mime type nếu muốn, hoặc default về image/jpeg
+            var contentType = "image/jpeg";
+
+            return File(imageBytes, contentType);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to fetch image from url {Url}", url);
+            return Problem($"Cannot fetch image from url: {url}");
+        }
+    }
+
 }

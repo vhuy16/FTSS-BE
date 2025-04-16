@@ -7,6 +7,7 @@ using FTSS_API.Constant;
 using FTSS_API.Payload;
 using FTSS_API.Payload.Request;
 using FTSS_API.Payload.Request.Pay;
+using FTSS_API.Payload.Request.Return;
 using FTSS_API.Payload.Response.Order;
 using FTSS_API.Payload.Response.Pay.Payment;
 using FTSS_API.Payload.Response.SetupPackage;
@@ -18,8 +19,10 @@ using FTSS_Model.Entities;
 using FTSS_Model.Enum;
 using FTSS_Repository.Interface;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc.Formatters;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using MediaType = FTSS_Model.Enum.MediaType;
 
 namespace FTSS_API.Service.Implement;
 
@@ -27,224 +30,20 @@ public class OrderService : BaseService<OrderService>, IOrderService
 {
     private readonly Lazy<IPaymentService> _paymentService;
     private readonly IEmailSender _emailSender;
+    private readonly SupabaseUltils _supabaseImageService;
 
     public OrderService(IUnitOfWork<MyDbContext> unitOfWork, ILogger<OrderService> logger, IMapper mapper,
         Lazy<IPaymentService> paymentService,
         IEmailSender emailSender,
+        SupabaseUltils supabaseImageService,
         IHttpContextAccessor httpContextAccessor) : base(unitOfWork, logger, mapper, httpContextAccessor)
     {
         _paymentService = paymentService;
         _emailSender = emailSender;
+        _supabaseImageService = supabaseImageService;
     }
 
-    // public async Task<ApiResponse> CreateOrder(CreateOrderRequest createOrderRequest)
-    // {
-    //     Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
-    //     if (userId == null)
-    //     {
-    //         throw new BadHttpRequestException("User ID cannot be null.");
-    //     }
-    //
-    //     // Validate if the CartItem list is empty
-    //     if (createOrderRequest.CartItem == null || !createOrderRequest.CartItem.Any())
-    //     {
-    //         return new ApiResponse()
-    //         {
-    //             status = StatusCodes.Status400BadRequest.ToString(),
-    //             message = "No Cart Items provided. Please add items to your cart before placing an order.",
-    //             data = null
-    //         };
-    //     }
-    //
-    //     try
-    //     {
-    //         var cart = await _unitOfWork.GetRepository<Cart>()
-    //             .SingleOrDefaultAsync(predicate: p => p.UserId.Equals(userId),
-    //                 include: query => query.Include(c => c.User));
-    //         var cartItems = new List<CartItem>();
-    //         foreach (var cartItemId in createOrderRequest.CartItem)
-    //         {
-    //             var cartItem = await _unitOfWork.GetRepository<CartItem>().SingleOrDefaultAsync(predicate: p =>
-    //                 p.CartId.Equals(cart.Id)
-    //                 && p.Id.Equals(cartItemId)
-    //                 && p.Status.Equals(CartEnum.Available.GetDescriptionFromEnum()));
-    //             if (cartItem != null)
-    //             {
-    //                 cartItems.Add(cartItem);
-    //             }
-    //         }
-    //
-    //         if (cartItems.Count == 0)
-    //         {
-    //             return new ApiResponse()
-    //             {
-    //                 status = StatusCodes.Status400BadRequest.ToString(),
-    //                 message = "None of the Cart Items are available for checkout. Please verify your cart.",
-    //                 data = null
-    //             };
-    //         }
-    //
-    //         decimal totalprice = 0;
-    //         if (cartItems.Count == 0)
-    //         {
-    //             return new ApiResponse()
-    //             {
-    //                 status = StatusCodes.Status404NotFound.ToString(),
-    //                 message = MessageConstant.CartMessage.CartItemIsEmpty,
-    //                 data = null
-    //             };
-    //         }
-    //
-    //         Order order = new Order
-    //         {
-    //             Id = Guid.NewGuid(),
-    //             TotalPrice = 0,
-    //             CreateDate = TimeUtils.GetCurrentSEATime(),
-    //             UserId = userId,
-    //             Status = OrderStatus.PENDING_PAYMENT.GetDescriptionFromEnum(),
-    //             Address = createOrderRequest.Address,
-    //             Shipcost = createOrderRequest.ShipCost,
-    //             OrderDetails = new List<OrderDetail>()
-    //         };
-    //
-    //         // Add Order details to the order
-    //         foreach (var cartItem in cartItems)
-    //         {
-    //             var product = await _unitOfWork.GetRepository<Product>().SingleOrDefaultAsync(
-    //                 predicate: p => p.Id.Equals(cartItem.ProductId));
-    //             totalprice += cartItem.Quantity * (int)product.Price;
-    //             var newOrderDetail = new OrderDetail
-    //             {
-    //                 Id = Guid.NewGuid(),
-    //                 OrderId = order.Id,
-    //                 ProductId = product.Id,
-    //                 Quantity = cartItem.Quantity,
-    //                 Price = product.Price,
-    //             };
-    //             order.OrderDetails.Add(newOrderDetail);
-    //             await _unitOfWork.GetRepository<OrderDetail>().InsertAsync(newOrderDetail);
-    //         }
-    //
-    //         order.TotalPrice = totalprice + createOrderRequest.ShipCost;
-    //
-    //         // Insert the Order into the database
-    //         await _unitOfWork.GetRepository<Order>().InsertAsync(order);
-    //         bool isSuccessOrder = await _unitOfWork.CommitAsync() > 0;
-    //         if (!isSuccessOrder)
-    //         {
-    //             return new ApiResponse()
-    //             {
-    //                 status = StatusCodes.Status400BadRequest.ToString(),
-    //                 message = MessageConstant.OrderMessage.CreateOrderFail,
-    //                 data = null
-    //             };
-    //         }
-    //
-    //         // Delete CartItems with status "buyed"
-    //         foreach (var cartItem in cartItems)
-    //         {
-    //             _unitOfWork.GetRepository<CartItem>().DeleteAsync(cartItem);
-    //         }
-    //
-    //         await _unitOfWork.CommitAsync(); // Commit after deletion
-    //
-    //         // Prepare response
-    //         var orderDetailsResponse = new List<CreateOrderResponse.OrderDetailCreateResponse>();
-    //         foreach (var od in order.OrderDetails)
-    //         {
-    //             var product = await _unitOfWork.GetRepository<Product>().SingleOrDefaultAsync(
-    //                 predicate: p => p.Id.Equals(od.ProductId));
-    //             if (product != null)
-    //             {
-    //                 orderDetailsResponse.Add(new CreateOrderResponse.OrderDetailCreateResponse
-    //                 {
-    //                     Price = od.Price,
-    //                     ProductName = product.ProductName,
-    //                     Quantity = od.Quantity
-    //                 });
-    //             }
-    //         }
-    //
-    //         order = await _unitOfWork.GetRepository<Order>()
-    //             .SingleOrDefaultAsync(predicate: p => p.Id.Equals(order.Id),
-    //                 include: query => query.Include(o => o.User));
-    //
-    //         // Check if order or user is still null
-    //
-    //         if (order == null || order.User == null)
-    //         {
-    //             throw new Exception("Order or User information is missing.");
-    //         }
-    //
-    //         if (string.IsNullOrEmpty(order.User.UserName) || string.IsNullOrEmpty(order.User.Email))
-    //         {
-    //             throw new Exception("User name or email is missing.");
-    //         }
-    //
-    //         // if (order.ShipCost == null)
-    //         // {
-    //         //     throw new Exception("Ship cost is missing.");
-    //         // }
-    //         //
-    //         // if (string.IsNullOrEmpty(order.Address))
-    //         // {
-    //         //     throw new Exception("Order address is missing.");
-    //         // }
-    //
-    //         CreateOrderResponse createOrderResponse = new CreateOrderResponse
-    //         {
-    //             Id = order.Id,
-    //             OrderDetails = orderDetailsResponse,
-    //             ShipCost = createOrderRequest.ShipCost,
-    //             TotalPrice = order.TotalPrice,
-    //             Address = order.Address,
-    //             userResponse = new CreateOrderResponse.UserResponse
-    //             {
-    //                 Name = order.User.UserName,
-    //                 Email = order.User.Email,
-    //                 PhoneNumber = order.User.PhoneNumber
-    //             }
-    //         };
-    //
-    //         return new ApiResponse()
-    //         {
-    //             status = StatusCodes.Status200OK.ToString(),
-    //             message = MessageConstant.OrderMessage.CreateOrderSuccess,
-    //             data = createOrderResponse
-    //         };
-    //     }
-    //     catch (DbUpdateConcurrencyException ex)
-    //     {
-    //         foreach (var entry in ex.Entries)
-    //         {
-    //             if (entry.Entity is Order)
-    //             {
-    //                 var databaseValues = entry.GetDatabaseValues();
-    //                 if (databaseValues == null)
-    //                 {
-    //                     throw new BadHttpRequestException("The order was deleted by another user.");
-    //                 }
-    //
-    //                 throw new BadHttpRequestException(
-    //                     "The order was updated by another user. Please refresh and try again.");
-    //             }
-    //             else if (entry.Entity is OrderDetail)
-    //             {
-    //                 throw new BadHttpRequestException("Concurrency conflict occurred for OrderDetail.");
-    //             }
-    //         }
-    //
-    //         throw;
-    //     }
-    //     catch (BadHttpRequestException)
-    //     {
-    //         throw;
-    //     }
-    //     catch (Exception ex)
-    //     {
-    //         throw new BadHttpRequestException("An unexpected error occurred while creating the order.", ex);
-    //     }
-    // }
+
     public async Task<ApiResponse> CreateOrder(CreateOrderRequest createOrderRequest)
     {
          Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
@@ -737,6 +536,12 @@ public class OrderService : BaseService<OrderService>, IOrderService
                     var email = order.User.Email;
                     await _emailSender.SendRefundNotificationEmailAsync(email, emailBody);
                 }
+                else if (updateOrderRequest.Status == OrderStatus.RETURN_ACCEPTED.ToString())
+                {
+                    string returnEmailBody = EmailTemplatesUtils.ReturnAcceptedEmailTemplate(order.Id, order.OrderCode);
+                    var customerEmail = order.User.Email;
+                    await _emailSender.SendReturnAcceptedEmailAsync(customerEmail, returnEmailBody);
+                }
 
                 order.Status = updateOrderRequest.Status;
                 order.ModifyDate = DateTime.Now;
@@ -1095,6 +900,8 @@ public async Task<ApiResponse> GetAllOrder(int page, int size, string status, st
                 .Include(o => o.User)
                 .Include(o => o.Voucher)
                 .Include(o => o.Payments)
+                .Include(o => o.ReturnRequests)
+                .ThenInclude(rr => rr.ReturnRequestMedia)
                 .Include(o => o.OrderDetails)
                 .ThenInclude(od => od.Product)
                 .ThenInclude(p => p.SubCategory) // Bao gồm SubCategory
@@ -1210,6 +1017,20 @@ public async Task<ApiResponse> GetAllOrder(int page, int size, string status, st
                     Email = order.User?.Email,
                     PhoneNumber = order.User?.PhoneNumber
                 },
+                ReturnRequests  = order.ReturnRequests?.Where(rr => rr.IsDelete == false).Select(rr => new GetOrderResponse.ReturnRequestResponse
+                {
+                    Id = rr.Id,
+                    Reason = rr.Reason,
+                    Status = rr.Status,
+                    CreatedAt = rr.CreatedAt,
+                    MediaFiles = rr.ReturnRequestMedia?.Where(m => m.IsDelete == false).Select(m => new GetOrderResponse.ReturnRequestMediaResponse
+                    {
+                        Id = m.Id,
+                        MediaLink = m.MediaLink,
+                        MediaType = m.MediaType
+                    }).ToList() ?? new List<GetOrderResponse.ReturnRequestMediaResponse>()
+                }).ToList() ?? new List<GetOrderResponse.ReturnRequestResponse>(),
+
                 OrderDetails = order.OrderDetails.Select(od => new GetOrderResponse.OrderDetailCreateResponse
                 {
                     ProductName = od.Product.ProductName,
@@ -1239,8 +1060,428 @@ public async Task<ApiResponse> GetAllOrder(int page, int size, string status, st
             };
         }
     }
+public async Task<ApiResponse> CreateReturnRequest(CreateReturnRequest request, Supabase.Client client)
+{
+    try
+    {
+        // Kiểm tra người dùng
+        Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
+        var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
+            predicate: u => u.Id.Equals(userId) &&
+                           u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) &&
+                           u.IsDelete == false &&
+                           u.Role.Equals(RoleEnum.Customer.GetDescriptionFromEnum()));
 
-    #region tạo orderCode
+        if (user == null)
+        {
+            return new ApiResponse
+            {
+                status = StatusCodes.Status403Forbidden.ToString(),
+                message = "Bạn không có quyền thực hiện thao tác này. Chỉ khách hàng mới có thể gửi yêu cầu hoàn hàng.",
+                data = null
+            };
+        }
+
+        // Kiểm tra đơn hàng
+        var order = await _unitOfWork.GetRepository<Order>().SingleOrDefaultAsync(
+            predicate: o => o.Id == request.OrderId && o.IsDelete == false,
+            include: query => query.Include(o => o.Payments));
+
+        if (order == null)
+        {
+            return new ApiResponse
+            {
+                status = StatusCodes.Status404NotFound.ToString(),
+                message = "Không tìm thấy đơn hàng hoặc đơn hàng đã bị xóa.",
+                data = null
+            };
+        }
+
+        // Kiểm tra đơn hàng thuộc về người dùng
+        if (order.UserId != userId)
+        {
+            return new ApiResponse
+            {
+                status = StatusCodes.Status403Forbidden.ToString(),
+                message = "Bạn không có quyền gửi yêu cầu hoàn hàng cho đơn hàng này.",
+                data = null
+            };
+        }
+
+        // Kiểm tra trạng thái thanh toán và trạng thái đơn hàng
+        var payment = order.Payments?.FirstOrDefault();
+        if (payment == null || payment.PaymentStatus != PaymentStatusEnum.Completed.ToString())
+        {
+            return new ApiResponse
+            {
+                status = StatusCodes.Status400BadRequest.ToString(),
+                message = "Đơn hàng chưa được thanh toán hoàn tất. Trạng thái thanh toán phải là 'completed' để gửi yêu cầu hoàn hàng.",
+                data = null
+            };
+        }
+
+        if (order.Status != OrderStatus.COMPLETED.ToString())
+        {
+            return new ApiResponse
+            {
+                status = StatusCodes.Status400BadRequest.ToString(),
+                message = "Đơn hàng chưa hoàn tất giao hàng. Trạng thái đơn hàng phải là 'completed' để gửi yêu cầu hoàn hàng.",
+                data = null
+            };
+        }
+
+        // Kiểm tra xem đã có yêu cầu hoàn hàng nào cho đơn hàng này chưa
+        var existingRequest = await _unitOfWork.GetRepository<ReturnRequest>().SingleOrDefaultAsync(
+            predicate: r => r.OrderId == request.OrderId && r.IsDelete == false);
+
+        if (existingRequest != null && existingRequest.Status == ReturnRequestStatusEnum.PENDING.ToString())
+        {
+            return new ApiResponse
+            {
+                status = StatusCodes.Status400BadRequest.ToString(),
+                message = "Đã có một yêu cầu hoàn hàng đang chờ xử lý cho đơn hàng này.",
+                data = null
+            };
+        }
+
+        // Kiểm tra lý do
+        if (string.IsNullOrWhiteSpace(request.Reason) || request.Reason.Length < 10)
+        {
+            return new ApiResponse
+            {
+                status = StatusCodes.Status400BadRequest.ToString(),
+                message = "Lý do hoàn hàng phải có ít nhất 10 ký tự.",
+                data = null
+            };
+        }
+
+        // Kiểm tra và tải file ảnh/video lên Supabase
+        if (request.MediaFiles == null || !request.MediaFiles.Any())
+        {
+            return new ApiResponse
+            {
+                status = StatusCodes.Status400BadRequest.ToString(),
+                message = "Cần cung cấp ít nhất một ảnh hoặc video minh chứng.",
+                data = null
+            };
+        }
+
+        // Validate định dạng file
+        var allowedImageExtensions = new[] { ".jpg", ".jpeg", ".png" };
+        var allowedVideoExtensions = new[] { ".mp4", ".mov", ".avi" };
+        var maxFileSize = 50 * 1024 * 1024; // 50MB
+
+        foreach (var file in request.MediaFiles)
+        {
+            if (file.Length == 0)
+            {
+                return new ApiResponse
+                {
+                    status = StatusCodes.Status400BadRequest.ToString(),
+                    message = "Một hoặc nhiều file rỗng. Vui lòng kiểm tra lại.",
+                    data = null
+                };
+            }
+
+            if (file.Length > maxFileSize)
+            {
+                return new ApiResponse
+                {
+                    status = StatusCodes.Status400BadRequest.ToString(),
+                    message = "Kích thước file không được vượt quá 50MB.",
+                    data = null
+                };
+            }
+
+            var fileExtension = Path.GetExtension(file.FileName).ToLower();
+            if (!allowedImageExtensions.Contains(fileExtension) && !allowedVideoExtensions.Contains(fileExtension))
+            {
+                return new ApiResponse
+                {
+                    status = StatusCodes.Status400BadRequest.ToString(),
+                    message = "Định dạng file không được hỗ trợ. Chỉ chấp nhận ảnh (JPG, JPEG, PNG) hoặc video (MP4, MOV, AVI).",
+                    data = null
+                };
+            }
+        }
+
+        // Tải các file lên Supabase
+        var mediaUrls = await _supabaseImageService.SendImagesAsync(request.MediaFiles, client);
+        if (mediaUrls == null || mediaUrls.Count != request.MediaFiles.Count)
+        {
+            return new ApiResponse
+            {
+                status = StatusCodes.Status500InternalServerError.ToString(),
+                message = "Không thể tải một hoặc nhiều file lên. Vui lòng thử lại.",
+                data = null
+            };
+        }
+
+        // Tạo yêu cầu hoàn hàng mới
+        var returnRequest = new ReturnRequest
+        {
+            Id = Guid.NewGuid(),
+            OrderId = request.OrderId,
+            UserId = userId.Value,
+            Reason = request.Reason,
+            Status = ReturnRequestStatusEnum.PENDING.ToString(),
+            CreatedAt = TimeUtils.GetCurrentSEATime(),
+            IsDelete = false,
+            ReturnRequestMedia = new List<ReturnRequestMedia>()
+        };
+
+        // Tạo danh sách media
+        for (int i = 0; i < request.MediaFiles.Count; i++)
+        {
+            var file = request.MediaFiles[i];
+            var fileExtension = Path.GetExtension(file.FileName).ToLower();
+            var mediaType = allowedImageExtensions.Contains(fileExtension) ? MediaType.IMAGE.ToString() : MediaType.VIDEO.ToString();
+
+            returnRequest.ReturnRequestMedia.Add(new ReturnRequestMedia
+            {
+                Id = Guid.NewGuid(),
+                ReturnRequestId = returnRequest.Id,
+                MediaLink = mediaUrls[i],
+                MediaType = mediaType,
+                CreatedAt = TimeUtils.GetCurrentSEATime(),
+                IsDelete = false
+            });
+        }
+
+        await _unitOfWork.GetRepository<ReturnRequest>().InsertAsync(returnRequest);
+        order.Status = OrderStatus.RETURNING.ToString();
+         _unitOfWork.GetRepository<Order>().UpdateAsync(order);
+        // Lưu thay đổi
+        bool isSuccess = await _unitOfWork.CommitAsync() > 0;
+        if (!isSuccess)
+        {
+            return new ApiResponse
+            {
+                status = StatusCodes.Status500InternalServerError.ToString(),
+                message = "Không thể lưu yêu cầu hoàn hàng. Vui lòng thử lại.",
+                data = null
+            };
+        }
+
+        // Gửi email thông báo cho manager
+        var managers = await _unitOfWork.GetRepository<User>().GetListAsync(
+            predicate: u => u.Role.Equals(RoleEnum.Manager.GetDescriptionFromEnum()) &&
+                           u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) &&
+                           u.IsDelete == false);
+
+        foreach (var manager in managers)
+        {
+            if (!string.IsNullOrEmpty(manager.Email))
+            {
+                // Tạo danh sách liên kết ảnh/video trong email
+                var mediaLinksHtml = string.Join("", returnRequest.ReturnRequestMedia.Select(m => 
+                    $"<p>{m.MediaType}: <a href='{m.MediaLink}'>Xem {m.MediaType.ToLower()}</a></p>"));
+
+                string emailBody = $@"<h1>Thông Báo Yêu Cầu Hoàn Hàng</h1>
+                                     <p>Khách hàng {user.UserName} đã gửi một yêu cầu hoàn hàng cho đơn hàng mã {order.OrderCode} (ID: {order.Id}).</p>
+                                     <p>Lý do: {request.Reason}</p>
+                                     <p>Minh chứng:</p>
+                                     {mediaLinksHtml}
+                                     <p>Vui lòng xem xét và xử lý yêu cầu.</p>";
+                await _emailSender.SendRefundNotificationEmailAsync(manager.Email, emailBody);
+            }
+        }
+
+        return new ApiResponse
+        {
+            status = StatusCodes.Status201Created.ToString(),
+            message = "Yêu cầu hoàn hàng đã được gửi thành công. Manager sẽ xem xét yêu cầu của bạn.",
+            data = new
+            {
+                ReturnRequestId = returnRequest.Id,
+                OrderId = returnRequest.OrderId,
+                Reason = returnRequest.Reason,
+                Status = returnRequest.Status,
+                CreatedAt = returnRequest.CreatedAt,
+                Media = returnRequest.ReturnRequestMedia.Select(m => new
+                {
+                    MediaLink = m.MediaLink,
+                    MediaType = m.MediaType
+                }).ToList()
+            }
+        };
+    }
+    catch (Exception ex)
+    {
+        return new ApiResponse
+        {
+            status = StatusCodes.Status500InternalServerError.ToString(),
+            message = $"Đã xảy ra lỗi khi gửi yêu cầu hoàn hàng: {ex.Message}",
+            data = null
+        };
+    }
+}
+
+public async Task<ApiResponse> GetReturnRequest(Guid? returnRequestId, Supabase.Client client, int page, int size)
+{
+   
+
+    try
+    {
+        // Kiểm tra người dùng
+        Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
+        var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
+            predicate: u => u.Id.Equals(userId) &&
+                            u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) &&
+                            u.IsDelete == false);
+
+        if (user == null)
+        {
+            return new ApiResponse
+            {
+                status = StatusCodes.Status403Forbidden.ToString(),
+                message = "Bạn không có quyền thực hiện thao tác này.",
+                data = null
+            };
+        }
+
+        bool isCustomer = user.Role.Equals(RoleEnum.Customer.GetDescriptionFromEnum());
+        bool isManager = user.Role.Equals(RoleEnum.Manager.GetDescriptionFromEnum());
+
+        if (!isCustomer && !isManager)
+        {
+            return new ApiResponse
+            {
+                status = StatusCodes.Status403Forbidden.ToString(),
+                message = "Chỉ khách hàng hoặc quản lý mới có thể xem yêu cầu hoàn hàng.",
+                data = null
+            };
+        }
+
+        // Nếu có returnRequestId, lấy chi tiết một yêu cầu hoàn hàng
+        if (returnRequestId.HasValue)
+        {
+            var returnRequest = await _unitOfWork.GetRepository<ReturnRequest>().SingleOrDefaultAsync(
+                predicate: r => r.Id == returnRequestId && r.IsDelete == false,
+                include: query => query
+                    .Include(r => r.Order)
+                    .Include(r => r.ReturnRequestMedia.Where(m => m.IsDelete == false)));
+
+            if (returnRequest == null)
+            {
+                return new ApiResponse
+                {
+                    status = StatusCodes.Status404NotFound.ToString(),
+                    message = "Không tìm thấy yêu cầu hoàn hàng hoặc yêu cầu đã bị xóa.",
+                    data = null
+                };
+            }
+
+            // Kiểm tra quyền truy cập
+            if (isCustomer && returnRequest.UserId != userId)
+            {
+                return new ApiResponse
+                {
+                    status = StatusCodes.Status403Forbidden.ToString(),
+                    message = "Bạn không có quyền xem yêu cầu hoàn hàng này.",
+                    data = null
+                };
+            }
+
+            return new ApiResponse
+            {
+                status = StatusCodes.Status200OK.ToString(),
+                message = "Lấy thông tin yêu cầu hoàn hàng thành công.",
+                data = new
+                {
+                    ReturnRequestId = returnRequest.Id,
+                    OrderId = returnRequest.OrderId,
+                    OrderCode = returnRequest.Order?.OrderCode,
+                    UserId = returnRequest.UserId,
+                    Reason = returnRequest.Reason,
+                    Status = returnRequest.Status,
+                    CreatedAt = returnRequest.CreatedAt,
+                    Media = returnRequest.ReturnRequestMedia.Select(m => new
+                    {
+                        MediaLink = m.MediaLink,
+                        MediaType = m.MediaType
+                    }).ToList()
+                }
+            };
+        }
+
+        // Lấy danh sách yêu cầu hoàn hàng
+   
+        int pageSize = size > 0 ? size : 10; // Default page size if not specified
+        int currentPage = page > 0 ? page : 1; // Default to first page if not specified
+
+       
+    
+
+        var returnRequests = await _unitOfWork.GetRepository<ReturnRequest>().GetPagingListAsync(
+            selector: r => new
+            {
+                ReturnRequestId = r.Id,
+                OrderId = r.OrderId,
+                OrderCode = r.Order != null ? r.Order.OrderCode : null,
+                UserId = r.UserId,
+                Reason = r.Reason,
+                Status = r.Status,
+                CreatedAt = r.CreatedAt,
+                Media = r.ReturnRequestMedia
+                    .Where(m => m.IsDelete == false)
+                    .Select(m => new
+                    {
+                        MediaLink = m.MediaLink,
+                        MediaType = m.MediaType
+                    }).ToList()
+            },
+            predicate: r => r.IsDelete == false && (isCustomer ? r.UserId == userId : true),
+            orderBy: q => q.OrderByDescending(r => r.CreatedAt),
+            size: pageSize,
+            page: currentPage
+        );
+        var totalItems = returnRequests.Total;
+        var totalPages = (int)Math.Ceiling((double)totalItems / pageSize);
+// If no return requests found
+        if (returnRequests == null || returnRequests.Items.Count == 0)
+        {
+            return new ApiResponse
+            {
+                status = StatusCodes.Status200OK.ToString(),
+                message = "Không có yêu cầu hoàn hàng nào.",
+                data = new
+                {
+                    TotalCount = 0,
+                    Page = currentPage,
+                    PageSize = pageSize,
+                    TotalPages = 0,
+                    ReturnRequests = new List<object>()
+                }
+            };
+        }
+        // Trả về ApiResponse
+        return new ApiResponse
+        {
+            status = StatusCodes.Status200OK.ToString(),
+            message = "Lấy danh sách yêu cầu hoàn trả thành công.",
+            data = new
+            {
+                TotalCount = totalItems,
+                Page = page,
+                PageSize = pageSize,
+                TotalPages = totalPages,
+                ReturnRequests = returnRequests.Items
+            }
+        };
+    }
+    catch (Exception ex)
+    {
+        return new ApiResponse
+        {
+            status = StatusCodes.Status500InternalServerError.ToString(),
+            message = $"Đã xảy ra lỗi khi lấy thông tin yêu cầu hoàn trả: {ex.Message}",
+            data = null
+        };
+    }
+}
+
+#region tạo orderCode
 
     private string GenerateOrderCode()
     {

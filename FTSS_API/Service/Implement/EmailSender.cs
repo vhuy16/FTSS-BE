@@ -43,7 +43,10 @@ public class EmailSender : IEmailSender
         _logger.LogInformation($"Email address : {_emailAddress}");
         _logger.LogInformation($"App password : {_appPassword}");
     }
-
+    public Task SendReturnAcceptedEmailAsync(string email, string message)
+    {
+        return SendEmailAsync(email, "Return Request Accepted", message);
+    }
     public Task SendVerificationEmailAsync(string email, string otp)
     {
         string message = EmailTemplatesUtils.VerificationEmailTemplate(otp);
