@@ -1291,17 +1291,28 @@ namespace FTSS_API.Service.Implement
                 SetupPackageResponse? setupPackage = null;
                 Guid? setupPackageId = null;
 
-                if (t.OrderId.HasValue && !t.BookingId.HasValue)
+                Guid? finalOrderId = t.OrderId;
+                string? orderCode = t.Order?.OrderCode;
+                DateTime? installationDate = t.Order?.InstallationDate;
+
+                if (t.BookingId.HasValue && !t.OrderId.HasValue)
                 {
-                    setupPackageId = t.Order?.SetupPackageId;
-                }
-                else if (t.BookingId.HasValue && !t.OrderId.HasValue)
-                {
-                    var booking = await _unitOfWork.GetRepository<Booking>().SingleOrDefaultAsync(
+                    var bookingWithOrder = await _unitOfWork.GetRepository<Booking>().SingleOrDefaultAsync(
                         predicate: b => b.Id == t.BookingId,
                         include: b => b.Include(bk => bk.Order)
                     );
-                    setupPackageId = booking?.Order?.SetupPackageId;
+
+                    if (bookingWithOrder?.Order != null)
+                    {
+                        finalOrderId = bookingWithOrder.Order.Id;
+                        orderCode = bookingWithOrder.Order.OrderCode;
+                        installationDate = bookingWithOrder.Order.InstallationDate;
+                        setupPackageId = bookingWithOrder.Order.SetupPackageId;
+                    }
+                }
+                else if (t.OrderId.HasValue)
+                {
+                    setupPackageId = t.Order?.SetupPackageId;
                 }
 
                 if (setupPackageId.HasValue)
@@ -1336,10 +1347,10 @@ namespace FTSS_API.Service.Implement
                                 IsDelete = spd.Product.IsDelete,
                                 CategoryName = spd.Product.SubCategory?.SubCategoryName ?? "Không rõ",
                                 images = spd.Product?.Images?
-                        .Where(img => img.IsDelete == false)
-                        .OrderBy(img => img.CreateDate)
-                        .Select(img => img.LinkImage)
-                        .FirstOrDefault() ?? "NoImageAvailable"
+                                    .Where(img => img.IsDelete == false)
+                                    .OrderBy(img => img.CreateDate)
+                                    .Select(img => img.LinkImage)
+                                    .FirstOrDefault() ?? "NoImageAvailable"
                             }).ToList()
                         };
                     }
@@ -1359,13 +1370,13 @@ namespace FTSS_API.Service.Implement
                     Address = t.Address,
                     PhoneNumber = t.PhoneNumber,
                     BookingId = t.BookingId,
-                    OrderId = t.OrderId,
+                    OrderId = finalOrderId, // ✅ Dữ liệu từ Order nếu có hoặc từ Booking nếu không có
                     BookingCode = t.Booking?.BookingCode,
                     BookingImage = t.Booking?.BookingImage,
-                    OrderCode = t.Order?.OrderCode,
-                    InstallationDate = t.Order?.InstallationDate,
+                    OrderCode = orderCode, // ✅
+                    InstallationDate = installationDate, // ✅
                     Services = servicePackages,
-                    SetupPackage = setupPackage!
+                    SetupPackage = setupPackage
                 });
             }
 
@@ -1817,11 +1828,12 @@ namespace FTSS_API.Service.Implement
 
                 // Chuẩn bị biến chứa SetupPackageResponse
                 SetupPackageResponse setupPackageResponse = null;
+                Order? orderInfo = null;
 
-                // Trường hợp 1: Có OrderId, không có BookingId → lấy setup từ Order trực tiếp
+                // Trường hợp 1: Có OrderId, không có BookingId → lấy Order trực tiếp
                 if (mission.OrderId.HasValue && !mission.BookingId.HasValue)
                 {
-                    var order = await _unitOfWork.GetRepository<Order>().SingleOrDefaultAsync(
+                    orderInfo = await _unitOfWork.GetRepository<Order>().SingleOrDefaultAsync(
                         predicate: o => o.Id == mission.OrderId,
                         include: o => o.Include(ord => ord.SetupPackage)
                                        .ThenInclude(sp => sp.SetupPackageDetails)
@@ -1833,9 +1845,9 @@ namespace FTSS_API.Service.Implement
                                                    .ThenInclude(sc => sc.Category)
                     );
 
-                    setupPackageResponse = GenerateSetupPackageResponse(order?.SetupPackage);
+                    setupPackageResponse = GenerateSetupPackageResponse(orderInfo?.SetupPackage);
                 }
-                // Trường hợp 2: Có BookingId, không có OrderId → lấy OrderId từ Booking
+                // Trường hợp 2: Có BookingId, không có OrderId → lấy Order từ Booking
                 else if (mission.BookingId.HasValue && !mission.OrderId.HasValue)
                 {
                     var booking = await _unitOfWork.GetRepository<Booking>().SingleOrDefaultAsync(
@@ -1852,7 +1864,8 @@ namespace FTSS_API.Service.Implement
                                                        .ThenInclude(sc => sc.Category)
                     );
 
-                    setupPackageResponse = GenerateSetupPackageResponse(booking?.Order?.SetupPackage);
+                    orderInfo = booking?.Order;
+                    setupPackageResponse = GenerateSetupPackageResponse(orderInfo?.SetupPackage);
                 }
 
                 // Lấy danh sách dịch vụ nếu có Booking
@@ -1885,9 +1898,11 @@ namespace FTSS_API.Service.Implement
                     Address = mission.Address,
                     PhoneNumber = mission.PhoneNumber,
                     BookingId = mission.BookingId,
-                    OrderId = mission.OrderId,
+                    OrderId = mission.OrderId ?? orderInfo?.Id,
                     BookingCode = mission.Booking?.BookingCode,
                     BookingImage = mission.Booking?.BookingImage,
+                    OrderCode = orderInfo?.OrderCode,
+                    InstallationDate = orderInfo?.InstallationDate,
                     Services = servicePackages,
                     SetupPackage = setupPackageResponse
                 };
