@@ -23,7 +23,7 @@ public partial class ReturnRequest
 
     public virtual Order Order { get; set; } = null!;
 
-    public virtual ICollection<ReturnRequestMedia> ReturnRequestMedia { get; set; } = new List<ReturnRequestMedia>();
+    public virtual ICollection<ReturnRequestMedium> ReturnRequestMedia { get; set; } = new List<ReturnRequestMedium>();
 
     public virtual User User { get; set; } = null!;
 }
