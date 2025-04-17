@@ -3,11 +3,11 @@ name: Build and Deploy .NET Application to Plesk via FTP
 on:
   push:
     branches:
-      - main # Thay đổi nhánh nếu cần
+      - main
 
 jobs:
   build-and-deploy:
-    runs-on: windows-latest # Chuyển sang windows-latest để hỗ trợ iisreset
+    runs-on: windows-latest
 
     steps:
       # 1. Lấy mã nguồn từ repository
@@ -18,32 +18,37 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v3
         with:
-          dotnet-version: 8.0 # Phiên bản .NET của dự án
+          dotnet-version: 8.0
 
       # 3. Build dự án .NET và tạo tài liệu Swagger XML
       - name: Build project
         run: dotnet publish -c Release -o ./publish /p:DocumentationFile=./publish/FTSS_API.xml
 
-      # 4. Dừng ứng dụng trên server (giả sử dùng IIS)
-      - name: Stop IIS on server
+      # 4. Dừng ứng dụng trên server (IIS và Kestrel)
+      - name: Stop application
         run: |
+          # Dừng IIS
           iisreset /stop
-        continue-on-error: true # Tiếp tục nếu lệnh thất bại (tránh lỗi nếu IIS không chạy)
+          # Dừng các tiến trình dotnet (Kestrel)
+          taskkill /IM dotnet.exe /F
+        continue-on-error: true # Tiếp tục nếu lệnh thất bại
 
       # 5. Triển khai mã nguồn qua FTP
       - name: Deploy via FTP
         uses: SamKirkland/FTP-Deploy-Action@4.3.0
         with:
-          server: 14.225.220.28
-          username: ftss-server
-          password: ftss12345 # Sử dụng secret để bảo mật
+          server: 14.225.220.28 # Lưu IP trong secret
+          username: ftss-server # Lưu username trong secret
+          password: ftss12345 # Lưu password trong secret
           local-dir: ./publish/
           server-dir: /ftss-publish/
-          protocol: ftp # Rõ ràng sử dụng FTP
-          dry-run: false # Có thể bật true để kiểm tra trước
+          protocol: ftp
+          dry-run: false # Đặt true để kiểm tra trước
+          log-level: verbose # Thêm chi tiết nhật ký để debug
 
       # 6. Khởi động lại ứng dụng trên server
-      - name: Start IIS on server
+      - name: Start application
         run: |
+          # Khởi động lại IIS
           iisreset /start
-        continue-on-error: true # Tiếp tục nếu lệnh thất bại
+        continue-on-error: true
