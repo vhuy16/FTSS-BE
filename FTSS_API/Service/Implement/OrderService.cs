@@ -6,6 +6,7 @@ using AutoMapper;
 using FTSS_API.Constant;
 using FTSS_API.Payload;
 using FTSS_API.Payload.Request;
+using FTSS_API.Payload.Request.Order;
 using FTSS_API.Payload.Request.Pay;
 using FTSS_API.Payload.Request.Return;
 using FTSS_API.Payload.Response.Order;
@@ -1512,5 +1513,57 @@ public async Task<ApiResponse> GetReturnRequest(Guid? returnRequestId, Supabase.
     public Task<ApiResponse> CancelOrder(Guid id)
     {
         throw new NotImplementedException();
+    }
+
+    public async Task<ApiResponse> UpdateTime(Guid id, UpdateTimeRequest request)
+    {
+        try
+        {
+            // Lấy đơn hàng
+            var order = await _unitOfWork.GetRepository<Order>().SingleOrDefaultAsync(
+                predicate: o => o.Id.Equals(id) && o.IsDelete == false);
+
+            if (order == null)
+            {
+                return new ApiResponse
+                {
+                    status = StatusCodes.Status404NotFound.ToString(),
+                    message = "Không tìm thấy đơn hàng.",
+                    data = null
+                };
+            }
+
+            var currentSEATime = TimeUtils.GetCurrentSEATime();
+
+            // Nếu có truyền ngày lắp đặt thì mới xử lý
+            if (request.InstallationDate.HasValue)
+            {
+                var installationDate = request.InstallationDate.Value;
+                if (order.InstallationDate != installationDate)
+                {
+                    order.InstallationDate = installationDate;
+                    order.ModifyDate = currentSEATime;
+
+                    _unitOfWork.GetRepository<Order>().UpdateAsync(order);
+                    await _unitOfWork.CommitAsync();
+                }
+            }
+
+            return new ApiResponse
+            {
+                status = StatusCodes.Status200OK.ToString(),
+                message = "Cập nhật thời gian lắp đặt thành công.",
+                data = null
+            };
+        }
+        catch (Exception ex)
+        {
+            return new ApiResponse
+            {
+                status = StatusCodes.Status500InternalServerError.ToString(),
+                message = "Đã xảy ra lỗi khi cập nhật thời gian lắp đặt.",
+                data = ex.Message
+            };
+        }
     }
 }

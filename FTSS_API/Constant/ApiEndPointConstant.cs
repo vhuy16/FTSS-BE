@@ -129,6 +129,7 @@ public static class ApiEndPointConstant
         public const string CancelOrder = OrderEndpoint + "/cancel-order" + "/{id}";
         public const string CreateReturnRequest = OrderEndpoint + "/create-return-request";
         public const string GetReturnRequest = OrderEndpoint + "/get-return-request";
+        public const string UpdateTime = OrderEndpoint+ "/update-time" + "/{id}";
     }
 
     public static class Cart
