@@ -117,7 +117,18 @@ public class UserController : BaseController<UserController>
         var response = await _userService.UpdateUser(id, updateUserRequest);
         return StatusCode(int.Parse(response.status), response);
     }
-
+    /// <summary>
+    /// Cập nhật thông tin ngân hàng.
+    /// </summary>
+    [HttpPut(ApiEndPointConstant.User.UpdateBankInfor)]
+    [ProducesResponseType(typeof(bool), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
+    [ProducesErrorResponseType(typeof(ProblemDetails))]
+    public async Task<IActionResult> UpdateBankInfor([FromForm] string? BankNumber, [FromForm] string? BankName, [FromForm] string? BankHolder)
+    {
+        var response = await _userService.UpdateBankInforUser(BankNumber, BankName, BankHolder);
+        return StatusCode(int.Parse(response.status), response);
+    }
     /// <summary>
     /// Xác thực OTP.
     /// </summary>

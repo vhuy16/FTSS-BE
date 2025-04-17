@@ -35,6 +35,12 @@ public partial class User
 
     public string? DistrictId { get; set; }
 
+    public string? BankNumber { get; set; }
+
+    public string? BankName { get; set; }
+
+    public string? BankHolder { get; set; }
+
     public virtual ICollection<Booking> Bookings { get; set; } = new List<Booking>();
 
     public virtual ICollection<Cart> Carts { get; set; } = new List<Cart>();

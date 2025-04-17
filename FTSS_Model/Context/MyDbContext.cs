@@ -990,6 +990,18 @@ public partial class MyDbContext : DbContext
             entity.Property(e => e.Address)
                 .HasMaxLength(255)
                 .HasColumnName("address");
+            entity.Property(e => e.BankHolder)
+                .HasMaxLength(50)
+                .IsUnicode(false)
+                .HasColumnName("bankHolder");
+            entity.Property(e => e.BankName)
+                .HasMaxLength(50)
+                .IsUnicode(false)
+                .HasColumnName("bankName");
+            entity.Property(e => e.BankNumber)
+                .HasMaxLength(50)
+                .IsUnicode(false)
+                .HasColumnName("bankNumber");
             entity.Property(e => e.CityId)
                 .HasMaxLength(50)
                 .HasColumnName("cityId");
