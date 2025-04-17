@@ -7,10 +7,10 @@ on:
 
 jobs:
   build-and-deploy:
-    runs-on: ubuntu-latest
+    runs-on: windows-latest # Chuyển sang windows-latest để hỗ trợ iisreset
 
     steps:
-      # 1. Lấy mã nguồn từ repository.
+      # 1. Lấy mã nguồn từ repository
       - name: Checkout repository
         uses: actions/checkout@v3
 
@@ -18,19 +18,32 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v3
         with:
-          dotnet-version: 8.0 # Thay đổi phiên bản .NET nếu cần
+          dotnet-version: 8.0 # Phiên bản .NET của dự án
 
       # 3. Build dự án .NET và tạo tài liệu Swagger XML
       - name: Build project
         run: dotnet publish -c Release -o ./publish /p:DocumentationFile=./publish/FTSS_API.xml
 
-      # 4. Triển khai mã nguồn qua FTP
+      # 4. Dừng ứng dụng trên server (giả sử dùng IIS)
+      - name: Stop IIS on server
+        run: |
+          iisreset /stop
+        continue-on-error: true # Tiếp tục nếu lệnh thất bại (tránh lỗi nếu IIS không chạy)
+
+      # 5. Triển khai mã nguồn qua FTP
       - name: Deploy via FTP
         uses: SamKirkland/FTP-Deploy-Action@4.3.0
         with:
           server: 14.225.220.28
           username: ftss-server
-          password: ftss12345 # Dùng secret nếu đã thiết lập
+          password: ftss12345 # Sử dụng secret để bảo mật
           local-dir: ./publish/
           server-dir: /ftss-publish/
-          ftp-passive: true # Bật passive mode
+          protocol: ftp # Rõ ràng sử dụng FTP
+          dry-run: false # Có thể bật true để kiểm tra trước
+
+      # 6. Khởi động lại ứng dụng trên server
+      - name: Start IIS on server
+        run: |
+          iisreset /start
+        continue-on-error: true # Tiếp tục nếu lệnh thất bại
