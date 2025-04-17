@@ -1,4 +1,4 @@
-name: Build and Deploy .NET Application to Plesk via FTP
+name: Build and Deploy .NET Application to Windows VPS via FTP
 
 on:
   push:
@@ -24,31 +24,15 @@ jobs:
       - name: Build project
         run: dotnet publish -c Release -o ./publish /p:DocumentationFile=./publish/FTSS_API.xml
 
-      # 4. Dừng ứng dụng trên server (IIS và Kestrel)
-      - name: Stop application
-        run: |
-          # Dừng IIS
-          iisreset /stop
-          # Dừng các tiến trình dotnet (Kestrel)
-          taskkill /IM dotnet.exe /F
-        continue-on-error: true # Tiếp tục nếu lệnh thất bại
-
-      # 5. Triển khai mã nguồn qua FTP
-      - name: Deploy via FTP
+      # 4. Triển khai mã nguồn qua FTP vào thư mục tạm
+      - name: Deploy to staging via FTP
         uses: SamKirkland/FTP-Deploy-Action@4.3.0
         with:
-          server: 14.225.220.28 # Lưu IP trong secret
-          username: ftss-server # Lưu username trong secret
-          password: ftss12345 # Lưu password trong secret
+          server: 14.225.220.28
+          username: ftss-server
+          password: ftss12345
           local-dir: ./publish/
-          server-dir: /ftss-publish/
+          server-dir: /staging/
           protocol: ftp
-          dry-run: false # Đặt true để kiểm tra trước
-          log-level: verbose # Thêm chi tiết nhật ký để debug
-
-      # 6. Khởi động lại ứng dụng trên server
-      - name: Start application
-        run: |
-          # Khởi động lại IIS
-          iisreset /start
-        continue-on-error: true
+          dry-run: false
+          log-level: verbose
