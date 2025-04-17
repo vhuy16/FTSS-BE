@@ -478,6 +478,39 @@ public class UserService : BaseService<UserService>, IUserService
         }
     }
 
+    public async Task<ApiResponse> UpdateBankInforUser(string? BankNumber, string? BankName, string? BankHolder)
+    {
+        Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
+        var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
+            predicate: u => u.Id.Equals(userId) &&
+                            u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()));
+        user.BankNumber = string.IsNullOrEmpty(BankNumber) ? user.BankNumber : BankNumber;
+        user.BankName = string.IsNullOrEmpty(BankName) ? user.BankName : BankName;
+        user.BankHolder = string.IsNullOrEmpty(BankHolder) ? user.BankHolder : BankHolder;
+        
+        user.ModifyDate = TimeUtils.GetCurrentSEATime();
+        _unitOfWork.GetRepository<User>().UpdateAsync(user);
+        bool isSuccessful = await _unitOfWork.CommitAsync() > 0;
+        
+        if(isSuccessful)
+        {
+            return new ApiResponse()
+            {
+                status = StatusCodes.Status200OK.ToString(),
+
+                message = "User updated successfully.",
+                data = user
+            };
+        }
+
+        return new ApiResponse()
+        {
+            status = StatusCodes.Status500InternalServerError.ToString(),
+            message = "Failed to update the user.",
+
+            data = null
+        };
+    }
     public async Task<string> CreateTokenByEmail(string email)
     {
         if (string.IsNullOrEmpty(email))

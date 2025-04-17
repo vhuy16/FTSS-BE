@@ -17,7 +17,7 @@ public interface IUserService
     Task<ApiResponse> GetUser(Guid id);
     Task<ApiResponse> UpdateUser(Guid id, UpdateUserRequest updateUserRequest);
     Task<string> CreateTokenByEmail(string email);
-
+    Task<ApiResponse> UpdateBankInforUser(string? BankNumber, string? BankName, string? BankHolder);
     Task<bool> GetAccountByEmail(string email);
     Task<bool> VerifyOtp(Guid UserId, string otpCheck);
     Task<ApiResponse> ResendOtp(string email);
