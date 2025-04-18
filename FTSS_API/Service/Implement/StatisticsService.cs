@@ -77,23 +77,43 @@ public class StatisticsService : BaseService<StatisticsService>, IStatisticsServ
 
     public async Task<List<RevenueResponse>> GetRevenueByDateRangeAsync(DateTime startDay, DateTime endDay)
     {
-        var revenues = new List<RevenueResponse>();
+        // Đảm bảo startDay bắt đầu từ 00:00:00 (đầu ngày)
+        var startOfDay = startDay.Date;
 
-        for (var date = startDay; date <= endDay; date = date.AddDays(1))
+        // Đảm bảo endDay kết thúc vào 23:59:59 (cuối ngày)
+        var endOfDay = endDay.Date.AddHours(23).AddMinutes(59).AddSeconds(59);
+
+        // Lấy tất cả đơn hàng trong khoảng thời gian từ startOfDay đến endOfDay
+        var orders = await _unitOfWork.GetRepository<Order>().GetListAsync(
+            predicate: o => o.CreateDate.HasValue 
+                            && o.CreateDate.Value >= startOfDay 
+                            && o.CreateDate.Value <= endOfDay 
+                            && o.Status == OrderStatus.COMPLETED.GetDescriptionFromEnum());
+
+        // Nhóm đơn hàng theo ngày và tính tổng doanh thu
+        var revenues = orders
+            .GroupBy(o => o.CreateDate.Value.Date) // Nhóm theo ngày
+            .Select(g => new RevenueResponse
+            {
+                Day = g.Key.ToString("dd/MM/yyyy"),
+                Revenue = g.Sum(o => o.TotalPrice)
+            })
+            .OrderBy(r => DateTime.ParseExact(r.Day, "dd/MM/yyyy", null)) // Sắp xếp theo ngày
+            .ToList();
+
+        // Nếu muốn bao gồm các ngày không có doanh thu (hiển thị doanh thu = 0)
+        var result = new List<RevenueResponse>();
+        for (var date = startOfDay; date <= endDay.Date; date = date.AddDays(1))
         {
-            var dailyOrders = await _unitOfWork.GetRepository<Order>().GetListAsync(
-                predicate: o => o.CreateDate.Value.Date == date.Date && o.Status == OrderStatus.COMPLETED.GetDescriptionFromEnum());
-
-            decimal totalRevenue = dailyOrders.Sum(o => o.TotalPrice);
-
-            revenues.Add(new RevenueResponse
+            var revenueForDay = revenues.FirstOrDefault(r => r.Day == date.ToString("dd/MM/yyyy"));
+            result.Add(new RevenueResponse
             {
                 Day = date.ToString("dd/MM/yyyy"),
-                Revenue = totalRevenue
+                Revenue = revenueForDay?.Revenue ?? 0 // Nếu không có doanh thu, trả về 0
             });
         }
 
-        return revenues;
+        return result;
     }
     private string CalculateChangePercentage(decimal current, decimal previous)
     {
@@ -137,13 +157,19 @@ public class StatisticsService : BaseService<StatisticsService>, IStatisticsServ
     }
     public async Task<List<CategorySalesResponse>> GetProductSalesByCategory(DateTime startDay, DateTime endDay)
     {
+        // Đảm bảo startDay bắt đầu từ 00:00:00 (đầu ngày)
+        var startOfDay = startDay.Date;
+
+        // Đảm bảo endDay kết thúc vào 23:59:59 (cuối ngày)
+        var endOfDay = endDay.Date.AddHours(23).AddMinutes(59).AddSeconds(59);
+
         var orders = await _unitOfWork.GetRepository<Order>().GetListAsync(
             include: o => o.Include(o => o.OrderDetails)
                 .ThenInclude(od => od.Product)
                 .ThenInclude(p => p.SubCategory)
                 .ThenInclude(p => p.Category),
-            predicate: o => o.CreateDate >= startDay && o.CreateDate <= endDay 
-                                                     && o.Status.Equals(OrderStatus.COMPLETED.GetDescriptionFromEnum()));
+            predicate: o => o.CreateDate >= startOfDay && o.CreateDate <= endOfDay 
+                                                       && o.Status.Equals(OrderStatus.COMPLETED.GetDescriptionFromEnum()));
 
         var salesData = orders
             .SelectMany(o => o.OrderDetails)
@@ -157,5 +183,4 @@ public class StatisticsService : BaseService<StatisticsService>, IStatisticsServ
 
         return salesData;
     }
-
 }

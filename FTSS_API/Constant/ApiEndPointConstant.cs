@@ -22,6 +22,7 @@ public static class ApiEndPointConstant
         public const string UpdateUser = UserEndPoint + "/{id}";
         public const string VerifyOtp = UserEndPoint + "/verify-otp";
         public const string ForgotPassword = UserEndPoint + "/forgot-password";
+        public const string UpdateBankInfor = UserEndPoint + "/update-bank-infor";
         public const string ResetPassword = UserEndPoint + "/reset-password";
         public const string VerifyForgotPassword = UserEndPoint + "/verify-forgot-password";
         public const string ResendOtp = UserEndPoint + "/resend-otp";
