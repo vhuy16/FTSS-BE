@@ -116,4 +116,21 @@ public class VnPayController : BaseController<VnPayController>
             });
         }
     }
+    [HttpPost("cancel-pending-transactions")]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
+    [ProducesErrorResponseType(typeof(ProblemDetails))]
+    public async Task<IActionResult> CancelPendingTransactions()
+    {
+        try
+        {
+            // Gọi phương thức với timeout 15 phút
+            var result = await _vnPayService.CancelPendingTransactions(TimeSpan.FromMinutes(15));
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error canceling pending VNPay transactions.");
+            return Problem("Lỗi khi hủy các giao dịch pending.");
+        }
+    }
 }
