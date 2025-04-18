@@ -12,27 +12,37 @@ jobs:
     steps:
       # 1. Lấy mã nguồn từ repository
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4 # Nâng cấp lên v4 để cải thiện hiệu suất
+        with:
+          fetch-depth: 1 # Chỉ lấy commit mới nhất để giảm thời gian checkout
 
       # 2. Cài đặt .NET SDK
       - name: Setup .NET
-        uses: actions/setup-dotnet@v3
+        uses: actions/setup-dotnet@v4 # Nâng cấp lên v4
         with:
           dotnet-version: 8.0
+          cache: true # Bật cache để tái sử dụng SDK
+          cache-dependency-path: '**/*.csproj' # Cache dựa trên file csproj
 
       # 3. Build dự án .NET và tạo tài liệu Swagger XML
+      - name: Restore dependencies
+        run: dotnet restore # Tách restore để tận dụng cache
       - name: Build project
-        run: dotnet publish -c Release -o ./publish /p:DocumentationFile=./publish/FTSS_API.xml
+        run: dotnet publish -c Release -o ./publish /p:DocumentationFile=./publish/FTSS_API.xml --no-restore # Bỏ restore trong build
 
       # 4. Triển khai mã nguồn qua FTP vào thư mục tạm
       - name: Deploy to staging via FTP
-        uses: SamKirkland/FTP-Deploy-Action@4.3.0
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5 # Nâng cấp lên phiên bản mới nhất
         with:
-          server: 14.225.220.28
-          username: ftss-server
-          password: ftss12345
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
           local-dir: ./publish/
           server-dir: /staging/
           protocol: ftp
           dry-run: false
           log-level: verbose
+          exclude: | # Loại bỏ các tệp không cần thiết để giảm thời gian truyền
+            **/*.pdb
+            **/appsettings.Development.json
+          dangerous-clean-slate: false # Tắt xóa thư mục đích để tránh rủi ro
