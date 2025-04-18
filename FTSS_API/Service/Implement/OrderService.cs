@@ -545,6 +545,14 @@ public class OrderService : BaseService<OrderService>, IOrderService
                     var customerEmail = order.User.Email;
                     await _emailSender.SendReturnAcceptedEmailAsync(customerEmail, returnEmailBody);
                 }
+                else if (updateOrderRequest.Status == OrderStatus.COMPLETED.ToString())
+                {
+                    if (order.Payments?.FirstOrDefault().PaymentStatus == PaymentStatusEnum.Processing.ToString())
+                    {
+                        var payment = order.Payments.FirstOrDefault();
+                        payment.PaymentStatus = PaymentStatusEnum.Completed.ToString();
+                    }
+                }
 
                 order.Status = updateOrderRequest.Status;
                 order.ModifyDate = DateTime.Now;

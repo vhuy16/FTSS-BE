@@ -1,7 +1,10 @@
 ﻿using System.Net;
+using System.Security.Cryptography;
+using System.Text;
 using AutoMapper;
 using FTSS_API.Payload;
 using FTSS_API.Payload.Request.Pay.VnPay;
+using FTSS_API.Payload.Response.Pay;
 using FTSS_API.Service.Interface;
 using FTSS_API.Utils;
 using FTSS_Model.Context;
@@ -10,6 +13,7 @@ using FTSS_Model.Enum;
 using FTSS_Repository.Interface;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using Newtonsoft.Json;
 
 namespace FTSS_API.Service.Implement;
 
@@ -234,4 +238,149 @@ public class VnPayService : BaseService<VnPayService>, IVnPayService
 
         _unitOfWork.GetRepository<Payment>().UpdateAsync(payment);
     }
+ 
+        public async Task<ApiResponse> CancelPendingTransactions(TimeSpan timeout)
+        {
+            try
+            {
+                var canceledTransactions = new List<string>();
+                var timeoutThreshold = DateTime.UtcNow.Add(-timeout);
+
+                // Lấy danh sách các giao dịch Payment có trạng thái Processing
+                var pendingPayments = await _unitOfWork.GetRepository<Payment>()
+                    .GetListAsync(
+                        predicate: p => p.PaymentStatus == PaymentStatusEnum.Processing.ToString(),
+                        include: p => p
+                            .Include(p => p.Order)
+                            .Include(p => p.Booking)
+                    );
+
+                foreach (var payment in pendingPayments)
+                {
+                    try
+                    {
+                        // Xác định thời gian tạo (CreatedDate) từ Order hoặc Booking
+                        DateTime? createdDate = null;
+                        string txnRef = null;
+
+                        if (payment.OrderId.HasValue && payment.Order != null)
+                        {
+                            createdDate = payment.Order.CreateDate;
+                            txnRef = payment.OrderId.ToString();
+                        }
+                  
+                        else
+                        {
+                            _logger.LogWarning($"Payment {payment.Id} không liên kết với Order hoặc Booking.");
+                            continue;
+                        }
+
+                        // Kiểm tra nếu giao dịch đã vượt quá thời gian timeout
+                        if (createdDate <= timeoutThreshold)
+                        {
+                            // Gọi API Query Transaction để kiểm tra trạng thái
+                            var queryResult = await QueryTransactionStatus(txnRef, createdDate.Value);
+
+                            // Nếu giao dịch không thành công (khác "00")
+                            if (queryResult.vnp_TransactionStatus != "00")
+                            {
+                                // Cập nhật trạng thái Payment thành Cancelled
+                                payment.PaymentStatus = PaymentStatusEnum.Cancelled.ToString();
+                                payment.PaymentDate = DateTime.UtcNow;
+                                _unitOfWork.GetRepository<Payment>().UpdateAsync(payment);
+
+                                // Cập nhật trạng thái Order (nếu có)
+                                if (payment.OrderId.HasValue && payment.Order != null)
+                                {
+                                    payment.Order.Status = OrderStatus.CANCELLED.ToString();
+                                    payment.Order.ModifyDate = DateTime.UtcNow;
+                                    _unitOfWork.GetRepository<Order>().UpdateAsync(payment.Order);
+                                }
+
+                                // Cập nhật trạng thái Booking (nếu có)
+                                if (payment.BookingId.HasValue && payment.Booking != null)
+                                {
+                                    payment.Booking.Status = "CANCELLED"; // Giả định Booking có Status
+                                    _unitOfWork.GetRepository<Booking>().UpdateAsync(payment.Booking);
+                                }
+
+                                canceledTransactions.Add(txnRef);
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError($"Error checking transaction {payment.OrderId ?? payment.BookingId}: {ex.Message}");
+                        continue; // Tiếp tục xử lý các giao dịch khác
+                    }
+                }
+
+                // Lưu thay đổi vào cơ sở dữ liệu
+                await _unitOfWork.CommitAsync();
+
+                return new ApiResponse
+                {
+                    status = StatusCodes.Status200OK.ToString(),
+                    message = $"Hủy thành công {canceledTransactions.Count} giao dịch đang xử lý.",
+                    data = canceledTransactions
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"Error canceling processing transactions: {ex.Message}");
+                return new ApiResponse
+                {
+                    status = StatusCodes.Status500InternalServerError.ToString(),
+                    message = "Lỗi khi hủy các giao dịch đang xử lý.",
+                    data = null
+                };
+            }
+        }
+
+        private async Task<VnPayQueryResponse> QueryTransactionStatus(string txnRef, DateTime createDate)
+        {
+            try
+            {
+                var queryUrl = "https://sandbox.vnpayment.vn/merchant_webapi/api/transaction";
+                var queryData = new Dictionary<string, string>
+                {
+                    { "vnp_TmnCode", _vnpTmnCode },
+                    { "vnp_TxnRef", txnRef },
+                    { "vnp_OrderInfo", "Query transaction status" },
+                    { "vnp_TransDate", createDate.ToString("yyyyMMddHHmmss") },
+                    { "vnp_CreateDate", DateTime.Now.ToString("yyyyMMddHHmmss") },
+                    { "vnp_Version", "2.1.0" },
+                    { "vnp_Command", "querydr" },
+                    { "vnp_IpAddr", utils.GetIpAddress() }
+                };
+
+                // Tạo checksum
+                var signData = string.Join("&", queryData.OrderBy(k => k.Key).Select(k => $"{k.Key}={k.Value}"));
+                var checksum = HmacSHA512(signData, _vnpHashSecret);
+                queryData["vnp_SecureHash"] = checksum;
+
+                // Gửi yêu cầu POST
+                var content = new FormUrlEncodedContent(queryData);
+                var response = await _client.PostAsync(queryUrl, content);
+                response.EnsureSuccessStatusCode();
+
+                var responseContent = await response.Content.ReadAsStringAsync();
+                return JsonConvert.DeserializeObject<VnPayQueryResponse>(responseContent);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"Error querying VNPay transaction {txnRef}: {ex.Message}");
+                throw;
+            }
+        }
+        
+
+        private string HmacSHA512(string input, string key)
+        {
+            var keyBytes = Encoding.UTF8.GetBytes(key);
+            using var hmac = new HMACSHA512(keyBytes);
+            var hashBytes = hmac.ComputeHash(Encoding.UTF8.GetBytes(input));
+            return BitConverter.ToString(hashBytes).Replace("-", "").ToLower();
+        }
+     
 }
