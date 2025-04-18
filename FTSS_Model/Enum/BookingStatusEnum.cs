@@ -8,5 +8,6 @@ public enum BookingStatusEnum
     DONE,
     MISSED,
     PROCESSING,
-    NOTDONE
+    NOTDONE,
+    COMPLETED
 }
