@@ -256,5 +256,18 @@ namespace FTSS_API.Controller
             var response = await _bookingService.GetHistoryOrder(orderid);
             return StatusCode(int.Parse(response.status), response);
         }
+        /// <summary>
+        /// API update mission cho technician.
+        /// </summary>
+        [HttpPut(ApiEndPointConstant.Booking.Confirm)]
+        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
+        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
+        [ProducesErrorResponseType(typeof(ProblemDetails))]
+        public async Task<IActionResult> Confirm(Guid? orderid,Guid? bookingid)
+        {
+            var response = await _bookingService.Confirm(orderid, bookingid);
+            return StatusCode(int.Parse(response.status), response);
+        }
     }
 }

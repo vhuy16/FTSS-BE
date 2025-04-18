@@ -1727,7 +1727,7 @@ namespace FTSS_API.Service.Implement
             string? orderStatus = missionStatus switch
             {
                 MissionStatusEnum.Processing => OrderStatus.PENDING_DELIVERY.ToString(),
-                MissionStatusEnum.Done => OrderStatus.COMPLETED.ToString(),
+                MissionStatusEnum.Done => OrderStatus.DONE.ToString(),
                 MissionStatusEnum.Cancel => OrderStatus.CANCELLED.ToString(),
                 MissionStatusEnum.NotDone => OrderStatus.NOTDONE.ToString(),
                 _ => null
@@ -2234,6 +2234,127 @@ namespace FTSS_API.Service.Implement
                 {
                     status = StatusCodes.Status500InternalServerError.ToString(),
                     message = "Đã xảy ra lỗi khi lấy lịch sử đơn hàng.",
+                    data = ex.Message
+                };
+            }
+        }
+
+        public async Task<ApiResponse> Confirm(Guid? orderid, Guid? bookingid)
+        {
+            try
+            {
+                if (orderid.HasValue)
+                {
+                    var order = await _unitOfWork.GetRepository<Order>().SingleOrDefaultAsync(
+                        predicate: o => o.Id == orderid.Value && o.IsDelete == false);
+
+                    if (order == null)
+                    {
+                        return new ApiResponse
+                        {
+                            status = StatusCodes.Status404NotFound.ToString(),
+                            message = "Không tìm thấy đơn hàng.",
+                            data = null
+                        };
+                    }
+
+                    if (!order.Status.Equals(OrderStatus.DONE.ToString(), StringComparison.OrdinalIgnoreCase))
+                    {
+                        return new ApiResponse
+                        {
+                            status = StatusCodes.Status400BadRequest.ToString(),
+                            message = "Chỉ những đơn hàng có trạng thái DONE mới được xác nhận.",
+                            data = null
+                        };
+                    }
+
+                    // Cập nhật trạng thái Order
+                    order.Status = OrderStatus.COMPLETED.ToString();
+                    _unitOfWork.GetRepository<Order>().UpdateAsync(order);
+
+                    // Cập nhật trạng thái Mission liên quan
+                    var missions = await _unitOfWork.GetRepository<Mission>().GetListAsync(
+                        predicate: m => m.OrderId == order.Id && m.IsDelete == false);
+
+                    foreach (var mission in missions)
+                    {
+                        mission.Status = MissionStatusEnum.Completed.ToString();
+                        _unitOfWork.GetRepository<Mission>().UpdateAsync(mission);
+                    }
+
+                    await _unitOfWork.CommitAsync();
+
+                    return new ApiResponse
+                    {
+                        status = StatusCodes.Status200OK.ToString(),
+                        message = "Xác nhận đơn hàng và nhiệm vụ thành công.",
+                        data = null
+                    };
+                }
+                else if (bookingid.HasValue)
+                {
+                    var booking = await _unitOfWork.GetRepository<Booking>().SingleOrDefaultAsync(
+                        predicate: b => b.Id == bookingid.Value);
+
+                    if (booking == null)
+                    {
+                        return new ApiResponse
+                        {
+                            status = StatusCodes.Status404NotFound.ToString(),
+                            message = "Không tìm thấy booking.",
+                            data = null
+                        };
+                    }
+
+                    if (!booking.Status.Equals(BookingStatusEnum.DONE.ToString(), StringComparison.OrdinalIgnoreCase))
+                    {
+                        return new ApiResponse
+                        {
+                            status = StatusCodes.Status400BadRequest.ToString(),
+                            message = "Chỉ những booking có trạng thái DONE mới được xác nhận.",
+                            data = null
+                        };
+                    }
+
+                    // Cập nhật trạng thái Booking
+                    booking.Status = BookingStatusEnum.COMPLETED.ToString();
+                    _unitOfWork.GetRepository<Booking>().UpdateAsync(booking);
+
+                    // Cập nhật trạng thái Mission liên quan
+                    var missions = await _unitOfWork.GetRepository<Mission>().GetListAsync(
+                        predicate: m => m.BookingId == booking.Id && m.IsDelete == false);
+
+                    foreach (var mission in missions)
+                    {
+                        mission.Status = MissionStatusEnum.Completed.ToString();
+                        _unitOfWork.GetRepository<Mission>().UpdateAsync(mission);
+                    }
+
+                    await _unitOfWork.CommitAsync();
+
+                    return new ApiResponse
+                    {
+                        status = StatusCodes.Status200OK.ToString(),
+                        message = "Xác nhận booking và nhiệm vụ thành công.",
+                        data = null
+                    };
+                }
+                else
+                {
+                    return new ApiResponse
+                    {
+                        status = StatusCodes.Status400BadRequest.ToString(),
+                        message = "Vui lòng cung cấp orderid hoặc bookingid.",
+                        data = null
+                    };
+                }
+            }
+            catch (Exception ex)
+            {
+                return new ApiResponse
+                {
+                    status = StatusCodes.Status500InternalServerError.ToString(),
+                    message = "Đã xảy ra lỗi khi xác nhận.",
                     data = ex.Message
                 };
             }

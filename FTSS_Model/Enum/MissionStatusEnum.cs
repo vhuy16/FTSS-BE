@@ -6,5 +6,6 @@ public enum MissionStatusEnum
     Cancel,
     Processing,
     NotStarted,
-    NotDone
+    NotDone,
+    Completed
 }
