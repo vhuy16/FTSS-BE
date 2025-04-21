@@ -13,4 +13,7 @@ public class GetUserResponse
     public bool? IsDeleted { get; set; }
     public string? CityId  {get; set; }
     public string? DistrictId {get; set; }
+    public string? BankName {get; set; }
+    public string? BankNumber {get; set; }
+    public string? BankHolder {get; set; }
 }
