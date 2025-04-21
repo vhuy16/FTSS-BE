@@ -362,7 +362,10 @@ public class UserService : BaseService<UserService>, IUserService
                 Address = u.Address,
                 IsDeleted = u.IsDelete,
                 CityId = u.CityId,
-                DistrictId = u.DistrictId
+                DistrictId = u.DistrictId,
+                BankHolder = u.BankHolder,
+                BankName = u.BankName,
+                BankNumber = u.BankNumber,
             },
             predicate: u => u.Id.Equals(userId.Value) && u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()));
 
