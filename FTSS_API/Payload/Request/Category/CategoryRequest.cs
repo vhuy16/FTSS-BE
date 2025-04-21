@@ -11,5 +11,6 @@
         public bool? IsFishTank { get; set; }
 
         public bool? IsObligatory { get; set; }
+        public bool? IsSolution { get; set; }
     }
 }

@@ -112,6 +112,7 @@ namespace FTSS_API.Service.Implement
                 IsDelete = false,
                 IsFishTank = request.IsFishTank,
                 IsObligatory = request.IsObligatory,
+                IsSolution = request.IsSolution,
                 LinkImage = imageUrl // Save the image URL
             };
 
@@ -137,6 +138,7 @@ namespace FTSS_API.Service.Implement
                             category.ModifyDate,
                             category.IsFishTank,
                             category.IsObligatory,
+                            category.IsSolution,
                         }
                     };
                 }
@@ -175,6 +177,7 @@ namespace FTSS_API.Service.Implement
                     ModifyDate = c.ModifyDate,
                     IsFishTank = c.IsFishTank,
                     IsObligatory = c.IsObligatory,
+                    IsSolution = c.IsSolution,
                     LinkImage = c.LinkImage,
                     // Dữ liệu SubCategory sẽ được ánh xạ tại đây
                     SubCategories = c.SubCategories
@@ -252,6 +255,7 @@ namespace FTSS_API.Service.Implement
                     ModifyDate = c.ModifyDate,
                     IsObligatory = c.IsObligatory,
                     IsFishTank = c.IsFishTank,
+                    IsSolution = c.IsSolution,
                     LinkImage = c.LinkImage,
                     SubCategories = c.SubCategories
                         .Where(sub => sub.IsDelete != true)  // Lọc nếu cần
@@ -338,6 +342,10 @@ namespace FTSS_API.Service.Implement
             {
                 existingCategory.IsObligatory = updateCategoryRequest.IsObligatory;
             }
+            if (updateCategoryRequest.IsSolution.HasValue)
+            {
+                existingCategory.IsSolution = updateCategoryRequest.IsSolution;
+            }
 
             // Cập nhật hình ảnh nếu có
             if (updateCategoryRequest.ImageFile != null)
@@ -401,6 +409,7 @@ namespace FTSS_API.Service.Implement
                     existingCategory.LinkImage,
                     existingCategory.IsFishTank,
                     existingCategory.IsObligatory,
+                    existingCategory.IsSolution,
                     existingCategory.ModifyDate
                 }
             };
@@ -450,5 +459,74 @@ namespace FTSS_API.Service.Implement
                 data = null
             };
         }
+
+        public async Task<ApiResponse> GetListCategory(int page, int size, string? searchName, bool? isAscending)
+        {
+            var categories = await _unitOfWork.GetRepository<Category>().GetPagingListAsync(
+                selector: c => new CategoryResponse
+                {
+                    Id = c.Id,
+                    CategoryName = c.CategoryName,
+                    Description = c.Description,
+                    CreateDate = c.CreateDate,
+                    ModifyDate = c.ModifyDate,
+                    IsFishTank = c.IsFishTank,
+                    IsObligatory = c.IsObligatory,
+                    IsSolution = c.IsSolution,
+                    LinkImage = c.LinkImage,
+                    SubCategories = c.SubCategories
+                        .Where(sub => sub.IsDelete != true)
+                        .Select(sub => new SubCategoryResponse
+                        {
+                            Id = sub.Id,
+                            SubCategoryName = sub.SubCategoryName,
+                            CategoryId = sub.CategoryId,
+                            Description = sub.Description,
+                            CreateDate = sub.CreateDate,
+                            ModifyDate = sub.ModifyDate,
+                            CategoryName = sub.Category.CategoryName
+                        }).ToList()
+                },
+                predicate: c => c.IsDelete != true &&
+                                c.IsSolution == false &&
+                                (string.IsNullOrEmpty(searchName) || c.CategoryName.Contains(searchName)),
+                orderBy: q =>
+                {
+                    var ordered = q.OrderByDescending(c => c.IsFishTank); // Ưu tiên IsFishTank = true
+
+                    if (isAscending.HasValue)
+                    {
+                        ordered = isAscending.Value
+                            ? ordered.ThenBy(c => c.CategoryName)
+                            : ordered.ThenByDescending(c => c.CategoryName);
+                    }
+                    else
+                    {
+                        ordered = ordered.ThenByDescending(c => c.CreateDate);
+                    }
+
+                    return ordered;
+                },
+                size: size,
+                page: page);
+
+            int totalItems = categories.Total;
+            int totalPages = (int)Math.Ceiling((double)totalItems / size);
+
+            return new ApiResponse
+            {
+                status = StatusCodes.Status200OK.ToString(),
+                message = "Categories retrieved successfully.",
+                data = new Paginate<CategoryResponse>
+                {
+                    Page = page,
+                    Size = size,
+                    Total = totalItems,
+                    TotalPages = totalPages,
+                    Items = categories.Items
+                }
+            };
+        }
+
     }
 }
