@@ -21,6 +21,7 @@ namespace FTSS_API.Payload.Response.Category
         public bool? IsFishTank { get; set; }
 
         public bool? IsObligatory { get; set; }
+        public bool? IsSolution { get; set; }
         public string LinkImage { get; set; } = null!;
         public List<SubCategoryResponse> SubCategories { get; set; } = new List<SubCategoryResponse>();
 

@@ -23,5 +23,7 @@ public partial class Category
 
     public bool? IsObligatory { get; set; }
 
+    public bool? IsSolution { get; set; }
+
     public virtual ICollection<SubCategory> SubCategories { get; set; } = new List<SubCategory>();
 }

@@ -45,6 +45,10 @@ public partial class FtssContext : DbContext
 
     public virtual DbSet<Product> Products { get; set; }
 
+    public virtual DbSet<ReturnRequest> ReturnRequests { get; set; }
+
+    public virtual DbSet<ReturnRequestMedium> ReturnRequestMedia { get; set; }
+
     public virtual DbSet<ServicePackage> ServicePackages { get; set; }
 
     public virtual DbSet<SetupPackage> SetupPackages { get; set; }
@@ -265,6 +269,13 @@ public partial class FtssContext : DbContext
             entity.Property(e => e.IsDelete)
                 .HasDefaultValue(false)
                 .HasColumnName("isDelete");
+            entity.Property(e => e.IsFishTank)
+                .HasDefaultValue(false)
+                .HasColumnName("isFishTank");
+            entity.Property(e => e.IsObligatory)
+                .HasDefaultValue(false)
+                .HasColumnName("isObligatory");
+            entity.Property(e => e.IsSolution).HasColumnName("isSolution");
             entity.Property(e => e.LinkImage)
                 .HasMaxLength(255)
                 .IsUnicode(false)
@@ -711,6 +722,47 @@ public partial class FtssContext : DbContext
                 .HasConstraintName("FK_Product_SubCategory");
         });
 
+        modelBuilder.Entity<ReturnRequest>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PK__ReturnRe__3214EC07B6838DC5");
+
+            entity.ToTable("ReturnRequest");
+
+            entity.HasIndex(e => e.OrderId, "IX_ReturnRequest_OrderId");
+
+            entity.HasIndex(e => e.UserId, "IX_ReturnRequest_UserId");
+
+            entity.Property(e => e.Id).HasDefaultValueSql("(newid())");
+            entity.Property(e => e.CreatedAt).HasColumnType("datetime");
+            entity.Property(e => e.Reason).HasMaxLength(500);
+            entity.Property(e => e.Status).HasMaxLength(50);
+            entity.Property(e => e.UpdatedAt).HasColumnType("datetime");
+
+            entity.HasOne(d => d.Order).WithMany(p => p.ReturnRequests)
+                .HasForeignKey(d => d.OrderId)
+                .HasConstraintName("FK_ReturnRequest_Order");
+
+            entity.HasOne(d => d.User).WithMany(p => p.ReturnRequests)
+                .HasForeignKey(d => d.UserId)
+                .HasConstraintName("FK_ReturnRequest_User");
+        });
+
+        modelBuilder.Entity<ReturnRequestMedium>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PK__ReturnRe__3214EC07FA170968");
+
+            entity.HasIndex(e => e.ReturnRequestId, "IX_ReturnRequestMedia_ReturnRequestId");
+
+            entity.Property(e => e.Id).HasDefaultValueSql("(newid())");
+            entity.Property(e => e.CreatedAt).HasColumnType("datetime");
+            entity.Property(e => e.MediaLink).HasMaxLength(255);
+            entity.Property(e => e.MediaType).HasMaxLength(50);
+
+            entity.HasOne(d => d.ReturnRequest).WithMany(p => p.ReturnRequestMedia)
+                .HasForeignKey(d => d.ReturnRequestId)
+                .HasConstraintName("FK_ReturnRequestMedia_ReturnRequest");
+        });
+
         modelBuilder.Entity<ServicePackage>(entity =>
         {
             entity.HasKey(e => e.Id).HasName("PK__ServiceP__3213E83FA4E5AED8");
@@ -938,6 +990,18 @@ public partial class FtssContext : DbContext
             entity.Property(e => e.Address)
                 .HasMaxLength(255)
                 .HasColumnName("address");
+            entity.Property(e => e.BankHolder)
+                .HasMaxLength(50)
+                .IsUnicode(false)
+                .HasColumnName("bankHolder");
+            entity.Property(e => e.BankName)
+                .HasMaxLength(50)
+                .IsUnicode(false)
+                .HasColumnName("bankName");
+            entity.Property(e => e.BankNumber)
+                .HasMaxLength(50)
+                .IsUnicode(false)
+                .HasColumnName("bankNumber");
             entity.Property(e => e.CityId)
                 .HasMaxLength(50)
                 .HasColumnName("cityId");

@@ -257,7 +257,7 @@ namespace FTSS_API.Controller
             return StatusCode(int.Parse(response.status), response);
         }
         /// <summary>
-        /// API update mission cho technician.
+        /// API confirm cho user.
         /// </summary>
         [HttpPut(ApiEndPointConstant.Booking.Confirm)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]

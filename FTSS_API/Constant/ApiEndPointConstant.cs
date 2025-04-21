@@ -86,6 +86,7 @@ public static class ApiEndPointConstant
         public const string CategoryEndPoint = ApiEndpoint + "/category";
         public const string CreateCategory = CategoryEndPoint;
         public const string GetAllCategory = CategoryEndPoint;
+        public const string GetListCategory = CategoryEndPoint + "/get-list-category";
         public const string GetCategory = CategoryEndPoint + "/{id}";
         public const string UpdateCategory = CategoryEndPoint + "/{id}";
         public const string DeleteCategory = CategoryEndPoint + "/{id}";
