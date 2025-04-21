@@ -1528,8 +1528,9 @@ namespace FTSS_API.Service.Implement
                 bool isSameName = string.IsNullOrWhiteSpace(request.MissionName) || request.MissionName == mission.MissionName;
                 bool isSameDesc = string.IsNullOrWhiteSpace(request.MissionDescription) || request.MissionDescription == mission.MissionDescription;
                 bool isSameTech = !request.TechnicianId.HasValue || request.TechnicianId.Value == mission.Userid;
+                bool isSameStatus = string.IsNullOrWhiteSpace(request.Status);
 
-                if (isSameName && isSameDesc && isSameTech)
+                if (isSameName && isSameDesc && isSameTech && isSameStatus)
                 {
                     return new ApiResponse
                     {
@@ -1576,11 +1577,56 @@ namespace FTSS_API.Service.Implement
                     mission.Userid = request.TechnicianId;
                 }
 
-                // Cập nhật các field được phép
+                // Cập nhật các trường nếu khác
                 mission.MissionName = !string.IsNullOrWhiteSpace(request.MissionName) ? request.MissionName : mission.MissionName;
                 mission.MissionDescription = !string.IsNullOrWhiteSpace(request.MissionDescription) ? request.MissionDescription : mission.MissionDescription;
 
-                // Cập nhật mission
+                // Nếu có cập nhật Status
+                if (!string.IsNullOrWhiteSpace(request.Status))
+                {
+                    mission.Status = request.Status;
+
+                    if (mission.OrderId.HasValue && !mission.BookingId.HasValue)
+                    {
+                        var order = await _unitOfWork.GetRepository<Order>()
+    .SingleOrDefaultAsync(selector: x => x, predicate: o => o.Id == mission.OrderId.Value);
+
+                        if (order != null)
+                        {
+                            switch (request.Status)
+                            {
+                                case nameof(MissionStatusEnum.Cancel):
+                                    order.Status = OrderStatus.CANCELLED.ToString(); break;
+                                case nameof(MissionStatusEnum.NotDone):
+                                    order.Status = OrderStatus.NOTDONE.ToString(); break;
+                                case nameof(MissionStatusEnum.Completed):
+                                    order.Status = OrderStatus.COMPLETED.ToString(); break;
+                            }
+
+                            _unitOfWork.GetRepository<Order>().UpdateAsync(order);
+                        }
+                    }
+                    else if (mission.BookingId.HasValue && !mission.OrderId.HasValue)
+                    {
+                        var booking = await _unitOfWork.GetRepository<Booking>()
+    .SingleOrDefaultAsync(selector: x => x, predicate: b => b.Id == mission.BookingId.Value);
+                        if (booking != null)
+                        {
+                            switch (request.Status)
+                            {
+                                case nameof(MissionStatusEnum.Cancel):
+                                    booking.Status = BookingStatusEnum.MISSED.ToString(); break;
+                                case nameof(MissionStatusEnum.NotDone):
+                                    booking.Status = BookingStatusEnum.NOTDONE.ToString(); break;
+                                case nameof(MissionStatusEnum.Completed):
+                                    booking.Status = BookingStatusEnum.COMPLETED.ToString(); break;
+                            }
+
+                            _unitOfWork.GetRepository<Booking>().UpdateAsync(booking);
+                        }
+                    }
+                }
+
                 _unitOfWork.GetRepository<Mission>().UpdateAsync(mission);
                 await _unitOfWork.CommitAsync();
 
@@ -1601,7 +1647,6 @@ namespace FTSS_API.Service.Implement
                 };
             }
         }
-
 
         public async Task<ApiResponse> UpdateStatusMission(Guid missionId, string status, Supabase.Client client, List<IFormFile>? ImageLinks, string? reason = null)
 {
