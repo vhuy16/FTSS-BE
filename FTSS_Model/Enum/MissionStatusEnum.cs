@@ -7,5 +7,6 @@ public enum MissionStatusEnum
     Processing,
     NotStarted,
     NotDone,
-    Completed
+    Completed,
+    Reported
 }

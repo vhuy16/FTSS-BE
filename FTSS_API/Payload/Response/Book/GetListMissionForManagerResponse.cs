@@ -27,6 +27,8 @@
         public string FullName { get; set; } = null!;
         public string? BookingImage { get; set; }
         public DateTime? InstallationDate { get; set; }
+        public string? ReportReason { get; set; }
+        public List<MissionImageResponse> Images { get; set; } = new();
 
         public List<ServicePackageResponse> Services { get; set; } = new();
     }

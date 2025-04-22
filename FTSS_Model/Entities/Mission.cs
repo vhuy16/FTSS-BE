@@ -31,6 +31,8 @@ public partial class Mission
 
     public DateTime? EndMissionSchedule { get; set; }
 
+    public string? ReportReason { get; set; }
+
     public virtual Booking? Booking { get; set; }
 
     public virtual ICollection<MissionImage> MissionImages { get; set; } = new List<MissionImage>();

@@ -18,6 +18,7 @@ namespace FTSS_API.Payload.Response.Category
 
         // Ngày chỉnh sửa gần nhất
         public DateTime? ModifyDate { get; set; }
+        public bool? IsDelete { get; set; }
         public bool? IsFishTank { get; set; }
 
         public bool? IsObligatory { get; set; }

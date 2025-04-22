@@ -20,6 +20,7 @@ using FTSS_API.Payload.Response.Pay.Payment;
 using Azure;
 using FTSS_API.Payload.Response.SetupPackage;
 using static FTSS_API.Payload.Response.Order.GetOrderResponse;
+using Supabase;
 
 namespace FTSS_API.Service.Implement
 {
@@ -686,14 +687,14 @@ namespace FTSS_API.Service.Implement
         {
             try
             {
+                // Lấy thông tin booking + liên quan
                 var booking = await _unitOfWork.GetRepository<Booking>().SingleOrDefaultAsync(
                     predicate: b => b.Id == bookingId,
                     include: b => b
                         .Include(x => x.User)
                         .Include(x => x.BookingDetails).ThenInclude(bd => bd.ServicePackage)
-                        .Include(x => x.Missions).ThenInclude(mm => mm.MissionImages)
                         .Include(x => x.Payments)
-                        .Include(x => x.Order) // Include Order để truy cập SetupPackageId
+                        .Include(x => x.Order) // để lấy SetupPackageId
                 );
 
                 if (booking == null)
@@ -706,7 +707,28 @@ namespace FTSS_API.Service.Implement
                     };
                 }
 
-                // Lấy thông tin payment đầu tiên nếu có
+                // Truy vấn Mission có BookingId = booking.Id
+                var mission = await _unitOfWork.GetRepository<Mission>().SingleOrDefaultAsync(
+                    predicate: m => m.BookingId == booking.Id && m.IsDelete == false,
+                    include: m => m.Include(mi => mi.MissionImages)
+                );
+
+                // Lấy danh sách ảnh kiểu Report từ MissionImage
+                var reportImages = mission?.MissionImages?
+                    .Where(img => img.IsDelete == false)
+                    .Select(img => new MissionImageResponse
+                    {
+                        Id = img.Id,
+                        LinkImage = img.LinkImage,
+                        Status = img.Status,
+                        CreateDate = img.CreateDate,
+                        ModifyDate = img.ModifyDate,
+                        IsDelete = img.IsDelete,
+                        Type = img.Type
+                    }).ToList() ?? new List<MissionImageResponse>();
+
+
+                // Lấy payment đầu tiên nếu có
                 var payment = booking.Payments.FirstOrDefault();
                 var paymentResponse = payment != null
                     ? new PaymentResponse
@@ -720,7 +742,7 @@ namespace FTSS_API.Service.Implement
                     }
                     : new PaymentResponse();
 
-                // Khởi tạo biến chứa SetupPackageResponse
+                // Lấy thông tin SetupPackage nếu có
                 SetupPackageResponse? setupPackageResponse = null;
 
                 if (booking.Order != null && booking.Order.SetupPackageId.HasValue)
@@ -758,15 +780,16 @@ namespace FTSS_API.Service.Implement
                                 IsDelete = spd.Product.IsDelete,
                                 CategoryName = spd.Product.SubCategory?.SubCategoryName ?? "Không rõ",
                                 images = spd.Product?.Images?
-                        .Where(img => img.IsDelete == false)
-                        .OrderBy(img => img.CreateDate)
-                        .Select(img => img.LinkImage)
-                        .FirstOrDefault() ?? "NoImageAvailable"
+                                    .Where(img => img.IsDelete == false)
+                                    .OrderBy(img => img.CreateDate)
+                                    .Select(img => img.LinkImage)
+                                    .FirstOrDefault() ?? "NoImageAvailable"
                             }).ToList()
                         };
                     }
                 }
 
+                // Gộp response
                 var response = new GetBookingById
                 {
                     Id = booking.Id,
@@ -780,12 +803,11 @@ namespace FTSS_API.Service.Implement
                     TotalPrice = booking.TotalPrice,
                     BookingCode = booking.BookingCode,
                     OrderId = booking.OrderId,
-                    ImageLinks = booking.Missions
-                        .SelectMany(m => m.MissionImages)
-                        .Where(mi => mi.IsDelete == false)
-                        .Select(mi => mi.LinkImage)
-                        .ToList(),
                     IsAssigned = booking.IsAssigned,
+                    MissionId = mission?.Id,
+                    CancelReason = mission?.CancelReason,
+                    ReportReason = mission?.ReportReason,
+                    Images = reportImages,
                     Services = booking.BookingDetails.Select(bd => new ServicePackageResponse
                     {
                         Id = bd.ServicePackage.Id,
@@ -813,6 +835,7 @@ namespace FTSS_API.Service.Implement
                 };
             }
         }
+
 
 
         public async Task<ApiResponse> GetBookingById(string bookingCode)
@@ -1107,22 +1130,28 @@ namespace FTSS_API.Service.Implement
                     TotalPrice = b.TotalPrice,
                     OrderId = b.OrderId,
                     IsAssigned = b.IsAssigned,
+
+                    // Lấy MissionId đầu tiên nếu có
+                    MissionId = b.Missions.FirstOrDefault()?.Id,
+
                     Services = b.BookingDetails.Select(bd => new ServicePackageResponse
                     {
                         Id = bd.ServicePackage.Id,
                         ServiceName = bd.ServicePackage.ServiceName,
                         Price = bd.ServicePackage.Price
                     }).ToList(),
+
                     Payment = b.Payments.Select(p => new PaymentResponse
                     {
                         PaymentId = p.Id,
                         PaymentMethod = p.PaymentMethod ?? "Không xác định",
                         PaymentStatus = p.PaymentStatus ?? "Không xác định",
-                        BankHolder =p.BankHolder ?? "Unknown",
+                        BankHolder = p.BankHolder ?? "Unknown",
                         BankName = p.BankName ?? "Unknown",
                         BankNumber = p.BankNumber ?? "Unknown",
                     }).FirstOrDefault() ?? new PaymentResponse()
                 }).ToList();
+
 
                 return new ApiResponse
                 {
@@ -1174,11 +1203,13 @@ namespace FTSS_API.Service.Implement
                 var missions = await _unitOfWork.GetRepository<Mission>().GetPagingListAsync(
                     predicate: filter,
                     orderBy: orderBy,
-                    include: m => m.Include(x => x.User)
-               .Include(x => x.Order)
-               .Include(x => x.Booking)
-                   .ThenInclude(b => b.BookingDetails)
-                       .ThenInclude(bd => bd.ServicePackage),
+                    include: m => m
+                        .Include(x => x.User)
+                        .Include(x => x.Order)
+                        .Include(x => x.MissionImages) // Thêm dòng này
+                        .Include(x => x.Booking)
+                            .ThenInclude(b => b.BookingDetails)
+                                .ThenInclude(bd => bd.ServicePackage),
                     page: pageNumber,
                     size: pageSize
                 );
@@ -1194,6 +1225,7 @@ namespace FTSS_API.Service.Implement
                     Address = m.Address,
                     PhoneNumber = m.PhoneNumber,
                     CancelReason = m.CancelReason,
+                    ReportReason = m.ReportReason, // ✅ Thêm field ReportReason
                     BookingId = m.BookingId,
                     OrderId = m.OrderId,
                     TechnicianId = m.Userid,
@@ -1201,19 +1233,32 @@ namespace FTSS_API.Service.Implement
                     OrderCode = m.Order?.OrderCode ?? "Không có",
                     BookingCode = m.Booking?.BookingCode ?? "Không có",
                     FullName = m.Booking != null
-        ? m.Booking.FullName
-        : (m.Order?.RecipientName ?? "Không có"),
+                        ? m.Booking.FullName
+                        : (m.Order?.RecipientName ?? "Không có"),
                     BookingImage = m.Booking?.BookingImage,
                     InstallationDate = m.Order?.InstallationDate,
-                    Services = m.Booking?.BookingDetails
-             ?.Select(s => new ServicePackageResponse
-             {
-                 Id = s.ServicePackage.Id,
-                 ServiceName = s.ServicePackage.ServiceName,
-                 Price = s.ServicePackage.Price
-             }).ToList() ?? new()
-                }).ToList();
+                    Services = m.Booking?.BookingDetails?
+                        .Select(s => new ServicePackageResponse
+                        {
+                            Id = s.ServicePackage.Id,
+                            ServiceName = s.ServicePackage.ServiceName,
+                            Price = s.ServicePackage.Price
+                        }).ToList() ?? new(),
 
+                    // ✅ Thêm danh sách hình ảnh nhiệm vụ
+                    Images = m.MissionImages
+                        .Where(img => img.IsDelete == false)
+                        .Select(img => new MissionImageResponse
+                        {
+                            Id = img.Id,
+                            LinkImage = img.LinkImage,
+                            Status = img.Status,
+                            CreateDate = img.CreateDate,
+                            ModifyDate = img.ModifyDate,
+                            IsDelete = img.IsDelete,
+                            Type = img.Type
+                        }).ToList()
+                }).ToList();
 
                 return new ApiResponse
                 {
@@ -1232,6 +1277,7 @@ namespace FTSS_API.Service.Implement
                 };
             }
         }
+
 
         public async Task<ApiResponse> GetListTaskTech(int pageNumber, int pageSize, string? status, bool? isAscending)
         {
@@ -1747,15 +1793,16 @@ namespace FTSS_API.Service.Implement
             // Thêm ảnh mới
             foreach (var imageUrl in imageUrls)
             {
-                var newImage = new MissionImage
-                {
-                    Id = Guid.NewGuid(),
-                    MissionId = missionId,
-                    LinkImage = imageUrl,
-                    Status = "Active", // Giả định trạng thái mặc định
-                    CreateDate = TimeUtils.GetCurrentSEATime(),
-                    ModifyDate = TimeUtils.GetCurrentSEATime(),
-                    IsDelete = false
+                        var newImage = new MissionImage
+                        {
+                            Id = Guid.NewGuid(),
+                            MissionId = missionId,
+                            LinkImage = imageUrl,
+                            Status = "Active", // Giả định trạng thái mặc định
+                            CreateDate = TimeUtils.GetCurrentSEATime(),
+                            ModifyDate = TimeUtils.GetCurrentSEATime(),
+                            IsDelete = false,
+                            Type = MissionImageTypeEnum.Cancel.GetDescriptionFromEnum()
                 };
 
                 // Thêm mới vào cơ sở dữ liệu
@@ -2405,5 +2452,171 @@ namespace FTSS_API.Service.Implement
             }
         }
 
+        public async Task<ApiResponse> Report(Guid id, Supabase.Client client, List<IFormFile>? imageLinks, string? reason)
+        {
+            try
+            {
+                // Lấy UserId từ HttpContext
+                Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
+
+                var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync<User>(
+                    selector: u => u,
+                    predicate: u => u.Id.Equals(userId) &&
+                                    u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) &&
+                                    u.IsDelete == false &&
+                                    u.Role.Equals(RoleEnum.Customer.GetDescriptionFromEnum()),
+                    orderBy: null,
+                    include: null
+                );
+
+                if (user == null)
+                {
+                    throw new BadHttpRequestException("Bạn không có quyền thực hiện thao tác này.");
+                }
+
+                var mission = await _unitOfWork.GetRepository<Mission>().SingleOrDefaultAsync<Mission>(
+                    selector: m => m,
+                    predicate: m => m.Id == id && m.IsDelete == false,
+                    orderBy: null,
+                    include: null
+                );
+
+                if (mission == null)
+                {
+                    return new ApiResponse
+                    {
+                        status = StatusCodes.Status404NotFound.ToString(),
+                        message = "Không tìm thấy nhiệm vụ.",
+                        data = null
+                    };
+                }
+                // ✅ Chỉ cho phép báo cáo nếu mission ở trạng thái "Done"
+                if (!mission.Status.Equals(MissionStatusEnum.Done.GetDescriptionFromEnum()))
+                {
+                    return new ApiResponse
+                    {
+                        status = StatusCodes.Status400BadRequest.ToString(),
+                        message = "Chỉ được phép báo cáo những nhiệm vụ đã hoàn thành.",
+                        data = null
+                    };
+                }
+                // Lý do là bắt buộc
+                if (string.IsNullOrWhiteSpace(reason))
+                {
+                    return new ApiResponse
+                    {
+                        status = StatusCodes.Status400BadRequest.ToString(),
+                        message = "Vui lòng cung cấp lý do báo cáo.",
+                        data = null
+                    };
+                }
+
+                // Gán lý do và cập nhật status
+                mission.ReportReason = reason;
+                mission.Status = MissionStatusEnum.Reported.GetDescriptionFromEnum();
+
+                // Nếu có OrderId mà không có BookingId => cập nhật Order status
+                if (mission.OrderId != null && mission.BookingId == null)
+                {
+                    var order = await _unitOfWork.GetRepository<Order>().SingleOrDefaultAsync<Order>(
+                        selector: o => o,
+                        predicate: o => o.Id == mission.OrderId,
+                        orderBy: null,
+                        include: null
+                    );
+
+                    if (order != null)
+                    {
+                        order.Status = OrderStatus.REPORTED.ToString();
+                        order.ModifyDate = TimeUtils.GetCurrentSEATime();
+                        _unitOfWork.GetRepository<Order>().UpdateAsync(order);
+                    }
+                }
+
+                // Nếu có BookingId mà không có OrderId => cập nhật Booking status
+                if (mission.BookingId != null && mission.OrderId == null)
+                {
+                    var booking = await _unitOfWork.GetRepository<Booking>().SingleOrDefaultAsync<Booking>(
+                        selector: b => b,
+                        predicate: b => b.Id == mission.BookingId,
+                        orderBy: null,
+                        include: null
+                    );
+
+                    if (booking != null)
+                    {
+                        booking.Status = BookingStatusEnum.REPORTED.ToString();
+                        _unitOfWork.GetRepository<Booking>().UpdateAsync(booking);
+                    }
+                }
+
+                // Xử lý ảnh nếu có
+                if (imageLinks != null && imageLinks.Any())
+                {
+                    if (imageLinks.Any(file => file == null || file.Length == 0))
+                    {
+                        return new ApiResponse
+                        {
+                            status = StatusCodes.Status400BadRequest.ToString(),
+                            message = "File ảnh không hợp lệ hoặc trống.",
+                            data = null
+                        };
+                    }
+
+                    // Xoá ảnh cũ kiểu Report
+                    var oldImages = await _unitOfWork.GetRepository<MissionImage>().GetListAsync<MissionImage>(
+                        selector: i => i,
+                        predicate: i => i.MissionId == id && i.Type == MissionImageTypeEnum.Report.GetDescriptionFromEnum(),
+                        orderBy: null,
+                        include: null
+                    );
+
+                    foreach (var img in oldImages)
+                    {
+                        _unitOfWork.GetRepository<MissionImage>().DeleteAsync(img);
+                    }
+
+                    // Upload ảnh mới
+                    var uploadedUrls = await _supabaseImageService.SendImagesAsync(imageLinks, client);
+
+                    foreach (var url in uploadedUrls)
+                    {
+                        var newImage = new MissionImage
+                        {
+                            Id = Guid.NewGuid(),
+                            MissionId = id,
+                            LinkImage = url,
+                            Status = "Active",
+                            CreateDate = TimeUtils.GetCurrentSEATime(),
+                            ModifyDate = TimeUtils.GetCurrentSEATime(),
+                            IsDelete = false,
+                            Type = MissionImageTypeEnum.Report.GetDescriptionFromEnum()
+                        };
+
+                        await _unitOfWork.GetRepository<MissionImage>().InsertAsync(newImage);
+                    }
+                }
+
+                // Cập nhật mission
+                _unitOfWork.GetRepository<Mission>().UpdateAsync(mission);
+                await _unitOfWork.CommitAsync();
+
+                return new ApiResponse
+                {
+                    status = StatusCodes.Status200OK.ToString(),
+                    message = "Báo cáo nhiệm vụ thành công.",
+                    data = null
+                };
+            }
+            catch (Exception ex)
+            {
+                return new ApiResponse
+                {
+                    status = StatusCodes.Status500InternalServerError.ToString(),
+                    message = "Đã xảy ra lỗi khi báo cáo nhiệm vụ.",
+                    data = ex.Message
+                };
+            }
+        }
     }
 }

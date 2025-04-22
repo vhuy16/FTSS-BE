@@ -161,6 +161,50 @@ namespace FTSS_API.Service.Implement
             };
         }
 
+        public async Task<ApiResponse> EnableSubCategory(Guid id)
+        {
+            // Kiểm tra sự tồn tại của SubCategory đã bị xóa
+            var subCategory = await _unitOfWork.GetRepository<SubCategory>()
+                .SingleOrDefaultAsync(predicate: sc => sc.Id == id && sc.IsDelete == true);
+
+            // Nếu không tìm thấy SubCategory
+            if (subCategory == null)
+            {
+                return new ApiResponse
+                {
+                    status = StatusCodes.Status404NotFound.ToString(),
+                    message = "SubCategory không tồn tại hoặc chưa bị xóa.",
+                    data = null
+                };
+            }
+
+            // Cập nhật IsDelete thành false
+            subCategory.IsDelete = false;
+            _unitOfWork.GetRepository<SubCategory>().UpdateAsync(subCategory);
+
+            // Lưu thay đổi
+            bool isSuccessful = await _unitOfWork.CommitAsync() > 0;
+
+            // Trả về kết quả
+            if (!isSuccessful)
+            {
+                return new ApiResponse
+                {
+                    status = StatusCodes.Status500InternalServerError.ToString(),
+                    message = "Không thể kích hoạt lại SubCategory.",
+                    data = null
+                };
+            }
+
+            return new ApiResponse
+            {
+                status = StatusCodes.Status200OK.ToString(),
+                message = "SubCategory đã được kích hoạt lại thành công.",
+                data = null
+            };
+        }
+
+
         public async Task<ApiResponse> GetAllSubCategories(int page, int size, string searchName, bool? isAscending)
         {
             var subCategories = await _unitOfWork.GetRepository<SubCategory>().GetPagingListAsync(
@@ -172,7 +216,8 @@ namespace FTSS_API.Service.Implement
                     CategoryId = s.CategoryId,
                     CreateDate = s.CreateDate,
                     ModifyDate = s.ModifyDate,
-                    CategoryName = s.Category.CategoryName // Bao gồm CategoryName từ liên kết với Category
+                    CategoryName = s.Category.CategoryName,
+                    IsDelete = s.IsDelete,
                 },
                 predicate: s => s.IsDelete == false &&
                                 (string.IsNullOrEmpty(searchName) || s.SubCategoryName.Contains(searchName)),

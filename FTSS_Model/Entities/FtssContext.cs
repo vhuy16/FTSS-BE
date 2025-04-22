@@ -483,6 +483,11 @@ public partial class FtssContext : DbContext
                 .IsUnicode(false)
                 .IsFixedLength()
                 .HasColumnName("status");
+            entity.Property(e => e.Type)
+                .HasMaxLength(10)
+                .IsUnicode(false)
+                .IsFixedLength()
+                .HasColumnName("type");
 
             entity.HasOne(d => d.Mission).WithMany(p => p.MissionImages)
                 .HasForeignKey(d => d.MissionId)
@@ -992,12 +997,8 @@ public partial class FtssContext : DbContext
                 .HasColumnName("address");
             entity.Property(e => e.BankHolder)
                 .HasMaxLength(50)
-                .IsUnicode(false)
                 .HasColumnName("bankHolder");
-            entity.Property(e => e.BankName)
-                .HasMaxLength(50)
-                .IsUnicode(false)
-                .HasColumnName("bankName");
+            entity.Property(e => e.BankName).HasColumnName("bankName");
             entity.Property(e => e.BankNumber)
                 .HasMaxLength(50)
                 .IsUnicode(false)
