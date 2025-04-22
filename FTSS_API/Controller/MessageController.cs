@@ -18,7 +18,7 @@ using Supabase.Postgrest.Interfaces;
 namespace FTSS_API.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/v1/[controller]")]
 [Authorize]
 public class ChatController : ControllerBase
 {
@@ -33,59 +33,88 @@ public class ChatController : ControllerBase
         _logger = logger;
     }
 
-    [HttpGet("messages")]
-    public async Task<IActionResult> GetMessages(Guid? roomId, int page = 1, int size = 50)
+  [HttpGet("messages")]
+public async Task<IActionResult> GetMessages(Guid? roomId, int page = 1, int size = 50)
+{
+    try
     {
-        try
+        var userId = UserUtil.GetAccountId(HttpContext);
+        if (!userId.HasValue)
         {
-            var userId = UserUtil.GetAccountId(HttpContext);
-            if (!userId.HasValue)
-            {
-                _logger.LogWarning("Unauthorized access attempt: Invalid user.");
-                return Unauthorized("Invalid user.");
-            }
-
-            var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
-                predicate: u => u.Id == userId.Value && u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()));
-            if (user == null)
-            {
-                _logger.LogWarning($"User {userId} not found or not available.");
-                return Unauthorized("User not found or not available.");
-            }
-
-            if (user.Role != RoleEnum.Customer.GetDescriptionFromEnum() && user.Role != RoleEnum.Manager.GetDescriptionFromEnum())
-            {
-                _logger.LogWarning($"User {user.UserName} with role {user.Role} attempted to access messages.");
-                return Forbid("Only Customers and Managers can access messages.");
-            }
-
-            IPostgrestTable<Message> query = _supabase.From<Message>();
-            if (roomId.HasValue)
-            {
-                query = query.Filter("room_id", Constants.Operator.Equals, roomId.Value.ToString());
-            }
-
-            if (user.Role == RoleEnum.Customer.GetDescriptionFromEnum())
-            {
-                query = query.Filter("user_id", Constants.Operator.Equals, user.Id.ToString());
-            }
-
-            var response = await query
-                .Order("timestamp", Constants.Ordering.Descending)
-                .Range((page - 1) * size, page * size - 1)
-                .Get();
-
-            var messages = response.Models.ToList();
-            _logger.LogInformation($"Retrieved {messages.Count} messages for user {user.UserName} in room {roomId?.ToString() ?? "all"}.");
-            return Ok(messages);
+            _logger.LogWarning("Unauthorized access attempt: Invalid user.");
+            return Unauthorized("Invalid user.");
         }
-        catch (Exception ex)
+
+        var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
+            predicate: u => u.Id == userId.Value && u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()));
+        if (user == null)
         {
-            _logger.LogError(ex, "Error retrieving messages.");
-            return StatusCode(500, "An error occurred while retrieving messages.");
+            _logger.LogWarning($"User {userId} not found or not available.");
+            return Unauthorized("User not found or not available.");
         }
+
+        if (user.Role != RoleEnum.Customer.GetDescriptionFromEnum() && user.Role != RoleEnum.Manager.GetDescriptionFromEnum())
+        {
+            _logger.LogWarning($"User {user.UserName} with role {user.Role} attempted to access messages.");
+            return Forbid("Only Customers and Managers can access messages.");
+        }
+
+        IPostgrestTable<Message> query = _supabase.From<Message>();
+        if (roomId.HasValue)
+        {
+            query = query.Filter("room_id", Constants.Operator.Equals, roomId.Value.ToString());
+        }
+
+        if (user.Role == RoleEnum.Customer.GetDescriptionFromEnum())
+        {
+            query = query.Filter("user_id", Constants.Operator.Equals, user.Id.ToString());
+        }
+
+        var response = await query
+            .Order("id", Constants.Ordering.Ascending) // Changed to sort by id ascending
+            .Range((page - 1) * size, page * size - 1)
+            .Get();
+
+        var messages = response.Models.ToList();
+        var messageDtos = new List<MessageDto>();
+
+        foreach (var message in messages)
+        {
+            // Fetch customer details for each message
+            var customer = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
+                predicate: u => u.Id == message.UserId && u.Role == RoleEnum.Customer.GetDescriptionFromEnum());
+
+            messageDtos.Add(new MessageDto
+            {
+                Id = message.Id,
+                RoomId = message.RoomId,
+                UserId = message.UserId,
+                Username = message.Username,
+                CustomerName = customer?.UserName ?? "Unknown", // Include CustomerName
+                Role = message.Role,
+                Text = message.Text,
+                Timestamp = message.Timestamp
+            });
+        }
+
+        // Get the most recent message timestamp
+        DateTime? latestMessageTime = messages.Any() ? messages.Max(m => m.Timestamp) : null;
+
+        var result = new
+        {
+            Messages = messageDtos,
+            LatestMessageTime = latestMessageTime
+        };
+
+        _logger.LogInformation($"Retrieved {messages.Count} messages for user {user.UserName} in room {roomId?.ToString() ?? "all"}.");
+        return Ok(result);
     }
-
+    catch (Exception ex)
+    {
+        _logger.LogError(ex, "Error retrieving messages.");
+        return StatusCode(500, "An error occurred while retrieving messages.");
+    }
+}
     [HttpPost("messages")]
     public async Task<IActionResult> SendMessage([FromBody] MessageRequest request)
     {
@@ -328,4 +357,15 @@ public class ManagerDto
 {
     public Guid Id { get; set; }
     public string UserName { get; set; }
+}
+public class MessageDto
+{
+    public long Id { get; set; }
+    public Guid? RoomId { get; set; }
+    public Guid UserId { get; set; }
+    public string Username { get; set; }
+    public string CustomerName { get; set; } // Added CustomerName
+    public string Role { get; set; }
+    public string Text { get; set; }
+    public DateTime Timestamp { get; set; }
 }
