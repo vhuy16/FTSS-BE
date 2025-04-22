@@ -2,6 +2,7 @@
 using FTSS_API.Payload.Request.Book;
 using FTSS_API.Payload.Request.MaintenanceSchedule;
 using Microsoft.AspNetCore.Mvc;
+using Supabase;
 
 namespace FTSS_API.Service.Interface
 {
@@ -22,6 +23,7 @@ namespace FTSS_API.Service.Interface
         Task<ApiResponse> GetListTech(GetListTechRequest request);
         Task<ApiResponse> GetMissionById(Guid missionid);
         Task<ApiResponse> GetServicePackage(int pageNumber, int pageSize, bool? isAscending);
+        Task<ApiResponse> Report(Guid id, Client client, List<IFormFile>? imageLinks, string? reason);
         Task<ApiResponse> UpdateBooking(Guid bookingid, UpdateBookingRequest request);
         Task<ApiResponse> UpdateBookingStatus(Guid bookingid);
         Task<ApiResponse> UpdateMission(Guid missionId, UpdateMissionRequest request);

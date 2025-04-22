@@ -85,6 +85,19 @@ namespace FTSS_API.Controller
             var response = await _categoryService.UpdateCategory(id, updateCategoryRequest, client);
             return StatusCode(int.Parse(response.status), response);
         }
+        /// <summary>
+        /// API enable loại hàng.
+        /// </summary>
+        [HttpPut(ApiEndPointConstant.Category.EnableCategory)]
+        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
+        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
+        [ProducesErrorResponseType(typeof(ProblemDetails))]
+        public async Task<IActionResult> EnableCategory([FromRoute] Guid id)
+        {
+            var response = await _categoryService.EnableCategory(id);
+            return StatusCode(int.Parse(response.status), response);
+        }
 
         /// <summary>
         /// API xóa loại hàng.

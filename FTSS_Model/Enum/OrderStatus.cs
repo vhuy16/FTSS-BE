@@ -16,5 +16,6 @@
     RETURNING,
     RETURN_ACCEPTED,
     NOTDONE,
-    DONE
+    DONE,
+    REPORTED
 }

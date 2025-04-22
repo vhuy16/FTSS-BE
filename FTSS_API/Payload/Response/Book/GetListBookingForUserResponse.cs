@@ -18,6 +18,7 @@ namespace FTSS_API.Payload.Response.Book
         public Guid? OrderId { get; set; }
 
         public bool? IsAssigned { get; set; }
+        public Guid? MissionId { get; set; }
         public List<ServicePackageResponse> Services { get; set; } = new();
         public PaymentResponse Payment { get; set; } = new PaymentResponse();
     }

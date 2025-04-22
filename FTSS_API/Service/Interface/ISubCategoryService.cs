@@ -8,6 +8,7 @@ namespace FTSS_API.Service.Interface
     {
         Task<ApiResponse> CreateSubCategory(SubCategoryRequest request);
         Task<ApiResponse> DeleteSubCategory(Guid id);
+        Task<ApiResponse> EnableSubCategory(Guid id);
         Task<ApiResponse> GetAllSubCategories(int page, int size, string searchName, bool? isAscending);
         Task<ApiResponse> GetSubCategory(Guid id);
         Task<ApiResponse> UpdateSubCategory(Guid id, SubCategoryRequest request);

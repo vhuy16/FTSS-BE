@@ -19,5 +19,7 @@ public partial class MissionImage
 
     public bool? IsDelete { get; set; }
 
+    public string? Type { get; set; }
+
     public virtual Mission? Mission { get; set; }
 }

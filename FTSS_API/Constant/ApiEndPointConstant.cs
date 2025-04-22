@@ -89,6 +89,7 @@ public static class ApiEndPointConstant
         public const string GetListCategory = CategoryEndPoint + "/get-list-category";
         public const string GetCategory = CategoryEndPoint + "/{id}";
         public const string UpdateCategory = CategoryEndPoint + "/{id}";
+        public const string EnableCategory = CategoryEndPoint + "/enable-category" + "/{id}";
         public const string DeleteCategory = CategoryEndPoint + "/{id}";
     }
     public static class SubCategory
@@ -98,6 +99,7 @@ public static class ApiEndPointConstant
         public const string GetAllSubCategories = SubCategoryEndPoint;
         public const string GetSubCategory = SubCategoryEndPoint + "/{id}";
         public const string UpdateSubCategory = SubCategoryEndPoint + "/{id}";
+        public const string EnableSubCategory = SubCategoryEndPoint + "/enable-subcategory" + "/{id}";
         public const string DeleteSubCategory = SubCategoryEndPoint + "/{id}";
     }
     public static class Product
@@ -172,6 +174,7 @@ public static class ApiEndPointConstant
         public const string BookingEndPoint = ApiEndpoint + "/booking";
         public const string AssigningTechnician = BookingEndPoint;
         public const string UpdateStatusMission = BookingEndPoint + "{id}";
+        public const string Report = BookingEndPoint +"/report" + "/{id}";
         public const string GetListBookingForManager = BookingEndPoint;
         public const string GetListMissionTech = BookingEndPoint + "/list-mission-tech";
         public const string BookingSchedule = BookingEndPoint + "/booking-schedule";

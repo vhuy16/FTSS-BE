@@ -178,6 +178,7 @@ namespace FTSS_API.Service.Implement
                     IsFishTank = c.IsFishTank,
                     IsObligatory = c.IsObligatory,
                     IsSolution = c.IsSolution,
+                    IsDelete = c.IsDelete,
                     LinkImage = c.LinkImage,
                     // Dữ liệu SubCategory sẽ được ánh xạ tại đây
                     SubCategories = c.SubCategories
@@ -190,7 +191,8 @@ namespace FTSS_API.Service.Implement
                             Description = sub.Description,
                             CreateDate = sub.CreateDate,
                             ModifyDate = sub.ModifyDate,
-                            CategoryName = sub.Category.CategoryName
+                            CategoryName = sub.Category.CategoryName,
+                            IsDelete = sub.IsDelete,
                         }).ToList()
                 },
                 predicate: p => p.IsDelete.Equals(false) &&
@@ -256,6 +258,7 @@ namespace FTSS_API.Service.Implement
                     IsObligatory = c.IsObligatory,
                     IsFishTank = c.IsFishTank,
                     IsSolution = c.IsSolution,
+                    IsDelete = c.IsDelete,
                     LinkImage = c.LinkImage,
                     SubCategories = c.SubCategories
                         .Where(sub => sub.IsDelete != true)  // Lọc nếu cần
@@ -267,6 +270,7 @@ namespace FTSS_API.Service.Implement
                             Description = sub.Description,
                             CreateDate = sub.CreateDate,
                             ModifyDate = sub.ModifyDate,
+                            IsDelete= sub.IsDelete,
                         }).ToList()
                 },
                 predicate: c => c.Id.Equals(id) &&
@@ -474,6 +478,7 @@ namespace FTSS_API.Service.Implement
                     IsObligatory = c.IsObligatory,
                     IsSolution = c.IsSolution,
                     LinkImage = c.LinkImage,
+                    IsDelete = c.IsDelete,
                     SubCategories = c.SubCategories
                         .Where(sub => sub.IsDelete != true)
                         .Select(sub => new SubCategoryResponse
@@ -484,7 +489,8 @@ namespace FTSS_API.Service.Implement
                             Description = sub.Description,
                             CreateDate = sub.CreateDate,
                             ModifyDate = sub.ModifyDate,
-                            CategoryName = sub.Category.CategoryName
+                            CategoryName = sub.Category.CategoryName,
+                            IsDelete = sub.IsDelete,
                         }).ToList()
                 },
                 predicate: c => c.IsDelete != true &&
@@ -528,5 +534,47 @@ namespace FTSS_API.Service.Implement
             };
         }
 
+        public async Task<ApiResponse> EnableCategory(Guid id)
+        {
+            // Kiểm tra sự tồn tại của Category đã bị xóa
+            var category = await _unitOfWork.GetRepository<Category>()
+                .SingleOrDefaultAsync(predicate: c => c.Id == id && c.IsDelete == true);
+
+            // Nếu không tìm thấy Category
+            if (category == null)
+            {
+                return new ApiResponse
+                {
+                    status = StatusCodes.Status404NotFound.ToString(),
+                    message = "Category không tồn tại hoặc chưa bị xóa.",
+                    data = null
+                };
+            }
+
+            // Cập nhật IsDelete thành false
+            category.IsDelete = false;
+            _unitOfWork.GetRepository<Category>().UpdateAsync(category);
+
+            // Lưu thay đổi
+            bool isSuccessful = await _unitOfWork.CommitAsync() > 0;
+
+            // Trả về kết quả
+            if (!isSuccessful)
+            {
+                return new ApiResponse
+                {
+                    status = StatusCodes.Status500InternalServerError.ToString(),
+                    message = "Không thể kích hoạt lại Category.",
+                    data = null
+                };
+            }
+
+            return new ApiResponse
+            {
+                status = StatusCodes.Status200OK.ToString(),
+                message = "Category đã được kích hoạt lại thành công.",
+                data = null
+            };
+        }
     }
 }
