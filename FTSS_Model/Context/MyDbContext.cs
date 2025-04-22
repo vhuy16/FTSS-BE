@@ -276,6 +276,7 @@ public partial class MyDbContext : DbContext
             entity.Property(e => e.IsObligatory)
                 .HasDefaultValue(false)
                 .HasColumnName("isObligatory");
+            entity.Property(e => e.IsSolution).HasColumnName("isSolution");
             entity.Property(e => e.LinkImage)
                 .HasMaxLength(255)
                 .IsUnicode(false)
@@ -992,12 +993,8 @@ public partial class MyDbContext : DbContext
                 .HasColumnName("address");
             entity.Property(e => e.BankHolder)
                 .HasMaxLength(50)
-                .IsUnicode(false)
                 .HasColumnName("bankHolder");
-            entity.Property(e => e.BankName)
-                .HasMaxLength(50)
-                .IsUnicode(false)
-                .HasColumnName("bankName");
+            entity.Property(e => e.BankName).HasColumnName("bankName");
             entity.Property(e => e.BankNumber)
                 .HasMaxLength(50)
                 .IsUnicode(false)

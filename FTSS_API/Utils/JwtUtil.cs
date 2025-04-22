@@ -37,10 +37,7 @@ namespace FTSS_API.Utils;
             new Claim(JwtRegisteredClaimNames.NameId, account.Id.ToString()),
             new Claim(JwtRegisteredClaimNames.Name, account.UserName.ToString()),
             new Claim(ClaimTypes.Role, account.Role),
-            new Claim(ClaimTypes.Name, account.UserName),
-            new Claim("BankName", account.BankName), // Add BankName claim
-            new Claim("BankHolder", account.BankHolder), // Add BankHolder claim
-            new Claim("BankNumber", account.BankNumber)
+            new Claim(ClaimTypes.Name, account.UserName)
         };
             if (guidClaim != null) claims.Add(new Claim(guidClaim.Item1, guidClaim.Item2.ToString()));
             var expires = account.Role.Equals(RoleEnum.Customer.GetDescriptionFromEnum())
