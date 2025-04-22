@@ -1,7 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Supabase;
 using Supabase.Interfaces;
-
 using FTSS_API.Utils;
 using FTSS_API.Payload.Request;
 using FTSS_API.Payload.Request.Message;
@@ -46,14 +45,16 @@ public class ChatController : ControllerBase
             }
 
             var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
-                predicate: u => u.Id == userId.Value && u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()));
+                predicate: u =>
+                    u.Id == userId.Value && u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()));
             if (user == null)
             {
                 _logger.LogWarning($"User {userId} not found or not available.");
                 return Unauthorized("User not found or not available.");
             }
 
-            if (user.Role != RoleEnum.Customer.GetDescriptionFromEnum() && user.Role != RoleEnum.Manager.GetDescriptionFromEnum())
+            if (user.Role != RoleEnum.Customer.GetDescriptionFromEnum() &&
+                user.Role != RoleEnum.Manager.GetDescriptionFromEnum())
             {
                 _logger.LogWarning($"User {user.UserName} with role {user.Role} attempted to access messages.");
                 return Forbid("Only Customers and Managers can access messages.");
@@ -64,9 +65,9 @@ public class ChatController : ControllerBase
             {
                 query = query.Filter("room_id", Constants.Operator.Equals, roomId.Value.ToString());
             }
-
-            if (user.Role == RoleEnum.Customer.GetDescriptionFromEnum())
+            else
             {
+                // Nếu không có roomId, chỉ lấy tin nhắn của người dùng hiện tại (tùy chọn)
                 query = query.Filter("user_id", Constants.Operator.Equals, user.Id.ToString());
             }
 
@@ -76,7 +77,8 @@ public class ChatController : ControllerBase
                 .Get();
 
             var messages = response.Models.ToList();
-            _logger.LogInformation($"Retrieved {messages.Count} messages for user {user.UserName} in room {roomId?.ToString() ?? "all"}.");
+            _logger.LogInformation(
+                $"Retrieved {messages.Count} messages for user {user.UserName} in room {roomId?.ToString() ?? "all"}.");
             return Ok(messages);
         }
         catch (Exception ex)
@@ -109,14 +111,16 @@ public class ChatController : ControllerBase
             }
 
             var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
-                predicate: u => u.Id == userId.Value && u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()));
+                predicate: u =>
+                    u.Id == userId.Value && u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()));
             if (user == null)
             {
                 _logger.LogWarning($"User {userId} not found or not available.");
                 return Unauthorized("User not found or not available.");
             }
 
-            if (user.Role != RoleEnum.Customer.GetDescriptionFromEnum() && user.Role != RoleEnum.Manager.GetDescriptionFromEnum())
+            if (user.Role != RoleEnum.Customer.GetDescriptionFromEnum() &&
+                user.Role != RoleEnum.Manager.GetDescriptionFromEnum())
             {
                 _logger.LogWarning($"User {user.UserName} with role {user.Role} attempted to send a message.");
                 return Forbid("Only Customers and Managers can send messages.");
@@ -133,7 +137,8 @@ public class ChatController : ControllerBase
             };
 
             var response = await _supabase.From<Message>().Insert(message);
-            _logger.LogInformation($"Message sent by {user.UserName} ({user.Role}) in room {request.RoomId}: {request.Text}");
+            _logger.LogInformation(
+                $"Message sent by {user.UserName} ({user.Role}) in room {request.RoomId}: {request.Text}");
             return Ok(response.Models.FirstOrDefault());
         }
         catch (Exception ex)
@@ -156,7 +161,8 @@ public class ChatController : ControllerBase
             }
 
             var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
-                predicate: u => u.Id == userId.Value && u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()));
+                predicate: u =>
+                    u.Id == userId.Value && u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()));
             if (user == null)
             {
                 _logger.LogWarning($"User {userId} not found or not available.");
@@ -170,7 +176,9 @@ public class ChatController : ControllerBase
             }
 
             var manager = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
-                predicate: u => u.Id == request.ManagerId && u.Role == RoleEnum.Manager.GetDescriptionFromEnum() && u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()));
+                predicate: u =>
+                    u.Id == request.ManagerId && u.Role == RoleEnum.Manager.GetDescriptionFromEnum() &&
+                    u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()));
             if (manager == null)
             {
                 _logger.LogWarning($"Manager {request.ManagerId} not found or not available.");
@@ -179,7 +187,7 @@ public class ChatController : ControllerBase
 
             IPostgrestTable<Room> query = _supabase.From<Room>();
             query = query.Filter("customer_id", Constants.Operator.Equals, user.Id.ToString())
-                         .Filter("manager_id", Constants.Operator.Equals, request.ManagerId.ToString());
+                .Filter("manager_id", Constants.Operator.Equals, request.ManagerId.ToString());
 
             var existingRoom = await query.Get();
             if (existingRoom.Models.Any())
@@ -196,7 +204,8 @@ public class ChatController : ControllerBase
             };
 
             var response = await _supabase.From<Room>().Insert(room);
-            _logger.LogInformation($"Room created: {room.Id} between Customer {user.UserName} and Manager {manager.UserName}");
+            _logger.LogInformation(
+                $"Room created: {room.Id} between Customer {user.UserName} and Manager {manager.UserName}");
             return Ok(response.Models.FirstOrDefault());
         }
         catch (Exception ex)
@@ -219,14 +228,16 @@ public class ChatController : ControllerBase
             }
 
             var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
-                predicate: u => u.Id == userId.Value && u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()));
+                predicate: u =>
+                    u.Id == userId.Value && u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()));
             if (user == null)
             {
                 _logger.LogWarning($"User {userId} not found or not available.");
                 return Unauthorized("User not found or not available.");
             }
 
-            if (user.Role != RoleEnum.Customer.GetDescriptionFromEnum() && user.Role != RoleEnum.Manager.GetDescriptionFromEnum())
+            if (user.Role != RoleEnum.Customer.GetDescriptionFromEnum() &&
+                user.Role != RoleEnum.Manager.GetDescriptionFromEnum())
             {
                 _logger.LogWarning($"User {user.UserName} with role {user.Role} attempted to access rooms.");
                 return Forbid("Only Customers and Managers can access rooms.");
@@ -283,7 +294,8 @@ public class ChatController : ControllerBase
             }
 
             var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
-                predicate: u => u.Id == userId.Value && u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()));
+                predicate: u =>
+                    u.Id == userId.Value && u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()));
             if (user == null)
             {
                 _logger.LogWarning($"User {userId} not found or not available.");
@@ -297,7 +309,9 @@ public class ChatController : ControllerBase
             }
 
             var managers = await _unitOfWork.GetRepository<User>().GetListAsync(
-                predicate: u => u.Role == RoleEnum.Manager.GetDescriptionFromEnum() && u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()));
+                predicate: u =>
+                    u.Role == RoleEnum.Manager.GetDescriptionFromEnum() &&
+                    u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()));
             var managerDtos = managers.Select(m => new ManagerDto
             {
                 Id = m.Id,
