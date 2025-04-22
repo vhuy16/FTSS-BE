@@ -24,6 +24,9 @@ public class Message : BaseModel
 
     [Column("text")]
     public string Text { get; set; }
+    
+    [Column("file_urls")]
+    public List<string>? FileUrls { get; set; }
 
     [Column("timestamp")]
     public DateTime Timestamp { get; set; }

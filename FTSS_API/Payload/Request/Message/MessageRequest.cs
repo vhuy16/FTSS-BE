@@ -4,4 +4,5 @@ public class MessageRequest
 {
     public string Text { get; set; }
     public Guid RoomId {get; set;}
+  public List<IFormFile>Files { get; set; }
 }
