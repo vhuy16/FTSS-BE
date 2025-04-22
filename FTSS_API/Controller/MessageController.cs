@@ -91,12 +91,12 @@ public class ChatController : ControllerBase
                     CustomerName = customer?.UserName ?? "Unknown",
                     Role = message.Role,
                     Text = message.Text,
-                    Timestamp = TimeUtils.ConvertToSEATime(message.Timestamp) // Chuyển UTC sang SEA
+                    Timestamp = TimeUtils.ConvertToSEATime(message.Timestamp) // Đã chuẩn hóa trong TimeUtils
                 });
             }
 
             DateTime? latestMessageTime = messages.Any()
-                ? TimeUtils.ConvertToSEATime(messages.Max(m => m.Timestamp)) // Chuyển UTC sang SEA
+                ? TimeUtils.ConvertToSEATime(messages.Max(m => m.Timestamp))
                 : null;
 
             var result = new
@@ -290,7 +290,7 @@ public class ChatController : ControllerBase
                     .Get();
 
                 DateTime? latestMessageTime = latestMessage.Models.Any()
-                    ? TimeUtils.ConvertToSEATime(latestMessage.Models.First().Timestamp) // Chuyển UTC sang SEA
+                    ? TimeUtils.ConvertToSEATime(latestMessage.Models.First().Timestamp)
                     : null;
 
                 roomDtos.Add(new RoomDto
@@ -300,7 +300,7 @@ public class ChatController : ControllerBase
                     ManagerId = room.ManagerId,
                     ManagerName = manager?.UserName ?? "Unknown",
                     CustomerName = customer?.UserName ?? "Unknown",
-                    CreatedAt = TimeUtils.ConvertToSEATime(room.CreatedAt), // Chuyển UTC sang SEA
+                    CreatedAt = TimeUtils.ConvertToSEATime(room.CreatedAt), // Đã chuẩn hóa trong TimeUtils
                     LatestMessageTime = latestMessageTime
                 });
             }

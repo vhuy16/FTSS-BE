@@ -16,22 +16,22 @@ public static class TimeUtils
 
     public static DateTime GetCurrentSEATime()
     {
-        // Lấy thời gian UTC và chuyển sang SEA (UTC+7)
-        DateTime utcTime = DateTime.UtcNow; // Luôn là UTC, DateTimeKind.Utc
-        return TimeZoneInfo.ConvertTimeFromUtc(utcTime, SeaTimeZone); // Trả về SEA, DateTimeKind.Unspecified
+        DateTime utcTime = DateTime.UtcNow;
+        return TimeZoneInfo.ConvertTimeFromUtc(utcTime, SeaTimeZone);
     }
 
     public static DateTime GetCurrentSEATimeAsUtc()
     {
-        return DateTime.UtcNow; // Dùng để lưu vào cơ sở dữ liệu
+        return DateTime.UtcNow; // Lưu UTC
     }
 
-    public static DateTime ConvertToSEATime(DateTime utcValue)
+    public static DateTime ConvertToSEATime(DateTime value)
     {
-        if (utcValue.Kind != DateTimeKind.Utc)
-        {
-            throw new ArgumentException("Đầu vào DateTime phải là UTC.", nameof(utcValue));
-        }
+        // Nếu đầu vào không phải UTC, giả định nó là UTC (dựa trên dữ liệu từ Supabase)
+        DateTime utcValue = value.Kind == DateTimeKind.Utc
+            ? value
+            : DateTime.SpecifyKind(value, DateTimeKind.Utc);
+
         return TimeZoneInfo.ConvertTimeFromUtc(utcValue, SeaTimeZone); // Chuyển UTC sang SEA
     }
 }
