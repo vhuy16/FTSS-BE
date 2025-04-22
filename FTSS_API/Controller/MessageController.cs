@@ -235,7 +235,7 @@ public async Task<IActionResult> GetMessages(Guid? roomId, int page = 1, int siz
         }
     }
 
-    [HttpGet("rooms")]
+     [HttpGet("rooms")]
     public async Task<IActionResult> GetRooms()
     {
         try
@@ -277,15 +277,32 @@ public async Task<IActionResult> GetMessages(Guid? roomId, int page = 1, int siz
             var roomDtos = new List<RoomDto>();
             foreach (var room in rooms)
             {
+                // Fetch manager details
                 var manager = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
                     predicate: u => u.Id == room.ManagerId);
+
+                // Fetch customer details
+                var customer = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
+                    predicate: u => u.Id == room.CustomerId);
+
+                // Fetch the most recent message timestamp for the room
+                var latestMessage = await _supabase.From<Message>()
+                    .Filter("room_id", Constants.Operator.Equals, room.Id.ToString())
+                    .Order("timestamp", Constants.Ordering.Descending)
+                    .Limit(1)
+                    .Get();
+
+                DateTime? latestMessageTime = latestMessage.Models.Any() ? latestMessage.Models.First().Timestamp : null;
+
                 roomDtos.Add(new RoomDto
                 {
                     Id = room.Id,
                     CustomerId = room.CustomerId,
                     ManagerId = room.ManagerId,
                     ManagerName = manager?.UserName ?? "Unknown",
-                    CreatedAt = room.CreatedAt
+                    CustomerName = customer?.UserName ?? "Unknown", // Added CustomerName
+                    CreatedAt = room.CreatedAt,
+                    LatestMessageTime = latestMessageTime // Added LatestMessageTime
                 });
             }
 
@@ -350,9 +367,10 @@ public class RoomDto
     public Guid CustomerId { get; set; }
     public Guid ManagerId { get; set; }
     public string ManagerName { get; set; }
+    public string CustomerName { get; set; } // Added CustomerName
     public DateTime CreatedAt { get; set; }
+    public DateTime? LatestMessageTime { get; set; } // Added LatestMessageTime
 }
-
 public class ManagerDto
 {
     public Guid Id { get; set; }
