@@ -1,7 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Supabase;
 using Supabase.Interfaces;
-
 using FTSS_API.Utils;
 using FTSS_API.Payload.Request;
 using FTSS_API.Payload.Request.Message;
@@ -33,88 +32,89 @@ public class ChatController : ControllerBase
         _logger = logger;
     }
 
-  [HttpGet("messages")]
-public async Task<IActionResult> GetMessages(Guid? roomId, int page = 1, int size = 50)
-{
-    try
+    [HttpGet("messages")]
+    public async Task<IActionResult> GetMessages(Guid? roomId, int page = 1, int size = 50)
     {
-        var userId = UserUtil.GetAccountId(HttpContext);
-        if (!userId.HasValue)
+        try
         {
-            _logger.LogWarning("Unauthorized access attempt: Invalid user.");
-            return Unauthorized("Invalid user.");
-        }
-
-        var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
-            predicate: u => u.Id == userId.Value && u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()));
-        if (user == null)
-        {
-            _logger.LogWarning($"User {userId} not found or not available.");
-            return Unauthorized("User not found or not available.");
-        }
-
-        if (user.Role != RoleEnum.Customer.GetDescriptionFromEnum() && user.Role != RoleEnum.Manager.GetDescriptionFromEnum())
-        {
-            _logger.LogWarning($"User {user.UserName} with role {user.Role} attempted to access messages.");
-            return Forbid("Only Customers and Managers can access messages.");
-        }
-
-        IPostgrestTable<Message> query = _supabase.From<Message>();
-        if (roomId.HasValue)
-        {
-            query = query.Filter("room_id", Constants.Operator.Equals, roomId.Value.ToString());
-        }
-
-        if (user.Role == RoleEnum.Customer.GetDescriptionFromEnum())
-        {
-            query = query.Filter("user_id", Constants.Operator.Equals, user.Id.ToString());
-        }
-
-        var response = await query
-            .Order("id", Constants.Ordering.Ascending) // Changed to sort by id ascending
-            .Range((page - 1) * size, page * size - 1)
-            .Get();
-
-        var messages = response.Models.ToList();
-        var messageDtos = new List<MessageDto>();
-
-        foreach (var message in messages)
-        {
-            // Fetch customer details for each message
-            var customer = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
-                predicate: u => u.Id == message.UserId && u.Role == RoleEnum.Customer.GetDescriptionFromEnum());
-
-            messageDtos.Add(new MessageDto
+            var userId = UserUtil.GetAccountId(HttpContext);
+            if (!userId.HasValue)
             {
-                Id = message.Id,
-                RoomId = message.RoomId,
-                UserId = message.UserId,
-                Username = message.Username,
-                CustomerName = customer?.UserName ?? "Unknown", // Include CustomerName
-                Role = message.Role,
-                Text = message.Text,
-                Timestamp = message.Timestamp
-            });
+                _logger.LogWarning("Unauthorized access attempt: Invalid user.");
+                return Unauthorized("Invalid user.");
+            }
+
+            var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
+                predicate: u => u.Id == userId.Value && u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()));
+            if (user == null)
+            {
+                _logger.LogWarning($"User {userId} not found or not available.");
+                return Unauthorized("User not found or not available.");
+            }
+
+            if (user.Role != RoleEnum.Customer.GetDescriptionFromEnum() && user.Role != RoleEnum.Manager.GetDescriptionFromEnum())
+            {
+                _logger.LogWarning($"User {user.UserName} with role {user.Role} attempted to access messages.");
+                return Forbid("Only Customers and Managers can access messages.");
+            }
+
+            IPostgrestTable<Message> query = _supabase.From<Message>();
+            if (roomId.HasValue)
+            {
+                query = query.Filter("room_id", Constants.Operator.Equals, roomId.Value.ToString());
+            }
+
+            if (user.Role == RoleEnum.Customer.GetDescriptionFromEnum())
+            {
+                query = query.Filter("user_id", Constants.Operator.Equals, user.Id.ToString());
+            }
+
+            var response = await query
+                .Order("id", Constants.Ordering.Ascending)
+                .Range((page - 1) * size, page * size - 1)
+                .Get();
+
+            var messages = response.Models.ToList();
+            var messageDtos = new List<MessageDto>();
+
+            foreach (var message in messages)
+            {
+                var customer = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
+                    predicate: u => u.Id == message.UserId && u.Role == RoleEnum.Customer.GetDescriptionFromEnum());
+
+                messageDtos.Add(new MessageDto
+                {
+                    Id = message.Id,
+                    RoomId = message.RoomId,
+                    UserId = message.UserId,
+                    Username = message.Username,
+                    CustomerName = customer?.UserName ?? "Unknown",
+                    Role = message.Role,
+                    Text = message.Text,
+                    Timestamp = TimeUtils.ConvertToSEATime(message.Timestamp) // Đã chuẩn hóa trong TimeUtils
+                });
+            }
+
+            DateTime? latestMessageTime = messages.Any()
+                ? TimeUtils.ConvertToSEATime(messages.Max(m => m.Timestamp))
+                : null;
+
+            var result = new
+            {
+                Messages = messageDtos,
+                LatestMessageTime = latestMessageTime
+            };
+
+            _logger.LogInformation($"Retrieved {messages.Count} messages for user {user.UserName} in room {roomId?.ToString() ?? "all"}.");
+            return Ok(result);
         }
-
-        // Get the most recent message timestamp
-        DateTime? latestMessageTime = messages.Any() ? messages.Max(m => m.Timestamp) : null;
-
-        var result = new
+        catch (Exception ex)
         {
-            Messages = messageDtos,
-            LatestMessageTime = latestMessageTime
-        };
+            _logger.LogError(ex, "Error retrieving messages.");
+            return StatusCode(500, "An error occurred while retrieving messages.");
+        }
+    }
 
-        _logger.LogInformation($"Retrieved {messages.Count} messages for user {user.UserName} in room {roomId?.ToString() ?? "all"}.");
-        return Ok(result);
-    }
-    catch (Exception ex)
-    {
-        _logger.LogError(ex, "Error retrieving messages.");
-        return StatusCode(500, "An error occurred while retrieving messages.");
-    }
-}
     [HttpPost("messages")]
     public async Task<IActionResult> SendMessage([FromBody] MessageRequest request)
     {
@@ -158,7 +158,7 @@ public async Task<IActionResult> GetMessages(Guid? roomId, int page = 1, int siz
                 Username = user.UserName,
                 Role = user.Role,
                 Text = request.Text,
-                Timestamp = DateTime.UtcNow
+                Timestamp = TimeUtils.GetCurrentSEATimeAsUtc() // Lưu UTC
             };
 
             var response = await _supabase.From<Message>().Insert(message);
@@ -221,7 +221,7 @@ public async Task<IActionResult> GetMessages(Guid? roomId, int page = 1, int siz
                 Id = Guid.NewGuid(),
                 CustomerId = user.Id,
                 ManagerId = request.ManagerId,
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = TimeUtils.GetCurrentSEATimeAsUtc() // Lưu UTC
             };
 
             var response = await _supabase.From<Room>().Insert(room);
@@ -279,13 +279,29 @@ public async Task<IActionResult> GetMessages(Guid? roomId, int page = 1, int siz
             {
                 var manager = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
                     predicate: u => u.Id == room.ManagerId);
+
+                var customer = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
+                    predicate: u => u.Id == room.CustomerId);
+
+                var latestMessage = await _supabase.From<Message>()
+                    .Filter("room_id", Constants.Operator.Equals, room.Id.ToString())
+                    .Order("timestamp", Constants.Ordering.Descending)
+                    .Limit(1)
+                    .Get();
+
+                DateTime? latestMessageTime = latestMessage.Models.Any()
+                    ? TimeUtils.ConvertToSEATime(latestMessage.Models.First().Timestamp)
+                    : null;
+
                 roomDtos.Add(new RoomDto
                 {
                     Id = room.Id,
                     CustomerId = room.CustomerId,
                     ManagerId = room.ManagerId,
                     ManagerName = manager?.UserName ?? "Unknown",
-                    CreatedAt = room.CreatedAt
+                    CustomerName = customer?.UserName ?? "Unknown",
+                    CreatedAt = TimeUtils.ConvertToSEATime(room.CreatedAt), // Đã chuẩn hóa trong TimeUtils
+                    LatestMessageTime = latestMessageTime
                 });
             }
 
@@ -350,7 +366,9 @@ public class RoomDto
     public Guid CustomerId { get; set; }
     public Guid ManagerId { get; set; }
     public string ManagerName { get; set; }
+    public string CustomerName { get; set; }
     public DateTime CreatedAt { get; set; }
+    public DateTime? LatestMessageTime { get; set; }
 }
 
 public class ManagerDto
@@ -358,13 +376,14 @@ public class ManagerDto
     public Guid Id { get; set; }
     public string UserName { get; set; }
 }
+
 public class MessageDto
 {
     public long Id { get; set; }
     public Guid? RoomId { get; set; }
     public Guid UserId { get; set; }
     public string Username { get; set; }
-    public string CustomerName { get; set; } // Added CustomerName
+    public string CustomerName { get; set; }
     public string Role { get; set; }
     public string Text { get; set; }
     public DateTime Timestamp { get; set; }
