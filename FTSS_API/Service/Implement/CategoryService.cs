@@ -172,7 +172,7 @@ namespace FTSS_API.Service.Implement
                     LinkImage = c.LinkImage,
                     // Dữ liệu SubCategory sẽ được ánh xạ tại đây
                     SubCategories = c.SubCategories
-                    
+                          // Lọc nếu cần
                         .Select(sub => new SubCategoryResponse
                         {
                             Id = sub.Id,
@@ -184,7 +184,7 @@ namespace FTSS_API.Service.Implement
                             CategoryName = sub.Category.CategoryName
                         }).ToList()
                 },
-                predicate: p => p.IsDelete.Equals(false) &&
+                predicate: p => 
                                 (string.IsNullOrEmpty(searchName) || p.CategoryName.Contains(searchName)),
                 orderBy: q => isAscending.HasValue
                     ? (isAscending.Value ? q.OrderBy(p => p.CategoryName) : q.OrderByDescending(p => p.CategoryName))
