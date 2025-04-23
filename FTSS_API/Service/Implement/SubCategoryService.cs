@@ -174,7 +174,7 @@ namespace FTSS_API.Service.Implement
                     ModifyDate = s.ModifyDate,
                     CategoryName = s.Category.CategoryName // Bao gồm CategoryName từ liên kết với Category
                 },
-                predicate: s => s.IsDelete == false &&
+                predicate: s => 
                                 (string.IsNullOrEmpty(searchName) || s.SubCategoryName.Contains(searchName)),
                 orderBy: q => isAscending.HasValue
                     ? (isAscending.Value ? q.OrderBy(s => s.SubCategoryName) : q.OrderByDescending(s => s.SubCategoryName))
