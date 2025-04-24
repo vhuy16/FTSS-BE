@@ -1504,33 +1504,6 @@ namespace FTSS_API.Service.Implement
             }
         }
 
-        public async Task<ApiResponse> GetServicePackage(int pageNumber, int pageSize, bool? isAscending)
-        {
-            var servicePackages = await _unitOfWork.GetRepository<ServicePackage>().GetListAsync(
-                predicate: sp => sp.Status == ServicePackageStatus.Available.ToString() && sp.IsDelete == false,
-                orderBy: isAscending == true ? sp => sp.OrderBy(x => x.ServiceName) : sp => sp.OrderByDescending(x => x.ServiceName)
-            );
-
-            var paginatedList = servicePackages
-                .Skip((pageNumber - 1) * pageSize)
-                .Take(pageSize)
-                .ToList();
-
-            var response = paginatedList.Select(sp => new GetServicePackageResponse
-            {
-                Id = sp.Id,
-                ServiceName = sp.ServiceName,
-                Price = sp.Price
-            }).ToList();
-
-            return new ApiResponse
-            {
-                status = StatusCodes.Status200OK.ToString(),
-                message = "Lấy danh sách gói dịch vụ khả dụng thành công.",
-                data = response
-            };
-        }
-
         public async Task<ApiResponse> UpdateMission(Guid missionId, UpdateMissionRequest request)
         {
             try
@@ -1833,7 +1806,7 @@ namespace FTSS_API.Service.Implement
                 if (order != null)
                 {
                     order.Status = orderStatus;
-                    order.ModifyDate = DateTime.UtcNow;
+                    order.ModifyDate = TimeUtils.GetCurrentSEATime();
                     _unitOfWork.GetRepository<Order>().UpdateAsync(order);
                 }
             }
@@ -2251,7 +2224,7 @@ namespace FTSS_API.Service.Implement
                     if (order != null)
                     {
                         order.IsEligible = true;
-                        order.ModifyDate = DateTime.Now;
+                        order.ModifyDate = TimeUtils.GetCurrentSEATime();
                         orderRepo.UpdateAsync(order);
                     }
                 }

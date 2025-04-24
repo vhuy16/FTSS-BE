@@ -66,4 +66,5 @@ public interface IGenericRepository<T> : IDisposable where T : class
 
     void DeleteAsync(T entity);
     void DeleteRangeAsync(IEnumerable<T> entities);
+    void Update(object servicePackage);
 }
