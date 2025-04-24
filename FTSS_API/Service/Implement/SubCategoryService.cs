@@ -219,7 +219,7 @@ namespace FTSS_API.Service.Implement
                     CategoryName = s.Category.CategoryName,
                     IsDelete = s.IsDelete,
                 },
-                predicate: s => s.IsDelete == false &&
+                predicate: s => 
                                 (string.IsNullOrEmpty(searchName) || s.SubCategoryName.Contains(searchName)),
                 orderBy: q => isAscending.HasValue
                     ? (isAscending.Value ? q.OrderBy(s => s.SubCategoryName) : q.OrderByDescending(s => s.SubCategoryName))

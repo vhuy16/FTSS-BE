@@ -1,7 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Supabase;
 using Supabase.Interfaces;
-
 using FTSS_API.Utils;
 using FTSS_API.Payload.Request;
 using FTSS_API.Payload.Request.Message;
@@ -25,104 +24,153 @@ public class ChatController : ControllerBase
     private readonly Supabase.Client _supabase;
     private readonly IUnitOfWork<MyDbContext> _unitOfWork;
     private readonly ILogger<ChatController> _logger;
+    private readonly SupabaseUltils _supabaseImageService;
 
-    public ChatController(Supabase.Client supabase, IUnitOfWork<MyDbContext> unitOfWork, ILogger<ChatController> logger)
+    public ChatController(Supabase.Client supabase, IUnitOfWork<MyDbContext> unitOfWork,
+        SupabaseUltils supabaseImageService, ILogger<ChatController> logger)
     {
         _supabase = supabase;
         _unitOfWork = unitOfWork;
         _logger = logger;
+        _supabaseImageService = supabaseImageService;
     }
 
-  [HttpGet("messages")]
-public async Task<IActionResult> GetMessages(Guid? roomId, int page = 1, int size = 50)
-{
-    try
-    {
-        var userId = UserUtil.GetAccountId(HttpContext);
-        if (!userId.HasValue)
-        {
-            _logger.LogWarning("Unauthorized access attempt: Invalid user.");
-            return Unauthorized("Invalid user.");
-        }
-
-        var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
-            predicate: u => u.Id == userId.Value && u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()));
-        if (user == null)
-        {
-            _logger.LogWarning($"User {userId} not found or not available.");
-            return Unauthorized("User not found or not available.");
-        }
-
-        if (user.Role != RoleEnum.Customer.GetDescriptionFromEnum() && user.Role != RoleEnum.Manager.GetDescriptionFromEnum())
-        {
-            _logger.LogWarning($"User {user.UserName} with role {user.Role} attempted to access messages.");
-            return Forbid("Only Customers and Managers can access messages.");
-        }
-
-        IPostgrestTable<Message> query = _supabase.From<Message>();
-        if (roomId.HasValue)
-        {
-            query = query.Filter("room_id", Constants.Operator.Equals, roomId.Value.ToString());
-        }
-
-        if (user.Role == RoleEnum.Customer.GetDescriptionFromEnum())
-        {
-            query = query.Filter("user_id", Constants.Operator.Equals, user.Id.ToString());
-        }
-
-        var response = await query
-            .Order("id", Constants.Ordering.Ascending) // Changed to sort by id ascending
-            .Range((page - 1) * size, page * size - 1)
-            .Get();
-
-        var messages = response.Models.ToList();
-        var messageDtos = new List<MessageDto>();
-
-        foreach (var message in messages)
-        {
-            // Fetch customer details for each message
-            var customer = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
-                predicate: u => u.Id == message.UserId && u.Role == RoleEnum.Customer.GetDescriptionFromEnum());
-
-            messageDtos.Add(new MessageDto
-            {
-                Id = message.Id,
-                RoomId = message.RoomId,
-                UserId = message.UserId,
-                Username = message.Username,
-                CustomerName = customer?.UserName ?? "Unknown", // Include CustomerName
-                Role = message.Role,
-                Text = message.Text,
-                Timestamp = message.Timestamp
-            });
-        }
-
-        // Get the most recent message timestamp
-        DateTime? latestMessageTime = messages.Any() ? messages.Max(m => m.Timestamp) : null;
-
-        var result = new
-        {
-            Messages = messageDtos,
-            LatestMessageTime = latestMessageTime
-        };
-
-        _logger.LogInformation($"Retrieved {messages.Count} messages for user {user.UserName} in room {roomId?.ToString() ?? "all"}.");
-        return Ok(result);
-    }
-    catch (Exception ex)
-    {
-        _logger.LogError(ex, "Error retrieving messages.");
-        return StatusCode(500, "An error occurred while retrieving messages.");
-    }
-}
-    [HttpPost("messages")]
-    public async Task<IActionResult> SendMessage([FromBody] MessageRequest request)
+    [HttpGet("messages")]
+    public async Task<IActionResult> GetMessages(Guid? roomId, int page = 1, int size = 50)
     {
         try
         {
-            if (string.IsNullOrEmpty(request.Text) || request.Text.Length > 500)
+            var userId = UserUtil.GetAccountId(HttpContext);
+            if (!userId.HasValue)
             {
-                return BadRequest("Text is required and must be less than 500 characters.");
+                _logger.LogWarning("Unauthorized access attempt: Invalid user.");
+                return Unauthorized("Invalid user.");
+            }
+
+            var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
+                predicate: u =>
+                    u.Id == userId.Value && u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()));
+            if (user == null)
+            {
+                _logger.LogWarning($"User {userId} not found or not available.");
+                return Unauthorized("User not found or not available.");
+            }
+
+            if (user.Role != RoleEnum.Customer.GetDescriptionFromEnum() &&
+                user.Role != RoleEnum.Manager.GetDescriptionFromEnum())
+            {
+                _logger.LogWarning($"User {user.UserName} with role {user.Role} attempted to access messages.");
+                return Forbid("Only Customers and Managers can access messages.");
+            }
+
+            // Kiểm tra quyền truy cập phòng chat nếu roomId được cung cấp
+            if (roomId.HasValue)
+            {
+                var room = await _supabase.From<Room>()
+                    .Filter("id", Constants.Operator.Equals, roomId.Value.ToString())
+                    .Single();
+                if (room == null)
+                {
+                    _logger.LogWarning($"Room {roomId} not found.");
+                    return NotFound("Room not found.");
+                }
+
+                // Kiểm tra xem user là Customer hoặc Manager của phòng
+                if (room.CustomerId != userId.Value && room.ManagerId != userId.Value)
+                {
+                    _logger.LogWarning($"User {user.UserName} does not have access to room {roomId}.");
+                    return Forbid("You do not have access to this room.");
+                }
+            }
+
+            IPostgrestTable<Message> query = _supabase.From<Message>();
+            if (roomId.HasValue)
+            {
+                query = query.Filter("room_id", Constants.Operator.Equals, roomId.Value.ToString());
+            }
+
+            var response = await query
+                .Order("id", Constants.Ordering.Ascending)
+                .Range((page - 1) * size, page * size - 1)
+                .Get();
+
+            var messages = response.Models.ToList();
+            var messageDtos = new List<MessageDto>();
+
+            foreach (var message in messages)
+            {
+                var customer = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
+                    predicate: u => u.Id == message.UserId && u.Role == RoleEnum.Customer.GetDescriptionFromEnum());
+
+                // Tạo danh sách Media từ FileUrls
+                var mediaList = new List<Media>();
+                if (message.FileUrls != null && message.FileUrls.Any())
+                {
+                    var imageExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif" };
+                    var videoExtensions = new[] { ".mp4", ".mov", ".avi" };
+
+                    foreach (var url in message.FileUrls)
+                    {
+                        var extension = Path.GetExtension(url).ToLower();
+                        var mediaType = imageExtensions.Contains(extension) ? "image" :
+                            videoExtensions.Contains(extension) ? "video" : "unknown";
+
+                        mediaList.Add(new Media
+                        {
+                            Url = url,
+                            Type = mediaType
+                        });
+                    }
+                }
+
+                messageDtos.Add(new MessageDto
+                {
+                    Id = message.Id,
+                    RoomId = message.RoomId,
+                    UserId = message.UserId,
+                    Username = message.Username,
+                    CustomerName = customer?.UserName ?? "Unknown",
+                    Role = message.Role,
+                    Text = message.Text,
+                    Timestamp = message.Timestamp, // Timestamp đã là SEA
+                    Media = mediaList.Any() ? mediaList : null
+                });
+            }
+
+            DateTime? latestMessageTime = messages.Any()
+                ? messages.Max(m => m.Timestamp)
+                : null;
+
+            var result = new
+            {
+                Messages = messageDtos,
+                LatestMessageTime = latestMessageTime
+            };
+
+            _logger.LogInformation(
+                $"Retrieved {messages.Count} messages for user {user.UserName} in room {roomId?.ToString() ?? "all"}.");
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving messages.");
+            return StatusCode(500, "An error occurred while retrieving messages.");
+        }
+    }
+
+    [HttpPost("messages")]
+    public async Task<IActionResult> SendMessage([FromForm] MessageRequest request)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(request.Text) && (request.Files == null || !request.Files.Any()))
+            {
+                return BadRequest("Either text or at least one file is required.");
+            }
+
+            if (!string.IsNullOrEmpty(request.Text) && request.Text.Length > 500)
+            {
+                return BadRequest("Text must be less than 500 characters.");
             }
 
             if (request.RoomId == null)
@@ -138,17 +186,54 @@ public async Task<IActionResult> GetMessages(Guid? roomId, int page = 1, int siz
             }
 
             var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
-                predicate: u => u.Id == userId.Value && u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()));
+                predicate: u =>
+                    u.Id == userId.Value && u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()));
             if (user == null)
             {
                 _logger.LogWarning($"User {userId} not found or not available.");
                 return Unauthorized("User not found or not available.");
             }
 
-            if (user.Role != RoleEnum.Customer.GetDescriptionFromEnum() && user.Role != RoleEnum.Manager.GetDescriptionFromEnum())
+            if (user.Role != RoleEnum.Customer.GetDescriptionFromEnum() &&
+                user.Role != RoleEnum.Manager.GetDescriptionFromEnum())
             {
                 _logger.LogWarning($"User {user.UserName} with role {user.Role} attempted to send a message.");
                 return Forbid("Only Customers and Managers can send messages.");
+            }
+
+            List<string> fileUrls = new List<string>();
+            if (request.Files != null && request.Files.Any())
+            {
+                var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif", ".mp4", ".mov", ".avi" };
+                const long maxFileSize = 10 * 1024 * 1024; // 10MB mỗi file
+                const int maxFiles = 5; // Giới hạn số lượng file tối đa
+
+                if (request.Files.Count > maxFiles)
+                {
+                    return BadRequest($"Cannot upload more than {maxFiles} files at a time.");
+                }
+
+                foreach (var file in request.Files)
+                {
+                    var fileExtension = Path.GetExtension(file.FileName).ToLower();
+                    if (!allowedExtensions.Contains(fileExtension))
+                    {
+                        return BadRequest(
+                            "Only image (.jpg, .jpeg, .png, .gif) or video (.mp4, .mov, .avi) files are allowed.");
+                    }
+
+                    if (file.Length > maxFileSize)
+                    {
+                        return BadRequest("Each file size must be less than 10MB.");
+                    }
+                }
+
+                // Upload file bằng _supabaseImageService
+                fileUrls = await _supabaseImageService.SendImagesAsync(request.Files, _supabase);
+                if (fileUrls == null || fileUrls.Count != request.Files.Count)
+                {
+                    return BadRequest("Failed to upload one or more files.");
+                }
             }
 
             var message = new Message
@@ -157,12 +242,14 @@ public async Task<IActionResult> GetMessages(Guid? roomId, int page = 1, int siz
                 RoomId = request.RoomId,
                 Username = user.UserName,
                 Role = user.Role,
-                Text = request.Text,
-                Timestamp = DateTime.UtcNow
+                Text = request.Text ?? "",
+                Timestamp = TimeUtils.GetCurrentSEATimeAsUtc(),
+                FileUrls = fileUrls.Any() ? fileUrls : null
             };
 
             var response = await _supabase.From<Message>().Insert(message);
-            _logger.LogInformation($"Message sent by {user.UserName} ({user.Role}) in room {request.RoomId}: {request.Text}");
+            _logger.LogInformation(
+                $"Message sent by {user.UserName} ({user.Role}) in room {request.RoomId}: {request.Text} with {fileUrls.Count} files");
             return Ok(response.Models.FirstOrDefault());
         }
         catch (Exception ex)
@@ -185,7 +272,8 @@ public async Task<IActionResult> GetMessages(Guid? roomId, int page = 1, int siz
             }
 
             var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
-                predicate: u => u.Id == userId.Value && u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()));
+                predicate: u =>
+                    u.Id == userId.Value && u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()));
             if (user == null)
             {
                 _logger.LogWarning($"User {userId} not found or not available.");
@@ -199,7 +287,9 @@ public async Task<IActionResult> GetMessages(Guid? roomId, int page = 1, int siz
             }
 
             var manager = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
-                predicate: u => u.Id == request.ManagerId && u.Role == RoleEnum.Manager.GetDescriptionFromEnum() && u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()));
+                predicate: u =>
+                    u.Id == request.ManagerId && u.Role == RoleEnum.Manager.GetDescriptionFromEnum() &&
+                    u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()));
             if (manager == null)
             {
                 _logger.LogWarning($"Manager {request.ManagerId} not found or not available.");
@@ -208,7 +298,7 @@ public async Task<IActionResult> GetMessages(Guid? roomId, int page = 1, int siz
 
             IPostgrestTable<Room> query = _supabase.From<Room>();
             query = query.Filter("customer_id", Constants.Operator.Equals, user.Id.ToString())
-                         .Filter("manager_id", Constants.Operator.Equals, request.ManagerId.ToString());
+                .Filter("manager_id", Constants.Operator.Equals, request.ManagerId.ToString());
 
             var existingRoom = await query.Get();
             if (existingRoom.Models.Any())
@@ -221,11 +311,12 @@ public async Task<IActionResult> GetMessages(Guid? roomId, int page = 1, int siz
                 Id = Guid.NewGuid(),
                 CustomerId = user.Id,
                 ManagerId = request.ManagerId,
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = TimeUtils.GetCurrentSEATimeAsUtc() // Lưu UTC
             };
 
             var response = await _supabase.From<Room>().Insert(room);
-            _logger.LogInformation($"Room created: {room.Id} between Customer {user.UserName} and Manager {manager.UserName}");
+            _logger.LogInformation(
+                $"Room created: {room.Id} between Customer {user.UserName} and Manager {manager.UserName}");
             return Ok(response.Models.FirstOrDefault());
         }
         catch (Exception ex)
@@ -248,14 +339,16 @@ public async Task<IActionResult> GetMessages(Guid? roomId, int page = 1, int siz
             }
 
             var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
-                predicate: u => u.Id == userId.Value && u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()));
+                predicate: u =>
+                    u.Id == userId.Value && u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()));
             if (user == null)
             {
                 _logger.LogWarning($"User {userId} not found or not available.");
                 return Unauthorized("User not found or not available.");
             }
 
-            if (user.Role != RoleEnum.Customer.GetDescriptionFromEnum() && user.Role != RoleEnum.Manager.GetDescriptionFromEnum())
+            if (user.Role != RoleEnum.Customer.GetDescriptionFromEnum() &&
+                user.Role != RoleEnum.Manager.GetDescriptionFromEnum())
             {
                 _logger.LogWarning($"User {user.UserName} with role {user.Role} attempted to access rooms.");
                 return Forbid("Only Customers and Managers can access rooms.");
@@ -279,13 +372,29 @@ public async Task<IActionResult> GetMessages(Guid? roomId, int page = 1, int siz
             {
                 var manager = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
                     predicate: u => u.Id == room.ManagerId);
+
+                var customer = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
+                    predicate: u => u.Id == room.CustomerId);
+
+                var latestMessage = await _supabase.From<Message>()
+                    .Filter("room_id", Constants.Operator.Equals, room.Id.ToString())
+                    .Order("timestamp", Constants.Ordering.Descending)
+                    .Limit(1)
+                    .Get();
+
+                DateTime? latestMessageTime = latestMessage.Models.Any()
+                    ? TimeUtils.ConvertToSEATime(latestMessage.Models.First().Timestamp)
+                    : null;
+
                 roomDtos.Add(new RoomDto
                 {
                     Id = room.Id,
                     CustomerId = room.CustomerId,
                     ManagerId = room.ManagerId,
                     ManagerName = manager?.UserName ?? "Unknown",
-                    CreatedAt = room.CreatedAt
+                    CustomerName = customer?.UserName ?? "Unknown",
+                    CreatedAt = TimeUtils.ConvertToSEATime(room.CreatedAt), // Đã chuẩn hóa trong TimeUtils
+                    LatestMessageTime = latestMessageTime
                 });
             }
 
@@ -312,7 +421,8 @@ public async Task<IActionResult> GetMessages(Guid? roomId, int page = 1, int siz
             }
 
             var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
-                predicate: u => u.Id == userId.Value && u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()));
+                predicate: u =>
+                    u.Id == userId.Value && u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()));
             if (user == null)
             {
                 _logger.LogWarning($"User {userId} not found or not available.");
@@ -326,7 +436,9 @@ public async Task<IActionResult> GetMessages(Guid? roomId, int page = 1, int siz
             }
 
             var managers = await _unitOfWork.GetRepository<User>().GetListAsync(
-                predicate: u => u.Role == RoleEnum.Manager.GetDescriptionFromEnum() && u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()));
+                predicate: u =>
+                    u.Role == RoleEnum.Manager.GetDescriptionFromEnum() &&
+                    u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()));
             var managerDtos = managers.Select(m => new ManagerDto
             {
                 Id = m.Id,
@@ -350,7 +462,9 @@ public class RoomDto
     public Guid CustomerId { get; set; }
     public Guid ManagerId { get; set; }
     public string ManagerName { get; set; }
+    public string CustomerName { get; set; }
     public DateTime CreatedAt { get; set; }
+    public DateTime? LatestMessageTime { get; set; }
 }
 
 public class ManagerDto
@@ -358,14 +472,22 @@ public class ManagerDto
     public Guid Id { get; set; }
     public string UserName { get; set; }
 }
+
 public class MessageDto
 {
     public long Id { get; set; }
     public Guid? RoomId { get; set; }
     public Guid UserId { get; set; }
     public string Username { get; set; }
-    public string CustomerName { get; set; } // Added CustomerName
+    public string CustomerName { get; set; }
     public string Role { get; set; }
-    public string Text { get; set; }
+    public string? Text { get; set; }
+    public List<Media>? Media { get; set; }
     public DateTime Timestamp { get; set; }
+}
+
+public class Media
+{
+    public string Url { get; set; }
+    public string Type { get; set; }
 }
