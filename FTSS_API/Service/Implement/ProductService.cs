@@ -75,7 +75,15 @@ public class ProductService : BaseService<ProductService>, IProductService
                 data = null
             };
         }
-
+        if (createProductRequest.Price <= 0)
+        {
+            return new ApiResponse
+            {
+                status = StatusCodes.Status400BadRequest.ToString(),
+                message = "Giá gói dịch vụ phải lớn hơn 0.",
+                data = null
+            };
+        }
         // Validate quantity
         if (createProductRequest.Quantity < 0)
         {
@@ -478,7 +486,7 @@ public class ProductService : BaseService<ProductService>, IProductService
                 return new ApiResponse
                 {
                     status = StatusCodes.Status400BadRequest.ToString(),
-                    message = MessageConstant.ProductMessage.NegativeQuantity, data = null
+                    message = "Giá tiền phải lớn hơn 0.", data = null
                 };
             }
 
