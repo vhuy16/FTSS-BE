@@ -122,22 +122,6 @@ namespace FTSS_API.Controller
             return StatusCode(int.Parse(response.status), response);
         }
         /// <summary>
-        /// API lấy danh sách service package cho booking.
-        /// </summary>
-        [HttpGet(ApiEndPointConstant.Booking.GetServicePackage)]
-        [ProducesResponseType(typeof(IPaginate<ApiResponse>), StatusCodes.Status200OK)]
-        [ProducesErrorResponseType(typeof(ProblemDetails))]
-        public async Task<IActionResult> GetServicePackage(
-            [FromQuery] int? page,
-            [FromQuery] int? size,
-            [FromQuery] bool? isAscending = null)
-        {
-            int pageNumber = page ?? 1;
-            int pageSize = size ?? 10;
-            var response = await _bookingService.GetServicePackage(pageNumber, pageSize, isAscending);
-            return StatusCode(int.Parse(response.status), response);
-        }
-        /// <summary>
         /// API lấy danh sách technician cho manager.
         /// </summary>
         /// 
