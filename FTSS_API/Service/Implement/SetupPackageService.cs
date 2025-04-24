@@ -912,9 +912,10 @@ namespace FTSS_API.Service.Implement
 
                     // Check if the new setup name already exists for other packages
                     var isSetupNameExists = await _unitOfWork.GetRepository<SetupPackage>()
-                        .SingleOrDefaultAsync(predicate: p =>
-                            p.SetupName.Equals(request.SetupName) && p.Id != setupPackageId && p.IsDelete == false);
-
+                            .SingleOrDefaultAsync(predicate: p =>
+                                p.SetupName.Equals(request.SetupName) &&
+                                p.Id != setupPackageId &&
+                                p.IsDelete == false);
                     if (isSetupNameExists != null)
                     {
                         return new ApiResponse

@@ -58,7 +58,7 @@ namespace FTSS_API.Service.Implement
                 Id = Guid.NewGuid(),
                 ServiceName = request.ServiceName,
                 Description = request.Description,
-                Price = request.Price,
+                Price = (decimal)request.Price,
                 Status = ServicePackageStatus.Available.GetDescriptionFromEnum(),
                 IsDelete = false,
             };
@@ -118,7 +118,7 @@ namespace FTSS_API.Service.Implement
 
             if (request.Price > 0 && request.Price != existing.Price)
             {
-                existing.Price = request.Price;
+                existing.Price = (decimal)request.Price;
                 isModified = true;
             }
 
@@ -155,7 +155,7 @@ namespace FTSS_API.Service.Implement
         public async Task<ApiResponse> GetServicePackage(int pageNumber, int pageSize, bool? isAscending)
         {
             var servicePackages = await _unitOfWork.GetRepository<ServicePackage>().GetListAsync(
-                predicate: sp => sp.Status == ServicePackageStatus.Available.ToString() && sp.IsDelete == false,
+                predicate: sp => sp.Status == ServicePackageStatus.Available.ToString() ,
                 orderBy: isAscending == true ? sp => sp.OrderBy(x => x.ServiceName) : sp => sp.OrderByDescending(x => x.ServiceName)
             );
 
@@ -200,7 +200,7 @@ namespace FTSS_API.Service.Implement
             }
 
             servicePackage.IsDelete = true;
-            _unitOfWork.GetRepository<ServicePackage>().Update(servicePackage);
+            _unitOfWork.GetRepository<ServicePackage>().UpdateAsync(servicePackage);
             bool isSaved = await _unitOfWork.CommitAsync() > 0;
 
             if (!isSaved)
@@ -224,7 +224,7 @@ namespace FTSS_API.Service.Implement
         public async Task<ApiResponse> EnableServicePackage(Guid id)
         {
             var servicePackage = await _unitOfWork.GetRepository<ServicePackage>()
-    .SingleOrDefaultAsync(predicate: sp => sp.Id == id && sp.IsDelete == false,
+    .SingleOrDefaultAsync(predicate: sp => sp.Id == id ,
                           orderBy: null,
                           include: null);
 
@@ -239,7 +239,7 @@ namespace FTSS_API.Service.Implement
             }
 
             servicePackage.IsDelete = false;
-            _unitOfWork.GetRepository<ServicePackage>().Update(servicePackage);
+            _unitOfWork.GetRepository<ServicePackage>().UpdateAsync(servicePackage);
             bool isSaved = await _unitOfWork.CommitAsync() > 0;
 
             if (!isSaved)
