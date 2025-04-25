@@ -127,16 +127,18 @@ namespace FTSS_API.Service.Implement
                     };
                 }
 
-                // Kiểm tra trạng thái Order phải là PROCESSED
-                if (!order.Status.Equals(OrderStatus.PROCESSED.ToString(), StringComparison.OrdinalIgnoreCase))
+                // Kiểm tra trạng thái Order phải là PROCESSED hoặc NOTDONE
+                var allowedStatuses = new[] { OrderStatus.PROCESSED.GetDescriptionFromEnum(), OrderStatus.NOTDONE.GetDescriptionFromEnum() };
+                if (!allowedStatuses.Contains(order.Status))
                 {
                     return new ApiResponse
                     {
                         status = StatusCodes.Status400BadRequest.ToString(),
-                        message = "Trạng thái đơn hàng phải là PROCESSED trước khi phân công kỹ thuật viên.",
+                        message = "Chỉ có thể phân công kỹ thuật viên khi đơn hàng ở trạng thái PROCESSED hoặc NOTDONE.",
                         data = null
                     };
                 }
+
 
                 // ✅ Kiểm tra Order đã được phân công chưa
                 if (order.IsAssigned == true)
@@ -164,7 +166,7 @@ namespace FTSS_API.Service.Implement
                     OrderId = order.Id,
                 };
 
-                await _unitOfWork.Context.Set<Mission>().AddAsync(newTask);
+                await _unitOfWork.GetRepository<Mission>().InsertAsync(newTask);
                 // ✅ Cập nhật trạng thái IsAssigned của Order thành true
                 order.IsAssigned = true;
                 _unitOfWork.GetRepository<Order>().UpdateAsync(order);
@@ -1601,6 +1603,7 @@ namespace FTSS_API.Service.Implement
                 mission.MissionDescription = !string.IsNullOrWhiteSpace(request.MissionDescription) ? request.MissionDescription : mission.MissionDescription;
 
                 // Nếu có cập nhật Status
+                // Nếu có cập nhật Status
                 if (!string.IsNullOrWhiteSpace(request.Status))
                 {
                     mission.Status = request.Status;
@@ -1608,7 +1611,7 @@ namespace FTSS_API.Service.Implement
                     if (mission.OrderId.HasValue && !mission.BookingId.HasValue)
                     {
                         var order = await _unitOfWork.GetRepository<Order>()
-    .SingleOrDefaultAsync(selector: x => x, predicate: o => o.Id == mission.OrderId.Value);
+                            .SingleOrDefaultAsync(selector: x => x, predicate: o => o.Id == mission.OrderId.Value);
 
                         if (order != null)
                         {
@@ -1620,6 +1623,10 @@ namespace FTSS_API.Service.Implement
                                     order.Status = OrderStatus.NOTDONE.ToString(); break;
                                 case nameof(MissionStatusEnum.Completed):
                                     order.Status = OrderStatus.COMPLETED.ToString(); break;
+                                case nameof(MissionStatusEnum.Reported):
+                                    order.Status = OrderStatus.NOTDONE.ToString();
+                                    order.IsAssigned = false;
+                                    break;
                             }
 
                             _unitOfWork.GetRepository<Order>().UpdateAsync(order);
@@ -1628,7 +1635,7 @@ namespace FTSS_API.Service.Implement
                     else if (mission.BookingId.HasValue && !mission.OrderId.HasValue)
                     {
                         var booking = await _unitOfWork.GetRepository<Booking>()
-    .SingleOrDefaultAsync(selector: x => x, predicate: b => b.Id == mission.BookingId.Value);
+                            .SingleOrDefaultAsync(selector: x => x, predicate: b => b.Id == mission.BookingId.Value);
                         if (booking != null)
                         {
                             switch (request.Status)
@@ -1639,6 +1646,10 @@ namespace FTSS_API.Service.Implement
                                     booking.Status = BookingStatusEnum.NOTDONE.ToString(); break;
                                 case nameof(MissionStatusEnum.Completed):
                                     booking.Status = BookingStatusEnum.COMPLETED.ToString(); break;
+                                case nameof(MissionStatusEnum.Reported):
+                                    booking.Status = BookingStatusEnum.NOTDONE.ToString();
+                                    booking.IsAssigned = false;
+                                    break;
                             }
 
                             _unitOfWork.GetRepository<Booking>().UpdateAsync(booking);
@@ -2167,30 +2178,6 @@ namespace FTSS_API.Service.Implement
                 }
 
                 bookingRepo.UpdateAsync(booking);
-
-                // Cập nhật các mission liên quan nếu có
-                var missions = await missionRepo.GetListAsync(
-    predicate: m => m.BookingId == bookingId && m.IsDelete == false
-);
-                foreach (var mission in missions)
-                {
-                    if (request.ScheduleDate.HasValue)
-                    {
-                        mission.MissionSchedule = request.ScheduleDate;
-                    }
-
-                    if (!string.IsNullOrWhiteSpace(request.Address))
-                    {
-                        mission.Address = request.Address;
-                    }
-
-                    if (!string.IsNullOrWhiteSpace(request.PhoneNumber))
-                    {
-                        mission.PhoneNumber = request.PhoneNumber;
-                    }
-
-                    missionRepo.UpdateAsync(mission);
-                }
 
                 await _unitOfWork.CommitAsync();
 
