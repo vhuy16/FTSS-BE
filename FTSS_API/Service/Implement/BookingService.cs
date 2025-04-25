@@ -1620,7 +1620,9 @@ namespace FTSS_API.Service.Implement
                                 case nameof(MissionStatusEnum.Cancel):
                                     order.Status = OrderStatus.CANCELLED.ToString(); break;
                                 case nameof(MissionStatusEnum.NotDone):
-                                    order.Status = OrderStatus.NOTDONE.ToString(); break;
+                                    order.Status = OrderStatus.NOTDONE.ToString();
+                                    order.IsAssigned = false; 
+                                    break;
                                 case nameof(MissionStatusEnum.Completed):
                                     order.Status = OrderStatus.COMPLETED.ToString(); break;
                                 case nameof(MissionStatusEnum.Reported):
@@ -1643,7 +1645,9 @@ namespace FTSS_API.Service.Implement
                                 case nameof(MissionStatusEnum.Cancel):
                                     booking.Status = BookingStatusEnum.MISSED.ToString(); break;
                                 case nameof(MissionStatusEnum.NotDone):
-                                    booking.Status = BookingStatusEnum.NOTDONE.ToString(); break;
+                                    booking.Status = BookingStatusEnum.NOTDONE.ToString();
+                                    booking.IsAssigned = false; 
+                                    break;
                                 case nameof(MissionStatusEnum.Completed):
                                     booking.Status = BookingStatusEnum.COMPLETED.ToString(); break;
                                 case nameof(MissionStatusEnum.Reported):
@@ -1823,6 +1827,13 @@ namespace FTSS_API.Service.Implement
                         {
                             order.Status = orderStatus;
                             order.ModifyDate = TimeUtils.GetCurrentSEATime();
+
+                            // ✅ Nếu là NotDone thì cập nhật IsAssigned = false
+                            if (missionStatus == MissionStatusEnum.NotDone)
+                            {
+                                order.IsAssigned = false;
+                            }
+
                             _unitOfWork.GetRepository<Order>().UpdateAsync(order);
                         }
                     }
@@ -1848,10 +1859,18 @@ namespace FTSS_API.Service.Implement
                         if (booking != null)
                         {
                             booking.Status = bookingStatus;
+
+                            // ✅ Nếu là NotDone thì cập nhật IsAssigned = false
+                            if (missionStatus == MissionStatusEnum.NotDone)
+                            {
+                                booking.IsAssigned = false;
+                            }
+
                             _unitOfWork.GetRepository<Booking>().UpdateAsync(booking);
                         }
                     }
                 }
+
 
                 _unitOfWork.GetRepository<Mission>().UpdateAsync(mission);
                 await _unitOfWork.CommitAsync();
