@@ -9,6 +9,8 @@ using FTSS_Model.Entities;
 using FTSS_API.Payload.Response.SubCategory;
 using FTSS_API.Utils;
 using FTSS_Model.Paginate;
+using Microsoft.EntityFrameworkCore;
+
 
 namespace FTSS_API.Service.Implement
 {
@@ -120,11 +122,10 @@ namespace FTSS_API.Service.Implement
 
         public async Task<ApiResponse> DeleteSubCategory(Guid id)
         {
-            // Tìm kiếm SubCategory với Id được cung cấp
+            // Tìm SubCategory chưa bị xóa
             var subCategory = await _unitOfWork.GetRepository<SubCategory>()
                 .SingleOrDefaultAsync(predicate: c => c.Id == id && c.IsDelete == false);
 
-            // Nếu không tìm thấy SubCategory, trả về lỗi
             if (subCategory == null)
             {
                 return new ApiResponse
@@ -135,10 +136,24 @@ namespace FTSS_API.Service.Implement
                 };
             }
 
-            // Cập nhật thuộc tính IsDelete thành true
-            subCategory.IsDelete = true;
+            // Kiểm tra SubCategory có chứa Product còn sống không
+            var productExists = await _unitOfWork.GetRepository<Product>()
+                .GetQueryable()
+                .Where(p => p.SubCategoryId == id && p.IsDelete == false)
+                .AnyAsync();
 
-            // Lưu thay đổi vào cơ sở dữ liệu
+            if (productExists)
+            {
+                return new ApiResponse
+                {
+                    status = StatusCodes.Status400BadRequest.ToString(),
+                    message = "Không thể xóa SubCategory vì đang chứa sản phẩm còn hoạt động.",
+                    data = null
+                };
+            }
+
+            // Đánh dấu là đã xóa
+            subCategory.IsDelete = true;
             _unitOfWork.GetRepository<SubCategory>().UpdateAsync(subCategory);
             bool isSuccessful = await _unitOfWork.CommitAsync() > 0;
 
@@ -152,7 +167,6 @@ namespace FTSS_API.Service.Implement
                 };
             }
 
-            // Trả về phản hồi thành công
             return new ApiResponse
             {
                 status = StatusCodes.Status200OK.ToString(),
@@ -160,6 +174,7 @@ namespace FTSS_API.Service.Implement
                 data = null
             };
         }
+
 
         public async Task<ApiResponse> EnableSubCategory(Guid id)
         {

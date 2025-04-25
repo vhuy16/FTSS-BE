@@ -174,7 +174,6 @@ public static class ApiEndPointConstant
         public const string BookingEndPoint = ApiEndpoint + "/booking";
         public const string AssigningTechnician = BookingEndPoint;
         public const string UpdateStatusMission = BookingEndPoint + "{id}";
-        public const string Report = BookingEndPoint +"/report" + "/{id}";
         public const string GetListBookingForManager = BookingEndPoint;
         public const string GetListMissionTech = BookingEndPoint + "/list-mission-tech";
         public const string BookingSchedule = BookingEndPoint + "/booking-schedule";

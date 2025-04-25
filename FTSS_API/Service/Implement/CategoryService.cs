@@ -14,6 +14,8 @@ using FTSS_Repository.Interface;
 using Google.Apis.Drive.v3;
 using Microsoft.IdentityModel.Tokens;
 using MRC_API.Utils;
+using Microsoft.EntityFrameworkCore;
+
 
 namespace FTSS_API.Service.Implement
 {
@@ -423,11 +425,11 @@ namespace FTSS_API.Service.Implement
 
         public async Task<ApiResponse> DeleteCategory(Guid id)
         {
-            // Kiểm tra sự tồn tại của Category
             var category = await _unitOfWork.GetRepository<Category>()
-                .SingleOrDefaultAsync(predicate: c => c.Id == id && c.IsDelete == false);
+                .SingleOrDefaultAsync(
+                    predicate: c => c.Id == id && c.IsDelete == false,
+                    include: source => source.Include(c => c.SubCategories));
 
-            // Nếu không tìm thấy Category
             if (category == null)
             {
                 return new ApiResponse
@@ -438,14 +440,29 @@ namespace FTSS_API.Service.Implement
                 };
             }
 
-            // Cập nhật IsDelete thành true
+            // Cách 1: Dùng GetQueryable để kiểm tra sản phẩm còn sống
+            var productExists = await _unitOfWork.GetRepository<Product>()
+    .GetQueryable()
+    .Where(p => p.IsDelete == false &&
+                p.SubCategory != null &&
+                p.SubCategory.CategoryId == id)
+    .AnyAsync();
+
+            if (productExists)
+            {
+                return new ApiResponse
+                {
+                    status = StatusCodes.Status400BadRequest.ToString(),
+                    message = "Không thể xóa Category vì đang chứa sản phẩm còn hoạt động.",
+                    data = null
+                };
+            }
+
             category.IsDelete = true;
             _unitOfWork.GetRepository<Category>().UpdateAsync(category);
 
-            // Lưu thay đổi
             bool isSuccessful = await _unitOfWork.CommitAsync() > 0;
 
-            // Trả về kết quả
             if (!isSuccessful)
             {
                 return new ApiResponse

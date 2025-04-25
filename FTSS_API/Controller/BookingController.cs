@@ -72,19 +72,6 @@ namespace FTSS_API.Controller
             return StatusCode(int.Parse(response.status), response);
         }
         /// <summary>
-        /// API report cho user.
-        /// </summary>
-        [HttpPut(ApiEndPointConstant.Booking.Report)]
-        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
-        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
-        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
-        [ProducesErrorResponseType(typeof(ProblemDetails))]
-        public async Task<IActionResult> Report(Guid id, [FromForm] List<IFormFile>? ImageLinks, Client client, string? reason = null)
-        {
-            var response = await _bookingService.Report(id, client, ImageLinks, reason);
-            return StatusCode(int.Parse(response.status), response);
-        }
-        /// <summary>
         /// API lấy danh sách booking cho manager.
         /// </summary>
         [HttpGet(ApiEndPointConstant.Booking.GetListBookingForManager)]

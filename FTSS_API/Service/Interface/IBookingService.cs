@@ -22,7 +22,6 @@ namespace FTSS_API.Service.Interface
         Task<ApiResponse> GetListTaskTech(int pageNumber, int pageSize, string? status, bool? isAscending);
         Task<ApiResponse> GetListTech(GetListTechRequest request);
         Task<ApiResponse> GetMissionById(Guid missionid);
-        Task<ApiResponse> Report(Guid id, Client client, List<IFormFile>? imageLinks, string? reason);
         Task<ApiResponse> UpdateBooking(Guid bookingid, UpdateBookingRequest request);
         Task<ApiResponse> UpdateBookingStatus(Guid bookingid);
         Task<ApiResponse> UpdateMission(Guid missionId, UpdateMissionRequest request);
