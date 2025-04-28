@@ -8,6 +8,7 @@ public class CreateProductRequest
 
     public decimal Price { get; set; }
     public int Quantity { get; set; }
+    public int Power  { get; set; }
     
     public string Size { get; set; } = null!;
     public Guid SubCategoryId { get; set; }

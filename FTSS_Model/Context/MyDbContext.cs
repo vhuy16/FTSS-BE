@@ -484,6 +484,11 @@ public partial class MyDbContext : DbContext
                 .IsUnicode(false)
                 .IsFixedLength()
                 .HasColumnName("status");
+            entity.Property(e => e.Type)
+                .HasMaxLength(10)
+                .IsUnicode(false)
+                .IsFixedLength()
+                .HasColumnName("type");
 
             entity.HasOne(d => d.Mission).WithMany(p => p.MissionImages)
                 .HasForeignKey(d => d.MissionId)
@@ -703,6 +708,7 @@ public partial class MyDbContext : DbContext
             entity.Property(e => e.ModifyDate)
                 .HasColumnType("datetime")
                 .HasColumnName("modifyDate");
+            entity.Property(e => e.Power).HasColumnName("power");
             entity.Property(e => e.Price)
                 .HasColumnType("decimal(18, 0)")
                 .HasColumnName("price");
