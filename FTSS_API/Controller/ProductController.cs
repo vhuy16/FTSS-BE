@@ -279,5 +279,10 @@ public class ProductController : BaseController<ProductController>
             return Problem($"Cannot fetch image from url: {url}");
         }
     }
-
+    [HttpPost("recommend-products")]
+    public async Task<IActionResult> RecommendProducts([FromBody] TankRequest request)
+    {
+        var response = await _productService.RecommendProducts(request);
+        return StatusCode(int.Parse(response.status), response);
+    }
 }

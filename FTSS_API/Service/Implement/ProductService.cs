@@ -1,4 +1,5 @@
-﻿using AutoMapper;
+﻿using System.Text.RegularExpressions;
+using AutoMapper;
 using FTSS_API.Constant;
 using FTSS_API.Payload;
 using FTSS_API.Payload.Request.Product;
@@ -122,6 +123,7 @@ public class ProductService : BaseService<ProductService>, IProductService
             Price = createProductRequest.Price,
             Quantity = createProductRequest.Quantity,
             Size = createProductRequest.Size,
+            Power = createProductRequest.Power,
             Status = ProductStatusEnum.Available.GetDescriptionFromEnum(),
             Images = new List<Image>()
         };
@@ -691,6 +693,287 @@ public class ProductService : BaseService<ProductService>, IProductService
 
            };
     }
+
+    #region Recommendations
+    // Phương thức kiểm tra kích thước
+    private (float Length, float Width, float Height) ValidateSize(string size)
+    {
+        var regex = new Regex(@"^\d+x\d+x\d+$");
+        if (!regex.IsMatch(size))
+        {
+            _logger.LogError("Định dạng kích thước không hợp lệ. Cần theo dạng 'XxYxZ' (ví dụ: 40x30x30).");
+            throw new BadHttpRequestException("Định dạng kích thước phải là 'XxYxZ' (ví dụ: 40x30x30)");
+        }
+
+        var dimensions = size.Split('x');
+        if (dimensions.Length != 3 || !float.TryParse(dimensions[0], out var length) ||
+            !float.TryParse(dimensions[1], out var width) || !float.TryParse(dimensions[2], out var height))
+        {
+            _logger.LogError("Các kích thước phải là số hợp lệ.");
+            throw new BadHttpRequestException("Các kích thước phải là số hợp lệ");
+        }
+
+        return (length, width, height);
+    }
+
+    // Phương thức phân tích khoảng giá trị
+    private (int Min, int Max) ParseRange(string rangeStr)
+    {
+        if (string.Equals(rangeStr, "all", StringComparison.OrdinalIgnoreCase))
+        {
+            return (0, int.MaxValue);
+        }
+
+        var match = Regex.Match(rangeStr, @"(\d+)-(\d+)");
+        if (match.Success && int.TryParse(match.Groups[1].Value, out var min) &&
+            int.TryParse(match.Groups[2].Value, out var max))
+        {
+            return (min, max);
+        }
+
+        _logger.LogWarning($"Định dạng khoảng giá trị không hợp lệ: {rangeStr}");
+        return (0, 0);
+    }
+
+    public async Task<ApiResponse> RecommendProducts(TankRequest request)
+    {
+        try
+        {
+            _logger.LogInformation($"=== Bắt đầu xử lý yêu cầu với kích thước={request.Size} ===");
+
+            // Kiểm tra quyền người dùng
+            Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
+            var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
+                predicate: u => u.Id.Equals(userId) &&
+                                u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) &&
+                                u.IsDelete == false);
+
+            if (user == null)
+            {
+                throw new BadHttpRequestException("Bạn không có quyền thực hiện hành động này.");
+            }
+
+            // Kiểm tra và tính toán tham số bể
+            var (length, width, height) = ValidateSize(request.Size);
+            var volume = (length * width * height) / 1000; // Thể tích (L)
+            var filterPower = volume * 4; // Công suất lọc (L/h)
+            var substrateArea = (length * width) / 10000; // Diện tích đáy (m2)
+            var substrateVolume = substrateArea * 0.04 * 1000; // Thể tích phân nền (L)
+
+            _logger.LogInformation($"Thể tích: {volume:F1}L");
+            _logger.LogInformation($"Công suất lọc cần thiết: {filterPower:F1}L/h");
+            _logger.LogInformation($"Thể tích phân nền: {substrateVolume:F1}L");
+
+            var resultData = new RecommendationResponse();
+
+            // Truy vấn sản phẩm từ cơ sở dữ liệu
+            var products = await _unitOfWork.GetRepository<Product>().GetListAsync(
+                selector: p => new ProductRecommendation
+                {
+                    Id = p.Id,
+                    ProductName = p.ProductName,
+                    Description = p.Description,
+                    Price = p.Price,
+                    Size = p.Size,
+                    SubCategoryName = p.SubCategory.SubCategoryName,
+                    CategoryName = p.SubCategory.Category.CategoryName,
+                    Images = p.Images.Select(i => i.LinkImage).ToList(),
+                    Power = p.Power ?? 0 // Lấy giá trị power, mặc định là 0 nếu null
+                },
+                predicate: p => p.Status.Equals(ProductStatusEnum.Available.GetDescriptionFromEnum()) &&
+                                p.IsDelete == false,
+                include: q => q.Include(p => p.SubCategory)
+                               .ThenInclude(sc => sc.Category)
+                               .Include(p => p.Images)
+            );
+
+            var productList = products.ToList();
+            _logger.LogInformation($"Tổng số sản phẩm tìm thấy: {productList.Count}");
+
+            // Phân loại sản phẩm dựa trên CategoryName
+            var filters = productList.Where(p => p.CategoryName.ToLower().Contains("lọc")).ToList();
+            var lights = productList.Where(p => p.CategoryName.ToLower().Contains("đèn")).ToList();
+            var substrates = productList.Where(p => p.CategoryName.ToLower().Contains("phân nền")).ToList();
+
+            _logger.LogInformation($"Số lượng lọc tìm thấy: {filters.Count}, Đèn: {lights.Count}, Phân nền: {substrates.Count}");
+
+            // Chọn lọc
+            if (filters.Any())
+            {
+                var filtersWithPower = new List<(ProductRecommendation Product, float Diff)>();
+                var tankType = volume < 50 ? "Mini" : volume > 200 ? "Hồ lớn" : "Trung bình";
+
+                foreach (var filter in filters)
+                {
+                    try
+                    {
+                        var powerValue = filter.Power; // Sử dụng cột power
+                        if (powerValue >= filterPower * 0.3 && powerValue <= filterPower * 2.0)
+                        {
+                            filtersWithPower.Add((filter, Math.Abs(powerValue - filterPower)));
+                            _logger.LogDebug($"Lọc {filter.ProductName}: công suất {powerValue}L/h, chênh lệch {Math.Abs(powerValue - filterPower)}L/h");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError($"Lỗi khi xử lý công suất lọc: {ex.Message}");
+                        continue;
+                    }
+                }
+
+                if (filtersWithPower.Any())
+                {
+                    resultData.Recommendations.Filter = filtersWithPower.OrderBy(x => x.Diff).First().Product;
+                    _logger.LogInformation($"Đã chọn lọc: {resultData.Recommendations.Filter.ProductName}");
+                }
+                else
+                {
+                    _logger.LogWarning("Không tìm thấy lọc phù hợp, chọn sản phẩm rẻ nhất");
+                    resultData.Recommendations.Filter = filters.OrderBy(x => x.Price).FirstOrDefault();
+                    if (resultData.Recommendations.Filter != null)
+                        _logger.LogInformation($"Đã chọn lọc rẻ nhất: {resultData.Recommendations.Filter.ProductName}");
+                }
+            }
+
+            // Chọn đèn
+            if (lights.Any())
+            {
+                var suitableLights = new List<ProductRecommendation>();
+                // Tính công suất đèn dựa trên chiều dài bể (giả sử cần 0.5W/cm chiều dài)
+                var requiredLightPower = length * 0.5f; // Công suất đèn tối thiểu (W)
+
+                foreach (var light in lights)
+                {
+                    try
+                    {
+                        var powerValue = light.Power; // Sử dụng cột power
+                        // Chấp nhận đèn có công suất trong khoảng ±50% công suất yêu cầu
+                        if (powerValue >= requiredLightPower * 0.5 && powerValue <= requiredLightPower * 1.5)
+                        {
+                            suitableLights.Add(light);
+                            _logger.LogDebug($"Đèn {light.ProductName}: công suất {powerValue}W, phù hợp cho bể dài {length}cm");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError($"Lỗi khi xử lý công suất đèn: {ex.Message}");
+                        continue;
+                    }
+                }
+
+                if (suitableLights.Any())
+                {
+                    // Chọn đèn có công suất gần nhất với yêu cầu
+                    resultData.Recommendations.Light = suitableLights
+                        .OrderBy(l => Math.Abs(l.Power - requiredLightPower))
+                        .First();
+                    _logger.LogInformation($"Đã chọn đèn: {resultData.Recommendations.Light.ProductName}");
+                }
+                else
+                {
+                    _logger.LogWarning("Không tìm thấy đèn phù hợp, chọn sản phẩm rẻ nhất");
+                    resultData.Recommendations.Light = lights.OrderBy(x => x.Price).FirstOrDefault();
+                    if (resultData.Recommendations.Light != null)
+                        _logger.LogInformation($"Đã chọn đèn rẻ nhất: {resultData.Recommendations.Light.ProductName}");
+                }
+            }
+
+            // Chọn phân nền
+            if (substrates.Any())
+            {
+                var suitableSubstrates = new List<ProductRecommendation>();
+                foreach (var substrate in substrates)
+                {
+                    var volumeStr = substrate.Size ?? "";
+                    try
+                    {
+                        var volumeMatch = Regex.Match(volumeStr, @"(\d+\.?\d*)\s*L");
+                        if (volumeMatch.Success && float.TryParse(volumeMatch.Groups[1].Value, out var substrateVol))
+                        {
+                            if (Math.Abs(substrateVol - substrateVolume) <= 2)
+                            {
+                                suitableSubstrates.Add(substrate);
+                                _logger.LogDebug($"Phân nền phù hợp: {substrate.ProductName} cho thể tích {volumeStr}");
+                            }
+                        }
+                        else if (string.Equals(volumeStr, "all", StringComparison.OrdinalIgnoreCase))
+                        {
+                            suitableSubstrates.Add(substrate);
+                            _logger.LogDebug($"Phân nền phù hợp: {substrate.ProductName} cho mọi thể tích");
+                        }
+                    }
+                    catch
+                    {
+                        continue;
+                    }
+                }
+
+                if (suitableSubstrates.Any())
+                {
+                    resultData.Recommendations.Substrate = suitableSubstrates.First();
+                    _logger.LogInformation($"Đã chọn phân nền: {resultData.Recommendations.Substrate.ProductName}");
+                }
+                else
+                {
+                    _logger.LogWarning("Không tìm thấy phân nền phù hợp, chọn sản phẩm rẻ nhất");
+                    resultData.Recommendations.Substrate = substrates.OrderBy(x => x.Price).FirstOrDefault();
+                    if (resultData.Recommendations.Substrate != null)
+                        _logger.LogInformation($"Đã chọn phân nền rẻ nhất: {resultData.Recommendations.Substrate.ProductName}");
+                }
+            }
+
+            // Kiểm tra nếu không tìm thấy sản phẩm nào
+            if (resultData.Recommendations.Filter == null &&
+                resultData.Recommendations.Light == null &&
+                resultData.Recommendations.Substrate == null)
+            {
+                _logger.LogWarning("Không tìm thấy sản phẩm phù hợp chính xác");
+                return new ApiResponse
+                {
+                    status = StatusCodes.Status200OK.ToString(),
+                    message = "Không tìm thấy sản phẩm phù hợp chính xác. Gợi ý các sản phẩm gần phù hợp:",
+                    data = new RecommendationResponse
+                    {
+                        Recommendations = new Recommendations
+                        {
+                            Filter = filters.OrderBy(x => x.Price).FirstOrDefault(),
+                            Light = lights.OrderBy(x => x.Price).FirstOrDefault(),
+                            Substrate = substrates.OrderBy(x => x.Price).FirstOrDefault()
+                        }
+                    }
+                };
+            }
+
+            _logger.LogInformation("=== Hoàn thành xử lý ===");
+            return new ApiResponse
+            {
+                status = StatusCodes.Status200OK.ToString(),
+                message = "Gợi ý sản phẩm thành công.",
+                data = resultData
+            };
+        }
+        catch (BadHttpRequestException ex)
+        {
+            _logger.LogError($"Lỗi xác thực: {ex.Message}");
+            return new ApiResponse
+            {
+                status = StatusCodes.Status400BadRequest.ToString(),
+                message = ex.Message,
+                data = null
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError($"Lỗi không xác định: {ex.Message}");
+            return new ApiResponse
+            {
+                status = StatusCodes.Status500InternalServerError.ToString(),
+                message = $"Lỗi hệ thống: {ex.Message}",
+                data = null
+            };
+        }
+    }
+    #endregion
 
     public Task<ApiResponse> UpImageForDescription(IFormFile formFile)
     {

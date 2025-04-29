@@ -28,6 +28,7 @@ public interface IProductService
     Task<ApiResponse> GetProductById(Guid productId);
 
     Task<ApiResponse> EnableProduct(Guid productId);
+    Task<ApiResponse> RecommendProducts(TankRequest request);
 
     Task<ApiResponse> UpImageForDescription(IFormFile formFile);
 }
