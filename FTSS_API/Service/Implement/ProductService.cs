@@ -746,9 +746,7 @@ public class ProductService : BaseService<ProductService>, IProductService
             var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
                 predicate: u => u.Id.Equals(userId) &&
                                 u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) &&
-                                u.IsDelete == false &&
-                                (u.Role == RoleEnum.Admin.GetDescriptionFromEnum() ||
-                                 u.Role == RoleEnum.Manager.GetDescriptionFromEnum()));
+                                u.IsDelete == false);
 
             if (user == null)
             {
