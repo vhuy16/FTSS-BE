@@ -90,6 +90,7 @@ public class UserService : BaseService<UserService>, IUserService
         Gender = createNewAccountRequest.Gender.GetDescriptionFromEnum(),
         CityId = createNewAccountRequest.CityId,
         DistrictId = createNewAccountRequest.DistrictId,
+        WardId = createNewAccountRequest.WardId,
     };
 
     try
@@ -310,6 +311,7 @@ public class UserService : BaseService<UserService>, IUserService
                 Address = u.Address,
                 IsDeleted = u.IsDelete,
                 CityId = u.CityId,
+                WardId = u.WardId,
                 DistrictId = u.DistrictId,
             },
             predicate: u => u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()),
@@ -362,6 +364,7 @@ public class UserService : BaseService<UserService>, IUserService
                 Address = u.Address,
                 IsDeleted = u.IsDelete,
                 CityId = u.CityId,
+                WardId = u.WardId,
                 DistrictId = u.DistrictId,
                 BankHolder = u.BankHolder,
                 BankName = u.BankName,
@@ -402,7 +405,8 @@ public class UserService : BaseService<UserService>, IUserService
                 Address = u.Address,
                 IsDeleted = u.IsDelete,
                 CityId = u.CityId,
-                DistrictId = u.DistrictId
+                DistrictId = u.DistrictId,
+                WardId = u.WardId,
             },
             predicate: u => u.Id.Equals(id) && u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()));
 
@@ -457,6 +461,9 @@ public class UserService : BaseService<UserService>, IUserService
         user.Role = string.IsNullOrEmpty(updateUserRequest.Role) ? user.Role : updateUserRequest.Role;
         user.Status = string.IsNullOrEmpty(updateUserRequest.Status) ? user.Status : updateUserRequest.Status;
         user.IsDelete = updateUserRequest.IsDelete ?? user.IsDelete;
+        user.CityId = string.IsNullOrEmpty(updateUserRequest.CityId) ? user.CityId : updateUserRequest.CityId;
+        user.WardId = string.IsNullOrEmpty(updateUserRequest.WardId) ? user.WardId : updateUserRequest.WardId;
+        user.DistrictId = string.IsNullOrEmpty(updateUserRequest.DistrictId) ? user.DistrictId : updateUserRequest.DistrictId;
         _unitOfWork.GetRepository<User>().UpdateAsync(user);
 
         bool isSuccessful = await _unitOfWork.CommitAsync() > 0;

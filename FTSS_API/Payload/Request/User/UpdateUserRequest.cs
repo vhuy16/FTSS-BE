@@ -11,4 +11,7 @@ public class UpdateUserRequest
     public string? Role { get; set; }
     public string? Status { get; set; }
     public bool? IsDelete { get; set; }
+    public string CityId { get; set; }
+    public string DistrictId { get; set; }
+    public string WardId { get; set; } 
 }

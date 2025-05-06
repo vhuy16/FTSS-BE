@@ -1051,6 +1051,9 @@ public partial class MyDbContext : DbContext
                 .HasMaxLength(255)
                 .IsUnicode(false)
                 .HasColumnName("userName");
+            entity.Property(e => e.WardId)
+                .HasMaxLength(50)
+                .HasColumnName("wardId");
         });
 
         modelBuilder.Entity<Voucher>(entity =>
