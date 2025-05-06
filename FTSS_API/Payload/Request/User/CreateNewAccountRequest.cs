@@ -16,4 +16,5 @@ public class CreateNewAccountRequest
     public string PhoneNumber { get; set; }
     public string CityId { get; set; }
     public string DistrictId { get; set; }
+    public string WardId { get; set; } 
 }
