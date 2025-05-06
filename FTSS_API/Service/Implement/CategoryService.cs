@@ -298,7 +298,6 @@ namespace FTSS_API.Service.Implement
 
         public async Task<ApiResponse> UpdateCategory(Guid categoryId, CategoryRequest updateCategoryRequest, Supabase.Client client)
         {
-            // Lấy thông tin danh mục từ database
             var existingCategory = await _unitOfWork.GetRepository<Category>()
                 .SingleOrDefaultAsync(predicate: c => c.Id.Equals(categoryId) && (c.IsDelete == null || c.IsDelete == false));
 
@@ -312,10 +311,24 @@ namespace FTSS_API.Service.Implement
                 };
             }
 
-            // Kiểm tra tên danh mục nếu có thay đổi
+            // Danh sách CategoryName không được thay đổi
+            var restrictedNames = new List<string> { "Bể", "Đèn", "Lọc", "Layout" };
+
             if (!string.IsNullOrEmpty(updateCategoryRequest.CategoryName) &&
                 !existingCategory.CategoryName.Equals(updateCategoryRequest.CategoryName))
             {
+                // Nếu Category hiện tại thuộc danh sách không được đổi tên => chặn
+                if (restrictedNames.Contains(existingCategory.CategoryName))
+                {
+                    return new ApiResponse
+                    {
+                        status = StatusCodes.Status400BadRequest.ToString(),
+                        message = $"CategoryName '{existingCategory.CategoryName}' không được phép thay đổi.",
+                        data = null
+                    };
+                }
+
+                // Kiểm tra tên mới có bị trùng không
                 var categoryCheck = await _unitOfWork.GetRepository<Category>()
                     .SingleOrDefaultAsync(predicate: c => c.CategoryName.Equals(updateCategoryRequest.CategoryName) && (c.IsDelete == null || c.IsDelete == false));
                 if (categoryCheck != null)
@@ -331,36 +344,33 @@ namespace FTSS_API.Service.Implement
                 existingCategory.CategoryName = updateCategoryRequest.CategoryName;
             }
 
-            // Cập nhật mô tả nếu có
+            // Cập nhật mô tả
             if (!string.IsNullOrEmpty(updateCategoryRequest.Description))
             {
                 existingCategory.Description = updateCategoryRequest.Description;
             }
 
-            // Cập nhật IsFishTank nếu có
             if (updateCategoryRequest.IsFishTank.HasValue)
             {
                 existingCategory.IsFishTank = updateCategoryRequest.IsFishTank;
             }
 
-            // Cập nhật IsObligatory nếu có
             if (updateCategoryRequest.IsObligatory.HasValue)
             {
                 existingCategory.IsObligatory = updateCategoryRequest.IsObligatory;
             }
+
             if (updateCategoryRequest.IsSolution.HasValue)
             {
                 existingCategory.IsSolution = updateCategoryRequest.IsSolution;
             }
 
-            // Cập nhật hình ảnh nếu có
+            // Cập nhật hình ảnh
             if (updateCategoryRequest.ImageFile != null)
             {
                 try
                 {
-                    // Upload hình ảnh mới lên Supabase
                     var imageUrls = await _supabaseImageService.SendImagesAsync(new List<IFormFile> { updateCategoryRequest.ImageFile }, client);
-
                     if (imageUrls != null && imageUrls.Any())
                     {
                         existingCategory.LinkImage = imageUrls.FirstOrDefault();
@@ -386,10 +396,8 @@ namespace FTSS_API.Service.Implement
                 }
             }
 
-            // Cập nhật ngày sửa
             existingCategory.ModifyDate = TimeUtils.GetCurrentSEATime();
 
-            // Gửi yêu cầu cập nhật danh mục
             _unitOfWork.GetRepository<Category>().UpdateAsync(existingCategory);
             bool isSuccessful = await _unitOfWork.CommitAsync() > 0;
 
@@ -420,6 +428,7 @@ namespace FTSS_API.Service.Implement
                 }
             };
         }
+
 
 
 
