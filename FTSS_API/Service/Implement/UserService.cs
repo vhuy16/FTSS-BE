@@ -100,8 +100,19 @@ public class UserService : BaseService<UserService>, IUserService
 
         if (isSuccessfully)
         {
-                // Tạo cart cho user mới tạo
-                
+                // ✅ Tạo cart cho user mới tạo
+                var newCart = new Cart
+                {
+                    Id = Guid.NewGuid(),
+                    UserId = newUser.Id,
+                    CreateDate = TimeUtils.GetCurrentSEATime(),
+                    ModifyDate = TimeUtils.GetCurrentSEATime(),
+                    Status = CartEnum.Available.GetDescriptionFromEnum(), // Bạn cần định nghĩa enum hoặc thay chuỗi phù hợp
+                    IsDelete = false
+                };
+
+                await _unitOfWork.GetRepository<Cart>().InsertAsync(newCart);
+
                 await _unitOfWork.CommitAsync();
                 var createNewAccountResponse = new CreateNewAccountResponse
             {
