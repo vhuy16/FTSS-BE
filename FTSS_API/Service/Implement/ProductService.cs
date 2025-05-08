@@ -236,6 +236,7 @@ public class ProductService : BaseService<ProductService>, IProductService
             Quantity = s.Quantity,
             Price = s.Price,
             Size = s.Size,
+            Power = s.Power,
             Status = s.Status
         },
         include: i => i.Include(p => p.Images),
@@ -311,6 +312,7 @@ public class ProductService : BaseService<ProductService>, IProductService
             Quantity = s.Quantity,
             Price = s.Price,
             Size = s.Size,
+            Power = s.Power,
             Status = s.Status
         },
         include: i => i.Include(p => p.Images)
@@ -373,6 +375,7 @@ public class ProductService : BaseService<ProductService>, IProductService
                     Quantity = s.Quantity,
                     Size = s.Size,
                     Price = s.Price,
+                    Power = s.Power,
                     Status = s.Status
                 }
             },
@@ -642,8 +645,8 @@ public class ProductService : BaseService<ProductService>, IProductService
                 ProductName = s.ProductName,
                 Quantity = s.Quantity,
                 Size = s.Size,
+                Power = s.Power,
                 Price = s.Price,
-
                 Status = s.Status
             },
             predicate: p =>
