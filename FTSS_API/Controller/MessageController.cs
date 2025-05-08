@@ -370,21 +370,26 @@ public class ChatController : ControllerBase
             var roomDtos = new List<RoomDto>();
             foreach (var room in rooms)
             {
-                var manager = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
-                    predicate: u => u.Id == room.ManagerId);
-
-                var customer = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
-                    predicate: u => u.Id == room.CustomerId);
-
+                // Lấy tin nhắn mới nhất
                 var latestMessage = await _supabase.From<Message>()
                     .Filter("room_id", Constants.Operator.Equals, room.Id.ToString())
                     .Order("timestamp", Constants.Ordering.Descending)
                     .Limit(1)
                     .Get();
 
-                DateTime? latestMessageTime = latestMessage.Models.Any()
-                    ? TimeUtils.ConvertToSEATime(latestMessage.Models.First().Timestamp)
-                    : null;
+                // Nếu không có tin nhắn thì bỏ qua room này
+                if (!latestMessage.Models.Any())
+                {
+                    continue;
+                }
+
+                var manager = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
+                    predicate: u => u.Id == room.ManagerId);
+
+                var customer = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
+                    predicate: u => u.Id == room.CustomerId);
+
+                DateTime? latestMessageTime = TimeUtils.ConvertToSEATime(latestMessage.Models.First().Timestamp);
 
                 roomDtos.Add(new RoomDto
                 {
@@ -393,7 +398,7 @@ public class ChatController : ControllerBase
                     ManagerId = room.ManagerId,
                     ManagerName = manager?.UserName ?? "Unknown",
                     CustomerName = customer?.UserName ?? "Unknown",
-                    CreatedAt = TimeUtils.ConvertToSEATime(room.CreatedAt), // Đã chuẩn hóa trong TimeUtils
+                    CreatedAt = TimeUtils.ConvertToSEATime(room.CreatedAt),
                     LatestMessageTime = latestMessageTime
                 });
             }
