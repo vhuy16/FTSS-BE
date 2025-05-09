@@ -167,7 +167,7 @@ namespace FTSS_API.Service.Implement
                     throw new BadHttpRequestException("Bạn không có quyền thực hiện thao tác này.");
                 }
                 var query = _unitOfWork.Context.Set<Voucher>().Where(v => v.IsDelete == false);
-
+                await UpdateExpiredVouchersAsync();
                 if (!string.IsNullOrEmpty(status))
                 {
                     query = query.Where(v => v.Status == status);
@@ -495,6 +495,28 @@ namespace FTSS_API.Service.Implement
                     message = "Đã xảy ra lỗi khi cập nhật voucher.",
                     data = ex.Message
                 };
+            }
+        }
+        public async Task UpdateExpiredVouchersAsync()
+        {
+            var now = DateTime.UtcNow;
+
+            // Lấy danh sách voucher hết hạn và chưa bị Inactive
+            var expiredVouchers = await _unitOfWork.GetRepository<Voucher>().GetListAsync(
+                predicate: v => v.ExpiryDate <= now && v.Status != VoucherEnum.Inactive.GetDescriptionFromEnum()
+            );
+
+            if (expiredVouchers.Any())
+            {
+                foreach (var voucher in expiredVouchers)
+                {
+                    voucher.Status = VoucherEnum.Inactive.GetDescriptionFromEnum();
+                    voucher.ModifyDate = now;
+                }
+
+                _unitOfWork.GetRepository<Voucher>().UpdateRange(expiredVouchers);
+
+                await _unitOfWork.CommitAsync();
             }
         }
 

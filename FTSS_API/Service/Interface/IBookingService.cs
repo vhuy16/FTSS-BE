@@ -11,7 +11,7 @@ namespace FTSS_API.Service.Interface
         Task<ApiResponse> AssigningTechnician(AssigningTechnicianRequest request);
         Task<ApiResponse> AssigningTechnicianBooking(AssignTechBookingRequest request);
         Task<ApiResponse> BookingSchedule(BookingScheduleRequest request);
-        Task<ApiResponse> CancelBooking(Guid bookingid);
+        Task<ApiResponse> CancelBooking(Guid bookingid, CancelBookingRequest request);
         Task<ApiResponse> Confirm(Guid? orderid, Guid? bookingid);
         Task<ApiResponse> GetBookingById(Guid bookingid);
         Task<ApiResponse> GetDateUnavailable();
