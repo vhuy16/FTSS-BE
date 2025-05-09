@@ -224,9 +224,9 @@ namespace FTSS_API.Controller
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
         [ProducesErrorResponseType(typeof(ProblemDetails))]
-        public async Task<IActionResult> CancelBooking(Guid bookingid)
+        public async Task<IActionResult> CancelBooking(Guid bookingid, CancelBookingRequest request)
         {
-            var response = await _bookingService.CancelBooking(bookingid);
+            var response = await _bookingService.CancelBooking(bookingid, request);
             return StatusCode(int.Parse(response.status), response);
         }
         /// <summary>

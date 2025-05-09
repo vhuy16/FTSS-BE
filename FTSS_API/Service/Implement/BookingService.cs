@@ -21,18 +21,20 @@ using Azure;
 using FTSS_API.Payload.Response.SetupPackage;
 using static FTSS_API.Payload.Response.Order.GetOrderResponse;
 using Supabase;
+using FTSS_API.Service.Implement.Implement;
 
 namespace FTSS_API.Service.Implement
 {
     public class BookingService : BaseService<BookingService>, IBookingService
     {
         private readonly SupabaseUltils _supabaseImageService;
+        private readonly IEmailSender _emailSender;
         public IPaymentService _paymentService { get; set; }
-        public BookingService(IUnitOfWork<MyDbContext> unitOfWork, ILogger<BookingService> logger, IMapper mapper,SupabaseUltils supabaseImageService, IHttpContextAccessor httpContextAccessor, IPaymentService paymentService) : base(unitOfWork, logger, mapper, httpContextAccessor)
+        public BookingService(IUnitOfWork<MyDbContext> unitOfWork, IEmailSender emailSender, ILogger<BookingService> logger, IMapper mapper,SupabaseUltils supabaseImageService, IHttpContextAccessor httpContextAccessor, IPaymentService paymentService) : base(unitOfWork, logger, mapper, httpContextAccessor)
         {
             _paymentService = paymentService;
             _supabaseImageService = supabaseImageService;
-            
+            _emailSender = emailSender;
         }
         public async Task<ApiResponse> AssigningTechnician(AssigningTechnicianRequest request)
         {
@@ -2217,29 +2219,13 @@ namespace FTSS_API.Service.Implement
                 };
             }
         }
-        public async Task<ApiResponse> CancelBooking(Guid bookingId)
+        public async Task<ApiResponse> CancelBooking(Guid bookingId, CancelBookingRequest request)
         {
             try
             {
-                // Lấy UserId từ HttpContext
-                Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
-                var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
-                    predicate: u => u.Id.Equals(userId) &&
-                                    u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) &&
-                                    u.IsDelete == false &&
-                                    u.Role.Equals(RoleEnum.Customer.GetDescriptionFromEnum()));
-
-                if (user == null)
-                {
-                    throw new BadHttpRequestException("Bạn không có quyền thực hiện thao tác này.");
-                }
-
-                var bookingRepo = _unitOfWork.GetRepository<Booking>();
-                var orderRepo = _unitOfWork.GetRepository<Order>();
-
-                var booking = await bookingRepo.SingleOrDefaultAsync(
+                var booking = await _unitOfWork.GetRepository<Booking>().SingleOrDefaultAsync(
                     predicate: b => b.Id == bookingId,
-                    include: b => b.Include(x => x.Order)
+                    include: b => b.Include(x => x.Payments).Include(x => x.User)
                 );
 
                 if (booking == null)
@@ -2247,58 +2233,38 @@ namespace FTSS_API.Service.Implement
                     return new ApiResponse
                     {
                         status = StatusCodes.Status404NotFound.ToString(),
-                        message = "Không tìm thấy booking.",
+                        message = "Booking not found.",
                         data = null
                     };
                 }
 
-                // ❌ Không cho hủy nếu không phải booking của người dùng hiện tại
-                if (booking.UserId != userId)
+                // Kiểm tra trạng thái thanh toán
+                var isPaid = booking.Payments.Any(p => p.PaymentStatus == PaymentStatusEnum.Completed.ToString());
+
+                // Gửi email thông báo huỷ
+                var email = booking.User?.Email;
+                if (!string.IsNullOrEmpty(email))
                 {
-                    return new ApiResponse
-                    {
-                        status = StatusCodes.Status403Forbidden.ToString(),
-                        message = "Bạn không có quyền hủy booking này.",
-                        data = null
-                    };
+                    string emailBody = EmailTemplatesUtils.RefundBookingNotificationEmailTemplate(
+                        booking.BookingCode ?? "N/A",
+                        isPaid,
+                        request.Reason ?? "Không có lý do cụ thể"
+                    );
+
+                    await _emailSender.RefundBookingNotificationEmailAsync(email, emailBody);
                 }
 
-                // ❌ Không cho hủy nếu đã được assigned
-                if (booking.IsAssigned == true)
-                {
-                    return new ApiResponse
-                    {
-                        status = StatusCodes.Status400BadRequest.ToString(),
-                        message = "Booking đã được phân công. Không thể hủy.",
-                        data = null
-                    };
-                }
+                // Cập nhật trạng thái
+                booking.Status = BookingStatusEnum.CANCELLED.ToString();
 
-                // ✅ Cập nhật trạng thái
-                booking.Status = BookingStatusEnum.CANCELLED.GetDescriptionFromEnum();
-                
-
-                // ✅ Nếu miễn phí => cập nhật order.IsEligible
-                if (booking.TotalPrice == 0 && booking.OrderId.HasValue)
-                {
-                    booking.Status = BookingStatusEnum.CANCELLED.GetDescriptionFromEnum();
-                    var order = booking.Order;
-                    if (order != null)
-                    {
-                        order.IsEligible = true;
-                        order.ModifyDate = TimeUtils.GetCurrentSEATime();
-                        orderRepo.UpdateAsync(order);
-                    }
-                }
-
-                bookingRepo.UpdateAsync(booking);
-                await _unitOfWork.CommitAsync();
+                _unitOfWork.GetRepository<Booking>().UpdateAsync(booking);
+                bool result = await _unitOfWork.CommitAsync() > 0;
 
                 return new ApiResponse
                 {
-                    status = StatusCodes.Status200OK.ToString(),
-                    message = "Hủy booking thành công.",
-                    data = null
+                    status = result ? StatusCodes.Status200OK.ToString() : StatusCodes.Status400BadRequest.ToString(),
+                    message = result ? "Booking cancelled successfully." : "Failed to cancel booking.",
+                    data = true
                 };
             }
             catch (Exception ex)
@@ -2306,7 +2272,7 @@ namespace FTSS_API.Service.Implement
                 return new ApiResponse
                 {
                     status = StatusCodes.Status500InternalServerError.ToString(),
-                    message = $"Đã xảy ra lỗi khi hủy booking: {ex.Message}",
+                    message = $"Error while cancelling booking: {ex.Message}",
                     data = null
                 };
             }
