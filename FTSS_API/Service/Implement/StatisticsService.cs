@@ -219,8 +219,8 @@ public class StatisticsService : BaseService<StatisticsService>, IStatisticsServ
         {
             new FinancialStatisticItem { Name = "Doanh thu thực tế", Value = actualRevenue },
             new FinancialStatisticItem { Name = "Tổng tiền đã hoàn trả", Value = refundedAmount },
-            new FinancialStatisticItem { Name = "Tổng tiền  bán sản phẩm", Value = productSales },
-            new FinancialStatisticItem { Name = "Tổng tiền dịch vụ", Value = serviceSales }
+            new FinancialStatisticItem { Name = "Tổng tiền thu được từ  bán sản phẩm", Value = productSales },
+            new FinancialStatisticItem { Name = "Tổng tiền từ dịch vụ", Value = serviceSales }
         }
     };
 
