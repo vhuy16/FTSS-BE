@@ -8,4 +8,5 @@ public interface IStatisticsService
     Task<List<RevenueResponse>> GetRevenueByDateRangeAsync(DateTime startDay, DateTime endDay);
     Task<List<DailySalesResponse>> GetWeeklySales();
     Task<List<CategorySalesResponse>> GetProductSalesByCategory(DateTime startDay, DateTime endDay);
+    Task<FinancialStatisticsResponse> GetFinancialStatistics();
 }
