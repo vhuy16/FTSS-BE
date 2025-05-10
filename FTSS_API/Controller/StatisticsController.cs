@@ -74,5 +74,24 @@ namespace FTSS_API.Controller
                 return StatusCode(500, "Internal server error.");
             }
         }
+        /// <summary>
+        /// API lấy thống kê tài chính (doanh thu thực tế, tổng tiền hoàn trả, sản phẩm, dịch vụ).
+        /// </summary>
+        [HttpGet("financial-statistics")]
+        [ProducesResponseType(typeof(FinancialStatisticsResponse), StatusCodes.Status200OK)]
+        [ProducesErrorResponseType(typeof(ProblemDetails))]
+        public async Task<IActionResult> GetFinancialStatistics()
+        {
+            try
+            {
+                var response = await _statisticsService.GetFinancialStatistics();
+                return Ok(response);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"Error fetching financial statistics: {ex.Message}");
+                return StatusCode(500, "Internal server error.");
+            }
+        }
     }
 }
