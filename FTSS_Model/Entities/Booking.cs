@@ -29,6 +29,8 @@ public partial class Booking
 
     public string? BookingImage { get; set; }
 
+    public string? CancelReason { get; set; }
+
     public virtual ICollection<BookingDetail> BookingDetails { get; set; } = new List<BookingDetail>();
 
     public virtual ICollection<Mission> Missions { get; set; } = new List<Mission>();

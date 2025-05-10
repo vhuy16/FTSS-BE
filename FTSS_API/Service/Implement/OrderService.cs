@@ -1010,7 +1010,6 @@ public class OrderService : BaseService<OrderService>, IOrderService
                 InstallationDate = order.InstallationDate,
 
                 CancelReason = mission?.CancelReason ?? string.Empty,
-                ReportReason = mission?.ReportReason ?? string.Empty,
                 Images = missionImages,
 
                 Voucher = order.Voucher != null ? new GetOrderResponse.VoucherResponse()
