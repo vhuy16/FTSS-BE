@@ -5,8 +5,8 @@ public class EmailTemplatesUtils
     public static string RefundBookingNotificationEmailTemplate(string bookingcode, bool isPaid, string reason)
     {
         string paymentNote = isPaid
-            ? "<p><strong>Chúng tôi sẽ hoàn lại khoản thanh toán trong vòng 3-5 ngày làm việc.</strong></p>"
-            : "<p><strong>Vì bạn chưa thanh toán, sẽ không có khoản tiền nào được hoàn lại.</strong></p>";
+            ? "<p><strong>Vui lòng lên hệ thống để cung cấp tài khoản hoàn tiền. Chúng tôi sẽ hoàn lại khoản thanh toán trong vòng 3-5 ngày làm việc.</strong></p>"
+            : "<p><strong>Vì bạn chưa thanh toán hoặc được miễn phí dịch vụ, sẽ không có khoản tiền nào được hoàn lại.</strong></p>";
 
         return $@"
             <html>
