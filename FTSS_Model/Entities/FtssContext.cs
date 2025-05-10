@@ -102,6 +102,9 @@ public partial class FtssContext : DbContext
             entity.Property(e => e.BookingImage)
                 .IsUnicode(false)
                 .HasColumnName("bookingImage");
+            entity.Property(e => e.CancelReason)
+                .HasMaxLength(255)
+                .HasColumnName("cancelReason");
             entity.Property(e => e.FullName)
                 .HasMaxLength(255)
                 .HasColumnName("fullName");
@@ -428,6 +431,7 @@ public partial class FtssContext : DbContext
                 .HasMaxLength(255)
                 .HasColumnName("address");
             entity.Property(e => e.BookingId).HasColumnName("bookingId");
+            entity.Property(e => e.CancelReason).HasColumnName("cancelReason");
             entity.Property(e => e.EndMissionSchedule)
                 .HasColumnType("datetime")
                 .HasColumnName("endMissionSchedule");
@@ -707,6 +711,7 @@ public partial class FtssContext : DbContext
             entity.Property(e => e.ModifyDate)
                 .HasColumnType("datetime")
                 .HasColumnName("modifyDate");
+            entity.Property(e => e.Power).HasColumnName("power");
             entity.Property(e => e.Price)
                 .HasColumnType("decimal(18, 0)")
                 .HasColumnName("price");
@@ -1049,6 +1054,9 @@ public partial class FtssContext : DbContext
                 .HasMaxLength(255)
                 .IsUnicode(false)
                 .HasColumnName("userName");
+            entity.Property(e => e.WardId)
+                .HasMaxLength(50)
+                .HasColumnName("wardId");
         });
 
         modelBuilder.Entity<Voucher>(entity =>

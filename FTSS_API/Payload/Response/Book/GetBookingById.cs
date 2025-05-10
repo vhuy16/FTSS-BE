@@ -28,7 +28,7 @@ namespace FTSS_API.Payload.Response.Book
         public bool? IsAssigned { get; set; }
         public Guid? MissionId { get; set; }
         public string? CancelReason { get; set; }
-        public string? ReportReason { get; set; }
+        public string? Reason {  get; set; }
 
         public List<ServicePackageResponse> Services { get; set; } = new();
         public List<MissionImageResponse> Images { get; set; } = new();

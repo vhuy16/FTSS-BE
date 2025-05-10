@@ -810,7 +810,7 @@ namespace FTSS_API.Service.Implement
                     IsAssigned = booking.IsAssigned,
                     MissionId = mission?.Id,
                     CancelReason = mission?.CancelReason,
-                    ReportReason = mission?.ReportReason,
+                    Reason = booking.CancelReason,
                     Images = reportImages,
                     Services = booking.BookingDetails.Select(bd => new ServicePackageResponse
                     {
@@ -1229,7 +1229,6 @@ namespace FTSS_API.Service.Implement
                     Address = m.Address,
                     PhoneNumber = m.PhoneNumber,
                     CancelReason = m.CancelReason,
-                    ReportReason = m.ReportReason, // ✅ Thêm field ReportReason
                     BookingId = m.BookingId,
                     OrderId = m.OrderId,
                     TechnicianId = m.Userid,
@@ -2223,9 +2222,30 @@ namespace FTSS_API.Service.Implement
         {
             try
             {
+                // Lấy user đăng nhập
+                Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
+                var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
+                    predicate: u => u.Id.Equals(userId) &&
+                                    u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) &&
+                                    u.IsDelete == false
+                );
+
+                if (user == null)
+                {
+                    return new ApiResponse
+                    {
+                        status = StatusCodes.Status401Unauthorized.ToString(),
+                        message = "Không xác định được người dùng.",
+                        data = null
+                    };
+                }
+
                 var booking = await _unitOfWork.GetRepository<Booking>().SingleOrDefaultAsync(
                     predicate: b => b.Id == bookingId,
-                    include: b => b.Include(x => x.Payments).Include(x => x.User)
+                    include: b => b.Include(x => x.Payments)
+                                   .Include(x => x.User)
+                                   .Include(x => x.Order)
+                                   .Include(x => x.Missions)
                 );
 
                 if (booking == null)
@@ -2233,37 +2253,92 @@ namespace FTSS_API.Service.Implement
                     return new ApiResponse
                     {
                         status = StatusCodes.Status404NotFound.ToString(),
-                        message = "Booking not found.",
+                        message = "Không tìm thấy lịch hẹn.",
                         data = null
                     };
                 }
 
-                // Kiểm tra trạng thái thanh toán
-                var isPaid = booking.Payments.Any(p => p.PaymentStatus == PaymentStatusEnum.Completed.ToString());
+                var isCustomer = user.Role == RoleEnum.Customer.GetDescriptionFromEnum();
+                var isManager = user.Role == RoleEnum.Manager.GetDescriptionFromEnum(); // optional nếu có
 
-                // Gửi email thông báo huỷ
+                if (isCustomer)
+                {
+                    // ✅ Chỉ được hủy lịch của chính mình
+                    if (booking.UserId != user.Id)
+                    {
+                        return new ApiResponse
+                        {
+                            status = StatusCodes.Status403Forbidden.ToString(),
+                            message = "Bạn không có quyền hủy lịch hẹn này.",
+                            data = null
+                        };
+                    }
+
+                    // ✅ Không được hủy nếu đã có nhiệm vụ (đã được phân công)
+                    if (booking.Missions != null && booking.Missions.Any())
+                    {
+                        return new ApiResponse
+                        {
+                            status = StatusCodes.Status400BadRequest.ToString(),
+                            message = "Lịch hẹn đã được phân công, không thể hủy.",
+                            data = null
+                        };
+                    }
+
+                    // ✅ Không gửi mail, không cần request.Reason
+                    booking.Status = BookingStatusEnum.CANCELLED.GetDescriptionFromEnum();
+
+                    // ✅ Nếu miễn phí => cập nhật order.IsEligible
+                    if (booking.TotalPrice == 0 && booking.OrderId.HasValue && booking.Order != null)
+                    {
+                        booking.Order.IsEligible = true;
+                        booking.Order.ModifyDate = TimeUtils.GetCurrentSEATime();
+                        _unitOfWork.GetRepository<Order>().UpdateAsync(booking.Order);
+                    }
+
+                    _unitOfWork.GetRepository<Booking>().UpdateAsync(booking);
+                    bool result = await _unitOfWork.CommitAsync() > 0;
+
+                    return new ApiResponse
+                    {
+                        status = result ? StatusCodes.Status200OK.ToString() : StatusCodes.Status400BadRequest.ToString(),
+                        message = result ? "Hủy lịch hẹn thành công." : "Hủy lịch hẹn thất bại.",
+                        data = true
+                    };
+                }
+
+                // ✅ Nếu là Manager thì giữ nguyên logic ban đầu
+                var isPaid = booking.Payments.Any(p => p.PaymentStatus == PaymentStatusEnum.Completed.GetDescriptionFromEnum());
+
                 var email = booking.User?.Email;
                 if (!string.IsNullOrEmpty(email))
                 {
                     string emailBody = EmailTemplatesUtils.RefundBookingNotificationEmailTemplate(
                         booking.BookingCode ?? "N/A",
                         isPaid,
-                        request.Reason ?? "Không có lý do cụ thể"
+                        request?.Reason ?? "Không có lý do cụ thể"
                     );
 
                     await _emailSender.RefundBookingNotificationEmailAsync(email, emailBody);
                 }
 
-                // Cập nhật trạng thái
-                booking.Status = BookingStatusEnum.CANCELLED.ToString();
+                booking.Status = BookingStatusEnum.CANCELLED.GetDescriptionFromEnum();
+                booking.CancelReason = request.Reason;
+
+                if (booking.TotalPrice == 0 && booking.OrderId.HasValue && booking.Order != null)
+                {
+                    booking.Order.IsEligible = true;
+                    booking.Order.ModifyDate = TimeUtils.GetCurrentSEATime();
+                    _unitOfWork.GetRepository<Order>().UpdateAsync(booking.Order);
+                }
 
                 _unitOfWork.GetRepository<Booking>().UpdateAsync(booking);
-                bool result = await _unitOfWork.CommitAsync() > 0;
+                bool managerResult = await _unitOfWork.CommitAsync() > 0;
 
                 return new ApiResponse
                 {
-                    status = result ? StatusCodes.Status200OK.ToString() : StatusCodes.Status400BadRequest.ToString(),
-                    message = result ? "Booking cancelled successfully." : "Failed to cancel booking.",
+                    status = managerResult ? StatusCodes.Status200OK.ToString() : StatusCodes.Status400BadRequest.ToString(),
+                    message = managerResult ? "Hủy lịch hẹn thành công." : "Hủy lịch hẹn thất bại.",
                     data = true
                 };
             }
@@ -2272,11 +2347,12 @@ namespace FTSS_API.Service.Implement
                 return new ApiResponse
                 {
                     status = StatusCodes.Status500InternalServerError.ToString(),
-                    message = $"Error while cancelling booking: {ex.Message}",
+                    message = $"Đã xảy ra lỗi khi hủy lịch hẹn: {ex.Message}",
                     data = null
                 };
             }
         }
+
 
         public Task<ApiResponse> UpdateBookingStatus(Guid bookingid)
         {
