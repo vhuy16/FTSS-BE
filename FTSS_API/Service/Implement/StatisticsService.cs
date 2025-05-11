@@ -190,7 +190,7 @@ public class StatisticsService : BaseService<StatisticsService>, IStatisticsServ
     var payments = await _unitOfWork.GetRepository<Payment>().GetListAsync(
         include: p => p.Include(p => p.Order)
                       .Include(p => p.Booking),
-        predicate: p => p.AmountPaid.HasValue );
+        predicate: p => p.AmountPaid.HasValue);
 
     // 1. Doanh thu thực tế: Tổng AmountPaid của các thanh toán thành công (Completed)
     decimal actualRevenue = payments
@@ -202,14 +202,18 @@ public class StatisticsService : BaseService<StatisticsService>, IStatisticsServ
         .Where(p => p.PaymentStatus == PaymentStatusEnum.Refunded.GetDescriptionFromEnum())
         .Sum(p => p.AmountPaid ?? 0);
 
-    // 3. Tổng tiền thực tế bán sản phẩm: Tổng AmountPaid của các Payment có OrderId và Completed
+    // 3. Tổng tiền thực tế bán sản phẩm: Tổng AmountPaid của các Payment có OrderId, Payment Completed và Order Completed
     decimal productSales = payments
-        .Where(p => p.OrderId.HasValue && p.PaymentStatus == PaymentStatusEnum.Completed.GetDescriptionFromEnum())
+        .Where(p => p.OrderId.HasValue && 
+                    p.PaymentStatus == PaymentStatusEnum.Completed.GetDescriptionFromEnum() &&
+                    p.Order != null && 
+                    p.Order.Status == OrderStatus.COMPLETED.GetDescriptionFromEnum())
         .Sum(p => p.AmountPaid ?? 0);
 
     // 4. Tổng tiền thực tế dịch vụ: Tổng AmountPaid của các Payment có BookingId và Completed
     decimal serviceSales = payments
-        .Where(p => p.BookingId.HasValue && p.PaymentStatus == PaymentStatusEnum.Completed.GetDescriptionFromEnum())
+        .Where(p => p.BookingId.HasValue && 
+                    p.PaymentStatus == PaymentStatusEnum.Completed.GetDescriptionFromEnum())
         .Sum(p => p.AmountPaid ?? 0);
 
     // Trả về danh sách thống kê
@@ -219,13 +223,11 @@ public class StatisticsService : BaseService<StatisticsService>, IStatisticsServ
         {
             new FinancialStatisticItem { Name = "Doanh thu thực tế", Value = actualRevenue },
             new FinancialStatisticItem { Name = "Tổng tiền đã hoàn trả", Value = refundedAmount },
-            new FinancialStatisticItem { Name = "Tổng tiền thu được từ  bán sản phẩm", Value = productSales },
+            new FinancialStatisticItem { Name = "Tổng tiền thu được từ bán sản phẩm", Value = productSales },
             new FinancialStatisticItem { Name = "Tổng tiền từ dịch vụ", Value = serviceSales }
         }
     };
 
-    // Nếu không có dữ liệu, sử dụng giá trị mặc định 100 như trong hình ảnh
-  
     return response;
 }
 }
