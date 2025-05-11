@@ -1151,7 +1151,7 @@ public async Task<ApiResponse> CreateReturnRequest(CreateReturnRequest request, 
             return new ApiResponse
             {
                 status = StatusCodes.Status400BadRequest.ToString(),
-                message = "Đã có một yêu cầu hoàn hàng đang chờ xử lý cho đơn hàng này.",
+                message = "Đơn hàng này đã bị từ chối hoàn trả, bạn không thể tiếp tục thao tác hoàn trả đơn hàng này.",
                 data = null
             };
         }
