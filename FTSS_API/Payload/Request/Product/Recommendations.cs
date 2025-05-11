@@ -2,8 +2,7 @@
 
 public class Recommendations
 {
-    public ProductRecommendation Filter { get; set; }
-    public ProductRecommendation Light { get; set; }
-    public ProductRecommendation Substrate { get; set; }
-    public List<ProductRecommendation> OtherProducts { get; set; } = new List<ProductRecommendation>();
+    public List<ProductRecommendation> Filters { get; set; } = new List<ProductRecommendation>();
+    public List<ProductRecommendation> Lights { get; set; } = new List<ProductRecommendation>();
+    public List<ProductRecommendation> Substrates { get; set; } = new List<ProductRecommendation>();
 }
