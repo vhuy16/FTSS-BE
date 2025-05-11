@@ -476,7 +476,7 @@ namespace FTSS_API.Service.Implement
                     };
                 }
 
-                if (string.IsNullOrWhiteSpace(request.SetupName) || request.SetupName.Length > 10 ||
+                if (string.IsNullOrWhiteSpace(request.SetupName)  ||
                     !char.IsUpper(request.SetupName.Trim()[0]))
                 {
                     return new ApiResponse
