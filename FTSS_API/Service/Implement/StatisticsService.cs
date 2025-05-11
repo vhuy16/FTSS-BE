@@ -192,17 +192,7 @@ public class StatisticsService : BaseService<StatisticsService>, IStatisticsServ
                       .Include(p => p.Booking),
         predicate: p => p.AmountPaid.HasValue);
 
-    // 1. Doanh thu thực tế: Tổng AmountPaid của các thanh toán thành công (Completed)
-    decimal actualRevenue = payments
-        .Where(p => p.PaymentStatus == PaymentStatusEnum.Completed.GetDescriptionFromEnum())
-        .Sum(p => p.AmountPaid ?? 0);
-
-    // 2. Tổng tiền đã hoàn trả: Tổng AmountPaid của các thanh toán có trạng thái Refunded
-    decimal refundedAmount = payments
-        .Where(p => p.PaymentStatus == PaymentStatusEnum.Refunded.GetDescriptionFromEnum())
-        .Sum(p => p.AmountPaid ?? 0);
-
-    // 3. Tổng tiền thực tế bán sản phẩm: Tổng AmountPaid của các Payment có OrderId, Payment Completed và Order Completed
+    // 1. Tổng tiền thực tế bán sản phẩm: Tổng AmountPaid của các Payment có OrderId, Payment Completed và Order Completed
     decimal productSales = payments
         .Where(p => p.OrderId.HasValue && 
                     p.PaymentStatus == PaymentStatusEnum.Completed.GetDescriptionFromEnum() &&
@@ -210,10 +200,18 @@ public class StatisticsService : BaseService<StatisticsService>, IStatisticsServ
                     p.Order.Status == OrderStatus.COMPLETED.GetDescriptionFromEnum())
         .Sum(p => p.AmountPaid ?? 0);
 
-    // 4. Tổng tiền thực tế dịch vụ: Tổng AmountPaid của các Payment có BookingId và Completed
+    // 2. Tổng tiền thực tế dịch vụ: Tổng AmountPaid của các Payment có BookingId và Completed
     decimal serviceSales = payments
         .Where(p => p.BookingId.HasValue && 
                     p.PaymentStatus == PaymentStatusEnum.Completed.GetDescriptionFromEnum())
+        .Sum(p => p.AmountPaid ?? 0);
+
+    // 3. Doanh thu thực tế: Tổng của productSales và serviceSales
+    decimal actualRevenue = productSales + serviceSales;
+
+    // 4. Tổng tiền đã hoàn trả: Tổng AmountPaid của các thanh toán có trạng thái Refunded
+    decimal refundedAmount = payments
+        .Where(p => p.PaymentStatus == PaymentStatusEnum.Refunded.GetDescriptionFromEnum())
         .Sum(p => p.AmountPaid ?? 0);
 
     // Trả về danh sách thống kê
@@ -227,6 +225,18 @@ public class StatisticsService : BaseService<StatisticsService>, IStatisticsServ
             new FinancialStatisticItem { Name = "Tổng tiền từ dịch vụ", Value = serviceSales }
         }
     };
+
+    // Nếu không có dữ liệu, sử dụng giá trị mặc định 100
+    if (!payments.Any())
+    {
+        response.Statistics = new List<FinancialStatisticItem>
+        {
+            new FinancialStatisticItem { Name = "Doanh thu thực tế", Value = 100 },
+            new FinancialStatisticItem { Name = "Tổng tiền đã hoàn trả", Value = 100 },
+            new FinancialStatisticItem { Name = "Tổng tiền thu được từ bán sản phẩm", Value = 100 },
+            new FinancialStatisticItem { Name = "Tổng tiền từ dịch vụ", Value = 100 }
+        };
+    }
 
     return response;
 }
