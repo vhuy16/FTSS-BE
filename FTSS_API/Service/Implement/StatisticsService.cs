@@ -225,11 +225,7 @@ public class StatisticsService : BaseService<StatisticsService>, IStatisticsServ
     };
 
     // Nếu không có dữ liệu, sử dụng giá trị mặc định 100 như trong hình ảnh
-    if (response.Statistics.All(s => s.Value == 0))
-    {
-        response.Statistics.ForEach(s => s.Value = 100);
-    }
-
+  
     return response;
 }
 }
