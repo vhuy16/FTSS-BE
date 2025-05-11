@@ -315,7 +315,7 @@ public class UserService : BaseService<UserService>, IUserService
                 Status = u.Status.ToString(),
                 DistrictId = u.DistrictId,
             },
-            predicate: u => u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()),
+           
             page: page,
             size: size);
 
