@@ -453,7 +453,7 @@ public class UserService : BaseService<UserService>, IUserService
             };
         }
         var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
-            predicate: u => u.Id.Equals(id) && u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()));
+            predicate: u => u.Id.Equals(id) );
 
         if (user == null)
         {
