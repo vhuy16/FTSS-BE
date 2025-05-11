@@ -89,12 +89,7 @@ public class VnPayController : BaseController<VnPayController>
             // Kiểm tra trạng thái giao dịch và thực hiện redirect
             if (vnp_TransactionStatus == "00") // "00" là mã thành công của VNPay
             {
-                // Kiểm tra SetupPackageId của order
-                if (order != null && order.SetupPackageId.HasValue)
-                {
-                    // Redirect tới trang setup-booking với orderId
-                    return Redirect($"https://ftss-fe.vercel.app/setup-booking/{order.Id}");
-                }
+               
 
                 // Nếu không có SetupPackageId, redirect tới trang thành công mặc định
                 return Redirect("https://ftss-fe.vercel.app/paymentSuccess");
