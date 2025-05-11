@@ -317,6 +317,7 @@ public class ProductService : BaseService<ProductService>, IProductService
             (!minPrice.HasValue || p.Price >= minPrice.Value) &&
             (!maxPrice.HasValue || p.Price <= maxPrice.Value) &&
             p.IsDelete == false &&
+            p.Quantity > 0 &&
             p.Status.Equals(ProductStatusEnum.Available.GetDescriptionFromEnum()),
         orderBy: q => isAscending.HasValue
             ? (isAscending.Value ? q.OrderBy(p => p.Price) : q.OrderByDescending(p => p.Price))
