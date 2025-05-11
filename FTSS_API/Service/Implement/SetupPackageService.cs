@@ -375,7 +375,7 @@ namespace FTSS_API.Service.Implement
                 {
                     return new ApiResponse
                     {
-                        status = StatusCodes.Status404NotFound.ToString(),
+                        status = StatusCodes.Status200OK.ToString(),
                         message = "Setup package not found.",
                         data = null
                     };
@@ -480,7 +480,7 @@ namespace FTSS_API.Service.Implement
                     };
                 }
 
-                if (string.IsNullOrWhiteSpace(request.SetupName) || request.SetupName.Length > 10 ||
+                if (string.IsNullOrWhiteSpace(request.SetupName)  ||
                     !char.IsUpper(request.SetupName.Trim()[0]))
                 {
                     return new ApiResponse

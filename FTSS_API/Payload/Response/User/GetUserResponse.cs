@@ -17,4 +17,5 @@ public class GetUserResponse
     public string? BankName {get; set; }
     public string? BankNumber {get; set; }
     public string? BankHolder {get; set; }
+    public string? Status {get; set; }
 }
