@@ -792,16 +792,21 @@ public class OrderService : BaseService<OrderService>, IOrderService
                 };
             }
 
-            // Đếm tổng số bản ghi trước
-            var countQuery = _unitOfWork.Context.Set<Order>()
-                .Where(x =>
-                    (string.IsNullOrEmpty(status) || x.Status.Equals(status)) &&
-                    (string.IsNullOrEmpty(orderCode) || x.OrderCode.Contains(orderCode)));
 
-            var totalItems = await countQuery.CountAsync();
+        // Đếm tổng số bản ghi trước
+        var countQuery = _unitOfWork.Context.Set<Order>()
+            .Where(x =>
+                x.UserId.Equals(userId) &&
+                (string.IsNullOrEmpty(status) || x.Status.Equals(status)) &&
+                (string.IsNullOrEmpty(orderCode) || x.OrderCode.Contains(orderCode)));
+                
+        var totalItems = await countQuery.CountAsync();
+        
+        // Nếu không có dữ liệu, trả về sớm
+        if (totalItems == 0)
+        {
+            return new ApiResponse
 
-            // Nếu không có dữ liệu, trả về sớm
-            if (totalItems == 0)
             {
                 return new ApiResponse
                 {
@@ -817,16 +822,26 @@ public class OrderService : BaseService<OrderService>, IOrderService
                 };
             }
 
-            // Tối ưu hóa query chính
-            var query = _unitOfWork.Context.Set<Order>()
-                .Where(x =>
-                    (string.IsNullOrEmpty(status) || x.Status.Equals(status)) &&
-                    (string.IsNullOrEmpty(orderCode) || x.OrderCode.Contains(orderCode)))
-                .Include(o => o.User)
-                .Include(o => o.Voucher)
-                .Include(o => o.Payments)
-                .Include(o => o.OrderDetails)
-                    .ThenInclude(od => od.Product)
+        // Tối ưu hóa query chính
+        var query = _unitOfWork.Context.Set<Order>()
+            .Where(x =>
+                x.UserId.Equals(userId) &&
+                (string.IsNullOrEmpty(status) || x.Status.Equals(status)) &&
+                (string.IsNullOrEmpty(orderCode) || x.OrderCode.Contains(orderCode)))
+            .Include(o => o.User)
+            .Include(o => o.Voucher)
+            .Include(o => o.Payments)
+            .Include(o => o.OrderDetails)
+                .ThenInclude(od => od.Product)
+                    .ThenInclude(p => p.SubCategory)
+                        .ThenInclude(sc => sc.Category)
+            .Include(o => o.OrderDetails)
+                .ThenInclude(od => od.Product)
+                    .ThenInclude(p => p.Images)
+            .Include(o => o.SetupPackage)
+                .ThenInclude(sp => sp.SetupPackageDetails)
+                    .ThenInclude(spd => spd.Product)
+
                         .ThenInclude(p => p.SubCategory)
                             .ThenInclude(sc => sc.Category)
                 .Include(o => o.OrderDetails)
