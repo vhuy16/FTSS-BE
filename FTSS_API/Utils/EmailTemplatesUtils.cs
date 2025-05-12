@@ -68,7 +68,7 @@ public class EmailTemplatesUtils
              <p style='font-size: 12px; color: #888;'>Nếu bạn có bất kỳ câu hỏi nào, vui lòng <a href='mailto:support@yourcompany.com'>liên hệ với đội ngũ hỗ trợ của chúng tôi</a>.</p>
          </div>";
 
-    public static string RefundNotificationEmailTemplate(Guid orderId, string orderCode, bool isPaid) => $@"
+    public static string CancelNotificationEmailTemplate(Guid orderId, string orderCode, bool isPaid) => $@"
     <div style='font-family: Arial, sans-serif; color: #333;'>
         <h2>Thông báo Hủy Đơn hàng</h2>
         <p>Kính gửi Quý khách,</p>
@@ -118,5 +118,21 @@ public class EmailTemplatesUtils
     <p>Trân trọng,<br>Đội ngũ Hỗ trợ FTSS</p>
     
     <p style='font-size: 12px; color: #888;'>Nếu bạn có bất kỳ câu hỏi nào, vui lòng <a href='mailto:support@ftss.com'>liên hệ với đội ngũ hỗ trợ của chúng tôi</a>.</p>
+</div>";
+    public static string RefundedNotificationEmailTemplate(Guid orderId, string orderCode) => $@"
+<div style='font-family: Arial, sans-serif; color: #333;'>
+    <h2>Thông Báo Hoàn Tiền Đơn Hàng</h2>
+    <p>Kính gửi Quý khách,</p>
+    <p>Chúng tôi xin thông báo rằng đơn hàng của bạn (Mã đơn: <strong>{orderCode}</strong>) đã được hoàn tiền.</p>
+   
+    <h3>Liên Hệ Chúng Tôi</h3>
+    <p>Nếu bạn có bất kỳ câu hỏi hoặc vấn đề nào liên quan đến việc hoàn tiền, vui lòng liên hệ với đội ngũ hỗ trợ của chúng tôi qua:</p>
+    <ul>
+        <li>Email: <a href='mailto:support@ftss.com' style='color: #2E86C1; text-decoration: none;'>support@ftss.com</a></li>
+        <li>Hotline: 0901960506 /li>
+    </ul>
+    <p>Chúng tôi xin lỗi vì bất kỳ sự bất tiện nào và cảm ơn sự thông cảm của bạn.</p>
+    <p>Trân trọng,<br>Đội ngũ Hỗ trợ FTSS</p>
+    <p style='font-size: 12px; color: #888;'>Cảm ơn bạn đã tin tưởng và sử dụng dịch vụ của chúng tôi!</p>
 </div>";
 }
