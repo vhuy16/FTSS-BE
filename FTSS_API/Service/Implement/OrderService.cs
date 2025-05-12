@@ -529,7 +529,7 @@ public class OrderService : BaseService<OrderService>, IOrderService
             // Update order status if provided
             if (!string.IsNullOrEmpty(updateOrderRequest.Status))
             {
-                // Check if the status is being updated to CANCELLED
+                // Check if the status is being updated to CANCEL
                 if (updateOrderRequest.Status == OrderStatus.CANCELLED.ToString())
                 {
                     var payment = order.Payments?.FirstOrDefault();
