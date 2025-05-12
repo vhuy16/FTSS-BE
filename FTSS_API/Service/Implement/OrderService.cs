@@ -793,6 +793,7 @@ public async Task<ApiResponse> GetAllOrder(int page, int size, string status, st
         // Đếm tổng số bản ghi trước
         var countQuery = _unitOfWork.Context.Set<Order>()
             .Where(x =>
+                x.UserId.Equals(userId) &&
                 (string.IsNullOrEmpty(status) || x.Status.Equals(status)) &&
                 (string.IsNullOrEmpty(orderCode) || x.OrderCode.Contains(orderCode)));
                 
@@ -817,6 +818,7 @@ public async Task<ApiResponse> GetAllOrder(int page, int size, string status, st
         // Tối ưu hóa query chính
         var query = _unitOfWork.Context.Set<Order>()
             .Where(x =>
+                x.UserId.Equals(userId) &&
                 (string.IsNullOrEmpty(status) || x.Status.Equals(status)) &&
                 (string.IsNullOrEmpty(orderCode) || x.OrderCode.Contains(orderCode)))
             .Include(o => o.User)
