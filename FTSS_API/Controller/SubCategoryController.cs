@@ -66,6 +66,19 @@ namespace FTSS_API.Controller
             return StatusCode(int.Parse(response.status), response);
         }
         /// <summary>
+        /// API enable subcategory.
+        /// </summary>
+        [HttpPut(ApiEndPointConstant.SubCategory.EnableSubCategory)]
+        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
+        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
+        [ProducesErrorResponseType(typeof(ProblemDetails))]
+        public async Task<IActionResult> EnableSubCategory([FromRoute] Guid id)
+        {
+            var response = await _subCategoryService.EnableSubCategory(id);
+            return StatusCode(int.Parse(response.status), response);
+        }
+        /// <summary>
         /// API xóa subcategory.
         /// </summary>
         [HttpDelete(ApiEndPointConstant.SubCategory.DeleteSubCategory)]

@@ -6,6 +6,7 @@
 
         public string? MissionDescription { get; set; }
         public Guid? TechnicianId { get; set; }
-       
+        public string? Status { get; set; }
+
     }
 }

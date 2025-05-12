@@ -2,6 +2,57 @@
 
 public class EmailTemplatesUtils
 {
+    public static string RefundBookingNotificationEmailTemplate(string bookingcode, bool isPaid, string reason)
+    {
+        string paymentNote = isPaid
+            ? "<p><strong>Vui lòng lên hệ thống để cung cấp tài khoản hoàn tiền. Chúng tôi sẽ hoàn lại khoản thanh toán trong vòng 3-5 ngày làm việc.</strong></p>"
+            : "<p><strong>Vì bạn chưa thanh toán hoặc được miễn phí dịch vụ, sẽ không có khoản tiền nào được hoàn lại.</strong></p>";
+
+        return $@"
+            <html>
+            <head>
+                <style>
+                    body {{
+                        font-family: Arial, sans-serif;
+                        background-color: #f9f9f9;
+                        color: #333;
+                        padding: 20px;
+                    }}
+                    .container {{
+                        background-color: #fff;
+                        padding: 20px;
+                        border-radius: 10px;
+                        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+                        max-width: 600px;
+                        margin: auto;
+                    }}
+                    h2 {{
+                        color: #d32f2f;
+                    }}
+                    .reason {{
+                        background-color: #fce4ec;
+                        padding: 10px;
+                        border-left: 5px solid #d32f2f;
+                        margin-top: 15px;
+                        font-style: italic;
+                    }}
+                </style>
+            </head>
+            <body>
+                <div class='container'>
+                    <h2>Thông Báo Huỷ Đặt Lịch</h2>
+                    <p>Xin chào,</p>
+                    <p>Đơn đặt lịch có mã <strong>{bookingcode}</strong> đã bị huỷ bởi người quản lý.</p>
+                    <div class='reason'>
+                        <strong>Lý do huỷ:</strong> {reason}
+                    </div>
+                    {paymentNote}
+                    <p>Nếu bạn có bất kỳ câu hỏi nào, xin vui lòng liên hệ với chúng tôi qua email hoặc hotline.</p>
+                    <p>Trân trọng,<br/>Đội ngũ chăm sóc khách hàng</p>
+                </div>
+            </body>
+            </html>";
+    }
     public static string VerificationEmailTemplate(string otp) => $@"
          <div style='font-family: Arial, sans-serif; color: #333;'>
              <h2>Mã OTP của bạn</h2>

@@ -2,6 +2,7 @@
 using FTSS_API.Payload.Request.Book;
 using FTSS_API.Payload.Request.MaintenanceSchedule;
 using Microsoft.AspNetCore.Mvc;
+using Supabase;
 
 namespace FTSS_API.Service.Interface
 {
@@ -10,7 +11,8 @@ namespace FTSS_API.Service.Interface
         Task<ApiResponse> AssigningTechnician(AssigningTechnicianRequest request);
         Task<ApiResponse> AssigningTechnicianBooking(AssignTechBookingRequest request);
         Task<ApiResponse> BookingSchedule(BookingScheduleRequest request);
-        Task<ApiResponse> CancelBooking(Guid bookingid);
+        Task<ApiResponse> CancelBooking(Guid bookingid, CancelBookingRequest request);
+        Task<ApiResponse> Confirm(Guid? orderid, Guid? bookingid);
         Task<ApiResponse> GetBookingById(Guid bookingid);
         Task<ApiResponse> GetDateUnavailable();
         Task<ApiResponse> GetHistoryOrder(Guid orderid);
@@ -20,7 +22,6 @@ namespace FTSS_API.Service.Interface
         Task<ApiResponse> GetListTaskTech(int pageNumber, int pageSize, string? status, bool? isAscending);
         Task<ApiResponse> GetListTech(GetListTechRequest request);
         Task<ApiResponse> GetMissionById(Guid missionid);
-        Task<ApiResponse> GetServicePackage(int pageNumber, int pageSize, bool? isAscending);
         Task<ApiResponse> UpdateBooking(Guid bookingid, UpdateBookingRequest request);
         Task<ApiResponse> UpdateBookingStatus(Guid bookingid);
         Task<ApiResponse> UpdateMission(Guid missionId, UpdateMissionRequest request);

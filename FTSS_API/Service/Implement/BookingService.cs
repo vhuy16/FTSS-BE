@@ -20,18 +20,21 @@ using FTSS_API.Payload.Response.Pay.Payment;
 using Azure;
 using FTSS_API.Payload.Response.SetupPackage;
 using static FTSS_API.Payload.Response.Order.GetOrderResponse;
+using Supabase;
+using FTSS_API.Service.Implement.Implement;
 
 namespace FTSS_API.Service.Implement
 {
     public class BookingService : BaseService<BookingService>, IBookingService
     {
         private readonly SupabaseUltils _supabaseImageService;
+        private readonly IEmailSender _emailSender;
         public IPaymentService _paymentService { get; set; }
-        public BookingService(IUnitOfWork<MyDbContext> unitOfWork, ILogger<BookingService> logger, IMapper mapper,SupabaseUltils supabaseImageService, IHttpContextAccessor httpContextAccessor, IPaymentService paymentService) : base(unitOfWork, logger, mapper, httpContextAccessor)
+        public BookingService(IUnitOfWork<MyDbContext> unitOfWork, IEmailSender emailSender, ILogger<BookingService> logger, IMapper mapper,SupabaseUltils supabaseImageService, IHttpContextAccessor httpContextAccessor, IPaymentService paymentService) : base(unitOfWork, logger, mapper, httpContextAccessor)
         {
             _paymentService = paymentService;
             _supabaseImageService = supabaseImageService;
-            
+            _emailSender = emailSender;
         }
         public async Task<ApiResponse> AssigningTechnician(AssigningTechnicianRequest request)
         {
@@ -126,16 +129,18 @@ namespace FTSS_API.Service.Implement
                     };
                 }
 
-                // Kiểm tra trạng thái Order phải là PROCESSED
-                if (!order.Status.Equals(OrderStatus.PROCESSED.ToString(), StringComparison.OrdinalIgnoreCase))
+                // Kiểm tra trạng thái Order phải là PROCESSED hoặc NOTDONE
+                var allowedStatuses = new[] { OrderStatus.PROCESSED.GetDescriptionFromEnum(), OrderStatus.NOTDONE.GetDescriptionFromEnum() };
+                if (!allowedStatuses.Contains(order.Status))
                 {
                     return new ApiResponse
                     {
                         status = StatusCodes.Status400BadRequest.ToString(),
-                        message = "Trạng thái đơn hàng phải là PROCESSED trước khi phân công kỹ thuật viên.",
+                        message = "Chỉ có thể phân công kỹ thuật viên khi đơn hàng ở trạng thái PROCESSED hoặc NOTDONE.",
                         data = null
                     };
                 }
+
 
                 // ✅ Kiểm tra Order đã được phân công chưa
                 if (order.IsAssigned == true)
@@ -163,7 +168,7 @@ namespace FTSS_API.Service.Implement
                     OrderId = order.Id,
                 };
 
-                await _unitOfWork.Context.Set<Mission>().AddAsync(newTask);
+                await _unitOfWork.GetRepository<Mission>().InsertAsync(newTask);
                 // ✅ Cập nhật trạng thái IsAssigned của Order thành true
                 order.IsAssigned = true;
                 _unitOfWork.GetRepository<Order>().UpdateAsync(order);
@@ -686,14 +691,14 @@ namespace FTSS_API.Service.Implement
         {
             try
             {
+                // Lấy thông tin booking + liên quan
                 var booking = await _unitOfWork.GetRepository<Booking>().SingleOrDefaultAsync(
                     predicate: b => b.Id == bookingId,
                     include: b => b
                         .Include(x => x.User)
                         .Include(x => x.BookingDetails).ThenInclude(bd => bd.ServicePackage)
-                        .Include(x => x.Missions).ThenInclude(mm => mm.MissionImages)
                         .Include(x => x.Payments)
-                        .Include(x => x.Order) // Include Order để truy cập SetupPackageId
+                        .Include(x => x.Order) // để lấy SetupPackageId
                 );
 
                 if (booking == null)
@@ -706,7 +711,28 @@ namespace FTSS_API.Service.Implement
                     };
                 }
 
-                // Lấy thông tin payment đầu tiên nếu có
+                // Truy vấn Mission có BookingId = booking.Id
+                var mission = await _unitOfWork.GetRepository<Mission>().SingleOrDefaultAsync(
+                    predicate: m => m.BookingId == booking.Id && m.IsDelete == false,
+                    include: m => m.Include(mi => mi.MissionImages)
+                );
+
+                // Lấy danh sách ảnh kiểu Report từ MissionImage
+                var reportImages = mission?.MissionImages?
+                    .Where(img => img.IsDelete == false)
+                    .Select(img => new MissionImageResponse
+                    {
+                        Id = img.Id,
+                        LinkImage = img.LinkImage,
+                        Status = img.Status,
+                        CreateDate = img.CreateDate,
+                        ModifyDate = img.ModifyDate,
+                        IsDelete = img.IsDelete,
+                        Type = img.Type
+                    }).ToList() ?? new List<MissionImageResponse>();
+
+
+                // Lấy payment đầu tiên nếu có
                 var payment = booking.Payments.FirstOrDefault();
                 var paymentResponse = payment != null
                     ? new PaymentResponse
@@ -720,7 +746,7 @@ namespace FTSS_API.Service.Implement
                     }
                     : new PaymentResponse();
 
-                // Khởi tạo biến chứa SetupPackageResponse
+                // Lấy thông tin SetupPackage nếu có
                 SetupPackageResponse? setupPackageResponse = null;
 
                 if (booking.Order != null && booking.Order.SetupPackageId.HasValue)
@@ -758,15 +784,16 @@ namespace FTSS_API.Service.Implement
                                 IsDelete = spd.Product.IsDelete,
                                 CategoryName = spd.Product.SubCategory?.SubCategoryName ?? "Không rõ",
                                 images = spd.Product?.Images?
-                        .Where(img => img.IsDelete == false)
-                        .OrderBy(img => img.CreateDate)
-                        .Select(img => img.LinkImage)
-                        .FirstOrDefault() ?? "NoImageAvailable"
+                                    .Where(img => img.IsDelete == false)
+                                    .OrderBy(img => img.CreateDate)
+                                    .Select(img => img.LinkImage)
+                                    .FirstOrDefault() ?? "NoImageAvailable"
                             }).ToList()
                         };
                     }
                 }
 
+                // Gộp response
                 var response = new GetBookingById
                 {
                     Id = booking.Id,
@@ -780,12 +807,11 @@ namespace FTSS_API.Service.Implement
                     TotalPrice = booking.TotalPrice,
                     BookingCode = booking.BookingCode,
                     OrderId = booking.OrderId,
-                    ImageLinks = booking.Missions
-                        .SelectMany(m => m.MissionImages)
-                        .Where(mi => mi.IsDelete == false)
-                        .Select(mi => mi.LinkImage)
-                        .ToList(),
                     IsAssigned = booking.IsAssigned,
+                    MissionId = mission?.Id,
+                    CancelReason = mission?.CancelReason,
+                    Reason = booking.CancelReason,
+                    Images = reportImages,
                     Services = booking.BookingDetails.Select(bd => new ServicePackageResponse
                     {
                         Id = bd.ServicePackage.Id,
@@ -813,6 +839,7 @@ namespace FTSS_API.Service.Implement
                 };
             }
         }
+
 
 
         public async Task<ApiResponse> GetBookingById(string bookingCode)
@@ -1107,22 +1134,28 @@ namespace FTSS_API.Service.Implement
                     TotalPrice = b.TotalPrice,
                     OrderId = b.OrderId,
                     IsAssigned = b.IsAssigned,
+
+                    // Lấy MissionId đầu tiên nếu có
+                    MissionId = b.Missions.FirstOrDefault()?.Id,
+
                     Services = b.BookingDetails.Select(bd => new ServicePackageResponse
                     {
                         Id = bd.ServicePackage.Id,
                         ServiceName = bd.ServicePackage.ServiceName,
                         Price = bd.ServicePackage.Price
                     }).ToList(),
+
                     Payment = b.Payments.Select(p => new PaymentResponse
                     {
                         PaymentId = p.Id,
                         PaymentMethod = p.PaymentMethod ?? "Không xác định",
                         PaymentStatus = p.PaymentStatus ?? "Không xác định",
-                        BankHolder =p.BankHolder ?? "Unknown",
+                        BankHolder = p.BankHolder ?? "Unknown",
                         BankName = p.BankName ?? "Unknown",
                         BankNumber = p.BankNumber ?? "Unknown",
                     }).FirstOrDefault() ?? new PaymentResponse()
                 }).ToList();
+
 
                 return new ApiResponse
                 {
@@ -1174,11 +1207,13 @@ namespace FTSS_API.Service.Implement
                 var missions = await _unitOfWork.GetRepository<Mission>().GetPagingListAsync(
                     predicate: filter,
                     orderBy: orderBy,
-                    include: m => m.Include(x => x.User)
-               .Include(x => x.Order)
-               .Include(x => x.Booking)
-                   .ThenInclude(b => b.BookingDetails)
-                       .ThenInclude(bd => bd.ServicePackage),
+                    include: m => m
+                        .Include(x => x.User)
+                        .Include(x => x.Order)
+                        .Include(x => x.MissionImages) // Thêm dòng này
+                        .Include(x => x.Booking)
+                            .ThenInclude(b => b.BookingDetails)
+                                .ThenInclude(bd => bd.ServicePackage),
                     page: pageNumber,
                     size: pageSize
                 );
@@ -1201,19 +1236,32 @@ namespace FTSS_API.Service.Implement
                     OrderCode = m.Order?.OrderCode ?? "Không có",
                     BookingCode = m.Booking?.BookingCode ?? "Không có",
                     FullName = m.Booking != null
-        ? m.Booking.FullName
-        : (m.Order?.RecipientName ?? "Không có"),
+                        ? m.Booking.FullName
+                        : (m.Order?.RecipientName ?? "Không có"),
                     BookingImage = m.Booking?.BookingImage,
                     InstallationDate = m.Order?.InstallationDate,
-                    Services = m.Booking?.BookingDetails
-             ?.Select(s => new ServicePackageResponse
-             {
-                 Id = s.ServicePackage.Id,
-                 ServiceName = s.ServicePackage.ServiceName,
-                 Price = s.ServicePackage.Price
-             }).ToList() ?? new()
-                }).ToList();
+                    Services = m.Booking?.BookingDetails?
+                        .Select(s => new ServicePackageResponse
+                        {
+                            Id = s.ServicePackage.Id,
+                            ServiceName = s.ServicePackage.ServiceName,
+                            Price = s.ServicePackage.Price
+                        }).ToList() ?? new(),
 
+                    // ✅ Thêm danh sách hình ảnh nhiệm vụ
+                    Images = m.MissionImages
+                        .Where(img => img.IsDelete == false)
+                        .Select(img => new MissionImageResponse
+                        {
+                            Id = img.Id,
+                            LinkImage = img.LinkImage,
+                            Status = img.Status,
+                            CreateDate = img.CreateDate,
+                            ModifyDate = img.ModifyDate,
+                            IsDelete = img.IsDelete,
+                            Type = img.Type
+                        }).ToList()
+                }).ToList();
 
                 return new ApiResponse
                 {
@@ -1232,6 +1280,7 @@ namespace FTSS_API.Service.Implement
                 };
             }
         }
+
 
         public async Task<ApiResponse> GetListTaskTech(int pageNumber, int pageSize, string? status, bool? isAscending)
         {
@@ -1458,33 +1507,6 @@ namespace FTSS_API.Service.Implement
             }
         }
 
-        public async Task<ApiResponse> GetServicePackage(int pageNumber, int pageSize, bool? isAscending)
-        {
-            var servicePackages = await _unitOfWork.GetRepository<ServicePackage>().GetListAsync(
-                predicate: sp => sp.Status == ServicePackageStatus.Available.ToString() && sp.IsDelete == false,
-                orderBy: isAscending == true ? sp => sp.OrderBy(x => x.ServiceName) : sp => sp.OrderByDescending(x => x.ServiceName)
-            );
-
-            var paginatedList = servicePackages
-                .Skip((pageNumber - 1) * pageSize)
-                .Take(pageSize)
-                .ToList();
-
-            var response = paginatedList.Select(sp => new GetServicePackageResponse
-            {
-                Id = sp.Id,
-                ServiceName = sp.ServiceName,
-                Price = sp.Price
-            }).ToList();
-
-            return new ApiResponse
-            {
-                status = StatusCodes.Status200OK.ToString(),
-                message = "Lấy danh sách gói dịch vụ khả dụng thành công.",
-                data = response
-            };
-        }
-
         public async Task<ApiResponse> UpdateMission(Guid missionId, UpdateMissionRequest request)
         {
             try
@@ -1528,8 +1550,9 @@ namespace FTSS_API.Service.Implement
                 bool isSameName = string.IsNullOrWhiteSpace(request.MissionName) || request.MissionName == mission.MissionName;
                 bool isSameDesc = string.IsNullOrWhiteSpace(request.MissionDescription) || request.MissionDescription == mission.MissionDescription;
                 bool isSameTech = !request.TechnicianId.HasValue || request.TechnicianId.Value == mission.Userid;
+                bool isSameStatus = string.IsNullOrWhiteSpace(request.Status);
 
-                if (isSameName && isSameDesc && isSameTech)
+                if (isSameName && isSameDesc && isSameTech && isSameStatus)
                 {
                     return new ApiResponse
                     {
@@ -1576,11 +1599,69 @@ namespace FTSS_API.Service.Implement
                     mission.Userid = request.TechnicianId;
                 }
 
-                // Cập nhật các field được phép
+                // Cập nhật các trường nếu khác
                 mission.MissionName = !string.IsNullOrWhiteSpace(request.MissionName) ? request.MissionName : mission.MissionName;
                 mission.MissionDescription = !string.IsNullOrWhiteSpace(request.MissionDescription) ? request.MissionDescription : mission.MissionDescription;
 
-                // Cập nhật mission
+                // Nếu có cập nhật Status
+                // Nếu có cập nhật Status
+                if (!string.IsNullOrWhiteSpace(request.Status))
+                {
+                    mission.Status = request.Status;
+
+                    if (mission.OrderId.HasValue && !mission.BookingId.HasValue)
+                    {
+                        var order = await _unitOfWork.GetRepository<Order>()
+                            .SingleOrDefaultAsync(selector: x => x, predicate: o => o.Id == mission.OrderId.Value);
+
+                        if (order != null)
+                        {
+                            switch (request.Status)
+                            {
+                                case nameof(MissionStatusEnum.Cancel):
+                                    order.Status = OrderStatus.CANCELLED.ToString(); break;
+                                case nameof(MissionStatusEnum.NotDone):
+                                    order.Status = OrderStatus.NOTDONE.ToString();
+                                    order.IsAssigned = false; 
+                                    break;
+                                case nameof(MissionStatusEnum.Completed):
+                                    order.Status = OrderStatus.COMPLETED.ToString(); break;
+                                case nameof(MissionStatusEnum.Reported):
+                                    order.Status = OrderStatus.NOTDONE.ToString();
+                                    order.IsAssigned = false;
+                                    break;
+                            }
+
+                            _unitOfWork.GetRepository<Order>().UpdateAsync(order);
+                        }
+                    }
+                    else if (mission.BookingId.HasValue && !mission.OrderId.HasValue)
+                    {
+                        var booking = await _unitOfWork.GetRepository<Booking>()
+                            .SingleOrDefaultAsync(selector: x => x, predicate: b => b.Id == mission.BookingId.Value);
+                        if (booking != null)
+                        {
+                            switch (request.Status)
+                            {
+                                case nameof(MissionStatusEnum.Cancel):
+                                    booking.Status = BookingStatusEnum.MISSED.ToString(); break;
+                                case nameof(MissionStatusEnum.NotDone):
+                                    booking.Status = BookingStatusEnum.NOTDONE.ToString();
+                                    booking.IsAssigned = false; 
+                                    break;
+                                case nameof(MissionStatusEnum.Completed):
+                                    booking.Status = BookingStatusEnum.COMPLETED.ToString(); break;
+                                case nameof(MissionStatusEnum.Reported):
+                                    booking.Status = BookingStatusEnum.NOTDONE.ToString();
+                                    booking.IsAssigned = false;
+                                    break;
+                            }
+
+                            _unitOfWork.GetRepository<Booking>().UpdateAsync(booking);
+                        }
+                    }
+                }
+
                 _unitOfWork.GetRepository<Mission>().UpdateAsync(mission);
                 await _unitOfWork.CommitAsync();
 
@@ -1602,57 +1683,56 @@ namespace FTSS_API.Service.Implement
             }
         }
 
-
         public async Task<ApiResponse> UpdateStatusMission(Guid missionId, string status, Supabase.Client client, List<IFormFile>? ImageLinks, string? reason = null)
-{
-    try
-    {
-        // Lấy UserId từ HttpContext
-        Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
-        var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
-            predicate: u => u.Id.Equals(userId) &&
-                            u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) &&
-                            u.IsDelete == false &&
-                            u.Role.Equals(RoleEnum.Technician.GetDescriptionFromEnum()));
-
-        if (user == null)
         {
-            throw new BadHttpRequestException("Bạn không có quyền thực hiện thao tác này.");
-        }
-
-        var mission = await _unitOfWork.GetRepository<Mission>().SingleOrDefaultAsync(
-            predicate: m => m.Id.Equals(missionId) && m.IsDelete == false);
-
-        if (mission == null)
-        {
-            return new ApiResponse
+            try
             {
-                status = StatusCodes.Status404NotFound.ToString(),
-                message = "Không tìm thấy nhiệm vụ.",
-                data = null
-            };
-        }
+                // Lấy UserId từ HttpContext
+                Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
+                var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
+                    predicate: u => u.Id.Equals(userId) &&
+                                    u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) &&
+                                    u.IsDelete == false &&
+                                    u.Role.Equals(RoleEnum.Technician.GetDescriptionFromEnum()));
 
-        // Kiểm tra technician chỉ được cập nhật mission của chính mình
-        if (mission.Userid == null || mission.Userid != userId)
-        {
-            return new ApiResponse
-            {
-                status = StatusCodes.Status403Forbidden.ToString(),
-                message = "Bạn không được phép cập nhật trạng thái nhiệm vụ này.",
-                data = null
-            };
-        }
+                if (user == null)
+                {
+                    throw new BadHttpRequestException("Bạn không có quyền thực hiện thao tác này.");
+                }
 
-        if (!Enum.TryParse(status, out MissionStatusEnum missionStatus))
-        {
-            return new ApiResponse
-            {
-                status = StatusCodes.Status400BadRequest.ToString(),
-                message = "Trạng thái không hợp lệ.",
-                data = null
-            };
-        }
+                var mission = await _unitOfWork.GetRepository<Mission>().SingleOrDefaultAsync(
+                    predicate: m => m.Id.Equals(missionId) && m.IsDelete == false);
+
+                if (mission == null)
+                {
+                    return new ApiResponse
+                    {
+                        status = StatusCodes.Status404NotFound.ToString(),
+                        message = "Không tìm thấy nhiệm vụ.",
+                        data = null
+                    };
+                }
+
+                // Kiểm tra technician chỉ được cập nhật mission của chính mình
+                if (mission.Userid == null || mission.Userid != userId)
+                {
+                    return new ApiResponse
+                    {
+                        status = StatusCodes.Status403Forbidden.ToString(),
+                        message = "Bạn không được phép cập nhật trạng thái nhiệm vụ này.",
+                        data = null
+                    };
+                }
+
+                if (!Enum.TryParse(status, out MissionStatusEnum missionStatus))
+                {
+                    return new ApiResponse
+                    {
+                        status = StatusCodes.Status400BadRequest.ToString(),
+                        message = "Trạng thái không hợp lệ.",
+                        data = null
+                    };
+                }
 
                 // Validate reason khi trạng thái là Cancel và NotDone
                 if (missionStatus == MissionStatusEnum.Cancel || missionStatus == MissionStatusEnum.NotDone)
@@ -1673,125 +1753,146 @@ namespace FTSS_API.Service.Implement
                     mission.CancelReason = null;
                 }
 
-
                 // Update images (logic giống UpdateProduct)
                 if (ImageLinks != null && ImageLinks.Any())
-        {
-            // Validate file ảnh
-            if (ImageLinks.Any(file => file == null || file.Length == 0))
-            {
+                {
+                    // Validate file ảnh
+                    if (ImageLinks.Any(file => file == null || file.Length == 0))
+                    {
+                        return new ApiResponse
+                        {
+                            status = StatusCodes.Status400BadRequest.ToString(),
+                            message = "File ảnh không hợp lệ hoặc trống.",
+                            data = null
+                        };
+                    }
+
+                    // Xóa tất cả ảnh hiện tại của mission
+                    var existingImages = await _unitOfWork.GetRepository<MissionImage>()
+                        .GetListAsync(predicate: i => i.MissionId.Equals(missionId));
+                    foreach (var img in existingImages)
+                    {
+                        _unitOfWork.GetRepository<MissionImage>().DeleteAsync(img);
+                    }
+
+                    // Gửi ảnh lên Supabase và lấy URL
+                    var imageUrls = await _supabaseImageService.SendImagesAsync(ImageLinks, client);
+
+                    // Thêm ảnh mới
+                    foreach (var imageUrl in imageUrls)
+                    {
+                        var newImage = new MissionImage
+                        {
+                            Id = Guid.NewGuid(),
+                            MissionId = missionId,
+                            LinkImage = imageUrl,
+                            Status = "Active", // Giả định trạng thái mặc định
+                            CreateDate = TimeUtils.GetCurrentSEATime(),
+                            ModifyDate = TimeUtils.GetCurrentSEATime(),
+                            IsDelete = false,
+                            Type = MissionImageTypeEnum.Cancel.GetDescriptionFromEnum()
+                        };
+
+                        // Thêm mới vào cơ sở dữ liệu
+                        await _unitOfWork.GetRepository<MissionImage>().InsertAsync(newImage);
+                    }
+                }
+
+                // Cập nhật trạng thái Mission
+                mission.Status = missionStatus.ToString();
+
+                // Cập nhật EndMissionSchedule chỉ khi trạng thái là Done hoặc Cancel
+                if (missionStatus == MissionStatusEnum.Done || missionStatus == MissionStatusEnum.Cancel)
+                {
+                    mission.EndMissionSchedule = TimeUtils.GetCurrentSEATime();
+                }
+
+                // Nếu mission liên kết với OrderId và không có BookingId => cập nhật Order
+                if (mission.OrderId.HasValue && mission.BookingId == null)
+                {
+                    string? orderStatus = missionStatus switch
+                    {
+                        MissionStatusEnum.Processing => OrderStatus.PENDING_DELIVERY.ToString(),
+                        MissionStatusEnum.Done => OrderStatus.DONE.ToString(),
+                        MissionStatusEnum.Cancel => OrderStatus.CANCELLED.ToString(),
+                        MissionStatusEnum.NotDone => OrderStatus.NOTDONE.ToString(),
+                        _ => null
+                    };
+
+                    if (orderStatus != null)
+                    {
+                        var order = await _unitOfWork.GetRepository<Order>().SingleOrDefaultAsync(
+                            predicate: o => o.Id == mission.OrderId.Value && o.IsDelete == false);
+
+                        if (order != null)
+                        {
+                            order.Status = orderStatus;
+                            order.ModifyDate = TimeUtils.GetCurrentSEATime();
+
+                            // ✅ Nếu là NotDone thì cập nhật IsAssigned = false
+                            if (missionStatus == MissionStatusEnum.NotDone)
+                            {
+                                order.IsAssigned = false;
+                            }
+
+                            _unitOfWork.GetRepository<Order>().UpdateAsync(order);
+                        }
+                    }
+                }
+
+                // Nếu mission liên kết với BookingId và không có OrderId => cập nhật Booking
+                if (mission.BookingId.HasValue && mission.OrderId == null)
+                {
+                    string? bookingStatus = missionStatus switch
+                    {
+                        MissionStatusEnum.Processing => BookingStatusEnum.PROCESSING.ToString(),
+                        MissionStatusEnum.Done => BookingStatusEnum.DONE.ToString(),
+                        MissionStatusEnum.Cancel => BookingStatusEnum.MISSED.ToString(),
+                        MissionStatusEnum.NotDone => BookingStatusEnum.NOTDONE.ToString(),
+                        _ => null
+                    };
+
+                    if (bookingStatus != null)
+                    {
+                        var booking = await _unitOfWork.GetRepository<Booking>().SingleOrDefaultAsync(
+                            predicate: b => b.Id == mission.BookingId.Value);
+
+                        if (booking != null)
+                        {
+                            booking.Status = bookingStatus;
+
+                            // ✅ Nếu là NotDone thì cập nhật IsAssigned = false
+                            if (missionStatus == MissionStatusEnum.NotDone)
+                            {
+                                booking.IsAssigned = false;
+                            }
+
+                            _unitOfWork.GetRepository<Booking>().UpdateAsync(booking);
+                        }
+                    }
+                }
+
+
+                _unitOfWork.GetRepository<Mission>().UpdateAsync(mission);
+                await _unitOfWork.CommitAsync();
+
                 return new ApiResponse
                 {
-                    status = StatusCodes.Status400BadRequest.ToString(),
-                    message = "File ảnh không hợp lệ hoặc trống.",
+                    status = StatusCodes.Status200OK.ToString(),
+                    message = "Cập nhật trạng thái nhiệm vụ thành công.",
                     data = null
                 };
             }
-
-            // Xóa tất cả ảnh hiện tại của mission
-            var existingImages = await _unitOfWork.GetRepository<MissionImage>()
-                .GetListAsync(predicate: i => i.MissionId.Equals(missionId));
-            foreach (var img in existingImages)
+            catch (Exception ex)
             {
-                _unitOfWork.GetRepository<MissionImage>().DeleteAsync(img);
-            }
-
-            // Gửi ảnh lên Supabase và lấy URL
-            var imageUrls = await _supabaseImageService.SendImagesAsync(ImageLinks, client);
-
-            // Thêm ảnh mới
-            foreach (var imageUrl in imageUrls)
-            {
-                var newImage = new MissionImage
+                return new ApiResponse
                 {
-                    Id = Guid.NewGuid(),
-                    MissionId = missionId,
-                    LinkImage = imageUrl,
-                    Status = "Active", // Giả định trạng thái mặc định
-                    CreateDate = TimeUtils.GetCurrentSEATime(),
-                    ModifyDate = TimeUtils.GetCurrentSEATime(),
-                    IsDelete = false
+                    status = StatusCodes.Status500InternalServerError.ToString(),
+                    message = "Đã xảy ra lỗi khi cập nhật trạng thái nhiệm vụ.",
+                    data = ex.Message
                 };
-
-                // Thêm mới vào cơ sở dữ liệu
-                await _unitOfWork.GetRepository<MissionImage>().InsertAsync(newImage);
             }
         }
-
-        // Cập nhật trạng thái Mission
-        mission.Status = missionStatus.ToString();
-
-        // Nếu mission liên kết với OrderId và không có BookingId => cập nhật Order
-        if (mission.OrderId.HasValue && mission.BookingId == null)
-        {
-            string? orderStatus = missionStatus switch
-            {
-                MissionStatusEnum.Processing => OrderStatus.PENDING_DELIVERY.ToString(),
-                MissionStatusEnum.Done => OrderStatus.COMPLETED.ToString(),
-                MissionStatusEnum.Cancel => OrderStatus.CANCELLED.ToString(),
-                MissionStatusEnum.NotDone => OrderStatus.NOTDONE.ToString(),
-                _ => null
-            };
-
-            if (orderStatus != null)
-            {
-                var order = await _unitOfWork.GetRepository<Order>().SingleOrDefaultAsync(
-                    predicate: o => o.Id == mission.OrderId.Value && o.IsDelete == false);
-
-                if (order != null)
-                {
-                    order.Status = orderStatus;
-                    order.ModifyDate = DateTime.UtcNow;
-                    _unitOfWork.GetRepository<Order>().UpdateAsync(order);
-                }
-            }
-        }
-
-        // Nếu mission liên kết với BookingId và không có OrderId => cập nhật Booking
-        if (mission.BookingId.HasValue && mission.OrderId == null)
-        {
-            string? bookingStatus = missionStatus switch
-            {
-                MissionStatusEnum.Processing => BookingStatusEnum.PROCESSING.ToString(),
-                MissionStatusEnum.Done => BookingStatusEnum.DONE.ToString(),
-                MissionStatusEnum.Cancel => BookingStatusEnum.MISSED.ToString(),
-                MissionStatusEnum.NotDone => BookingStatusEnum.NOTDONE.ToString(),
-                _ => null
-            };
-
-            if (bookingStatus != null)
-            {
-                var booking = await _unitOfWork.GetRepository<Booking>().SingleOrDefaultAsync(
-                    predicate: b => b.Id == mission.BookingId.Value);
-
-                if (booking != null)
-                {
-                    booking.Status = bookingStatus;
-                    _unitOfWork.GetRepository<Booking>().UpdateAsync(booking);
-                }
-            }
-        }
-        mission.EndMissionSchedule = TimeUtils.GetCurrentSEATime();
-        _unitOfWork.GetRepository<Mission>().UpdateAsync(mission);
-        await _unitOfWork.CommitAsync();
-
-        return new ApiResponse
-        {
-            status = StatusCodes.Status200OK.ToString(),
-            message = "Cập nhật trạng thái nhiệm vụ thành công.",
-            data = null
-        };
-    }
-    catch (Exception ex)
-    {
-        return new ApiResponse
-        {
-            status = StatusCodes.Status500InternalServerError.ToString(),
-            message = "Đã xảy ra lỗi khi cập nhật trạng thái nhiệm vụ.",
-            data = ex.Message
-        };
-    }
-}
 
         private string GenerateBookingCode()
         {
@@ -1992,7 +2093,6 @@ namespace FTSS_API.Service.Implement
         {
             try
             {
-                // Lấy UserId từ HttpContext
                 Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
                 var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
                     predicate: u => u.Id.Equals(userId) &&
@@ -2005,9 +2105,11 @@ namespace FTSS_API.Service.Implement
                 }
 
                 var bookingRepo = _unitOfWork.GetRepository<Booking>();
+                var missionRepo = _unitOfWork.GetRepository<Mission>();
 
                 var booking = await bookingRepo.SingleOrDefaultAsync(
-                    predicate: b => b.Id == bookingId);
+    predicate: b => b.Id == bookingId
+);
 
                 if (booking == null)
                 {
@@ -2019,7 +2121,7 @@ namespace FTSS_API.Service.Implement
                     };
                 }
 
-                // Nếu là Customer thì chỉ được cập nhật booking của mình và chưa phân công
+                // Kiểm tra quyền cập nhật dựa theo vai trò
                 if (user.Role == RoleEnum.Customer.GetDescriptionFromEnum())
                 {
                     if (booking.UserId != userId)
@@ -2042,16 +2144,31 @@ namespace FTSS_API.Service.Implement
                         };
                     }
                 }
+                else if (user.Role == RoleEnum.Manager.GetDescriptionFromEnum())
+                {
+                    if (booking.IsAssigned == true && booking.Status != BookingStatusEnum.NOTDONE.ToString())
+                    {
+                        return new ApiResponse
+                        {
+                            status = StatusCodes.Status403Forbidden.ToString(),
+                            message = "Booking đã phân công và không ở trạng thái chưa hoàn thành. Không thể cập nhật.",
+                            data = null
+                        };
+                    }
+                }
 
-                // Cập nhật các trường nếu được truyền
+                bool isUpdated = false;
+
                 if (request.ScheduleDate.HasValue)
                 {
                     booking.ScheduleDate = request.ScheduleDate;
+                    isUpdated = true;
                 }
 
                 if (!string.IsNullOrWhiteSpace(request.Address))
                 {
                     booking.Address = request.Address;
+                    isUpdated = true;
                 }
 
                 if (!string.IsNullOrWhiteSpace(request.PhoneNumber))
@@ -2067,10 +2184,21 @@ namespace FTSS_API.Service.Implement
                         };
                     }
                     booking.PhoneNumber = request.PhoneNumber;
+                    isUpdated = true;
                 }
 
+                if (!isUpdated)
+                {
+                    return new ApiResponse
+                    {
+                        status = StatusCodes.Status400BadRequest.ToString(),
+                        message = "Không có dữ liệu nào được gửi để cập nhật.",
+                        data = null
+                    };
+                }
 
                 bookingRepo.UpdateAsync(booking);
+
                 await _unitOfWork.CommitAsync();
 
                 return new ApiResponse
@@ -2090,29 +2218,34 @@ namespace FTSS_API.Service.Implement
                 };
             }
         }
-        public async Task<ApiResponse> CancelBooking(Guid bookingId)
+        public async Task<ApiResponse> CancelBooking(Guid bookingId, CancelBookingRequest request)
         {
             try
             {
-                // Lấy UserId từ HttpContext
+                // Lấy user đăng nhập
                 Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
                 var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
                     predicate: u => u.Id.Equals(userId) &&
                                     u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) &&
-                                    u.IsDelete == false &&
-                                    u.Role.Equals(RoleEnum.Customer.GetDescriptionFromEnum()));
+                                    u.IsDelete == false
+                );
 
                 if (user == null)
                 {
-                    throw new BadHttpRequestException("Bạn không có quyền thực hiện thao tác này.");
+                    return new ApiResponse
+                    {
+                        status = StatusCodes.Status401Unauthorized.ToString(),
+                        message = "Không xác định được người dùng.",
+                        data = null
+                    };
                 }
 
-                var bookingRepo = _unitOfWork.GetRepository<Booking>();
-                var orderRepo = _unitOfWork.GetRepository<Order>();
-
-                var booking = await bookingRepo.SingleOrDefaultAsync(
+                var booking = await _unitOfWork.GetRepository<Booking>().SingleOrDefaultAsync(
                     predicate: b => b.Id == bookingId,
-                    include: b => b.Include(x => x.Order)
+                    include: b => b.Include(x => x.Payments)
+                                   .Include(x => x.User)
+                                   .Include(x => x.Order)
+                                   .Include(x => x.Missions)
                 );
 
                 if (booking == null)
@@ -2120,58 +2253,93 @@ namespace FTSS_API.Service.Implement
                     return new ApiResponse
                     {
                         status = StatusCodes.Status404NotFound.ToString(),
-                        message = "Không tìm thấy booking.",
+                        message = "Không tìm thấy lịch hẹn.",
                         data = null
                     };
                 }
 
-                // ❌ Không cho hủy nếu không phải booking của người dùng hiện tại
-                if (booking.UserId != userId)
-                {
-                    return new ApiResponse
-                    {
-                        status = StatusCodes.Status403Forbidden.ToString(),
-                        message = "Bạn không có quyền hủy booking này.",
-                        data = null
-                    };
-                }
+                var isCustomer = user.Role == RoleEnum.Customer.GetDescriptionFromEnum();
+                var isManager = user.Role == RoleEnum.Manager.GetDescriptionFromEnum(); // optional nếu có
 
-                // ❌ Không cho hủy nếu đã được assigned
-                if (booking.IsAssigned == true)
+                if (isCustomer)
                 {
-                    return new ApiResponse
+                    // ✅ Chỉ được hủy lịch của chính mình
+                    if (booking.UserId != user.Id)
                     {
-                        status = StatusCodes.Status400BadRequest.ToString(),
-                        message = "Booking đã được phân công. Không thể hủy.",
-                        data = null
-                    };
-                }
-
-                // ✅ Cập nhật trạng thái
-                booking.Status = BookingStatusEnum.CANCELLED.GetDescriptionFromEnum();
-                
-
-                // ✅ Nếu miễn phí => cập nhật order.IsEligible
-                if (booking.TotalPrice == 0 && booking.OrderId.HasValue)
-                {
-                    booking.Status = BookingStatusEnum.CANCELLED.GetDescriptionFromEnum();
-                    var order = booking.Order;
-                    if (order != null)
-                    {
-                        order.IsEligible = true;
-                        order.ModifyDate = DateTime.Now;
-                        orderRepo.UpdateAsync(order);
+                        return new ApiResponse
+                        {
+                            status = StatusCodes.Status403Forbidden.ToString(),
+                            message = "Bạn không có quyền hủy lịch hẹn này.",
+                            data = null
+                        };
                     }
+
+                    // ✅ Không được hủy nếu đã có nhiệm vụ (đã được phân công)
+                    if (booking.Missions != null && booking.Missions.Any())
+                    {
+                        return new ApiResponse
+                        {
+                            status = StatusCodes.Status400BadRequest.ToString(),
+                            message = "Lịch hẹn đã được phân công, không thể hủy.",
+                            data = null
+                        };
+                    }
+
+                    // ✅ Không gửi mail, không cần request.Reason
+                    booking.Status = BookingStatusEnum.CANCELLED.GetDescriptionFromEnum();
+
+                    // ✅ Nếu miễn phí => cập nhật order.IsEligible
+                    if (booking.TotalPrice == 0 && booking.OrderId.HasValue && booking.Order != null)
+                    {
+                        booking.Order.IsEligible = true;
+                        booking.Order.ModifyDate = TimeUtils.GetCurrentSEATime();
+                        _unitOfWork.GetRepository<Order>().UpdateAsync(booking.Order);
+                    }
+
+                    _unitOfWork.GetRepository<Booking>().UpdateAsync(booking);
+                    bool result = await _unitOfWork.CommitAsync() > 0;
+
+                    return new ApiResponse
+                    {
+                        status = result ? StatusCodes.Status200OK.ToString() : StatusCodes.Status400BadRequest.ToString(),
+                        message = result ? "Hủy lịch hẹn thành công." : "Hủy lịch hẹn thất bại.",
+                        data = true
+                    };
                 }
 
-                bookingRepo.UpdateAsync(booking);
-                await _unitOfWork.CommitAsync();
+                // ✅ Nếu là Manager thì giữ nguyên logic ban đầu
+                var isPaid = booking.Payments.Any(p => p.PaymentStatus == PaymentStatusEnum.Completed.GetDescriptionFromEnum());
+
+                var email = booking.User?.Email;
+                if (!string.IsNullOrEmpty(email))
+                {
+                    string emailBody = EmailTemplatesUtils.RefundBookingNotificationEmailTemplate(
+                        booking.BookingCode ?? "N/A",
+                        isPaid,
+                        request?.Reason ?? "Không có lý do cụ thể"
+                    );
+
+                    await _emailSender.RefundBookingNotificationEmailAsync(email, emailBody);
+                }
+
+                booking.Status = BookingStatusEnum.CANCELLED.GetDescriptionFromEnum();
+                booking.CancelReason = request.Reason;
+
+                if (booking.TotalPrice == 0 && booking.OrderId.HasValue && booking.Order != null)
+                {
+                    booking.Order.IsEligible = true;
+                    booking.Order.ModifyDate = TimeUtils.GetCurrentSEATime();
+                    _unitOfWork.GetRepository<Order>().UpdateAsync(booking.Order);
+                }
+
+                _unitOfWork.GetRepository<Booking>().UpdateAsync(booking);
+                bool managerResult = await _unitOfWork.CommitAsync() > 0;
 
                 return new ApiResponse
                 {
-                    status = StatusCodes.Status200OK.ToString(),
-                    message = "Hủy booking thành công.",
-                    data = null
+                    status = managerResult ? StatusCodes.Status200OK.ToString() : StatusCodes.Status400BadRequest.ToString(),
+                    message = managerResult ? "Hủy lịch hẹn thành công." : "Hủy lịch hẹn thất bại.",
+                    data = true
                 };
             }
             catch (Exception ex)
@@ -2179,11 +2347,12 @@ namespace FTSS_API.Service.Implement
                 return new ApiResponse
                 {
                     status = StatusCodes.Status500InternalServerError.ToString(),
-                    message = $"Đã xảy ra lỗi khi hủy booking: {ex.Message}",
+                    message = $"Đã xảy ra lỗi khi hủy lịch hẹn: {ex.Message}",
                     data = null
                 };
             }
         }
+
 
         public Task<ApiResponse> UpdateBookingStatus(Guid bookingid)
         {
@@ -2239,5 +2408,125 @@ namespace FTSS_API.Service.Implement
             }
         }
 
+        public async Task<ApiResponse> Confirm(Guid? orderid, Guid? bookingid)
+        {
+            try
+            {
+                if (orderid.HasValue)
+                {
+                    var order = await _unitOfWork.GetRepository<Order>().SingleOrDefaultAsync(
+                        predicate: o => o.Id == orderid.Value && o.IsDelete == false);
+
+                    if (order == null)
+                    {
+                        return new ApiResponse
+                        {
+                            status = StatusCodes.Status404NotFound.ToString(),
+                            message = "Không tìm thấy đơn hàng.",
+                            data = null
+                        };
+                    }
+
+                    if (!order.Status.Equals(OrderStatus.DONE.ToString(), StringComparison.OrdinalIgnoreCase))
+                    {
+                        return new ApiResponse
+                        {
+                            status = StatusCodes.Status400BadRequest.ToString(),
+                            message = "Chỉ những đơn hàng có trạng thái DONE mới được xác nhận.",
+                            data = null
+                        };
+                    }
+
+                    // Cập nhật trạng thái Order
+                    order.Status = OrderStatus.COMPLETED.ToString();
+                    _unitOfWork.GetRepository<Order>().UpdateAsync(order);
+
+                    // Cập nhật trạng thái Mission liên quan
+                    var missions = await _unitOfWork.GetRepository<Mission>().GetListAsync(
+                        predicate: m => m.OrderId == order.Id && m.IsDelete == false);
+
+                    foreach (var mission in missions)
+                    {
+                        mission.Status = MissionStatusEnum.Completed.ToString();
+                        _unitOfWork.GetRepository<Mission>().UpdateAsync(mission);
+                    }
+
+                    await _unitOfWork.CommitAsync();
+
+                    return new ApiResponse
+                    {
+                        status = StatusCodes.Status200OK.ToString(),
+                        message = "Xác nhận đơn hàng và nhiệm vụ thành công.",
+                        data = null
+                    };
+                }
+                else if (bookingid.HasValue)
+                {
+                    var booking = await _unitOfWork.GetRepository<Booking>().SingleOrDefaultAsync(
+                        predicate: b => b.Id == bookingid.Value);
+
+                    if (booking == null)
+                    {
+                        return new ApiResponse
+                        {
+                            status = StatusCodes.Status404NotFound.ToString(),
+                            message = "Không tìm thấy booking.",
+                            data = null
+                        };
+                    }
+
+                    if (!booking.Status.Equals(BookingStatusEnum.DONE.ToString(), StringComparison.OrdinalIgnoreCase))
+                    {
+                        return new ApiResponse
+                        {
+                            status = StatusCodes.Status400BadRequest.ToString(),
+                            message = "Chỉ những booking có trạng thái DONE mới được xác nhận.",
+                            data = null
+                        };
+                    }
+
+                    // Cập nhật trạng thái Booking
+                    booking.Status = BookingStatusEnum.COMPLETED.ToString();
+                    _unitOfWork.GetRepository<Booking>().UpdateAsync(booking);
+
+                    // Cập nhật trạng thái Mission liên quan
+                    var missions = await _unitOfWork.GetRepository<Mission>().GetListAsync(
+                        predicate: m => m.BookingId == booking.Id && m.IsDelete == false);
+
+                    foreach (var mission in missions)
+                    {
+                        mission.Status = MissionStatusEnum.Completed.ToString();
+                        _unitOfWork.GetRepository<Mission>().UpdateAsync(mission);
+                    }
+
+                    await _unitOfWork.CommitAsync();
+
+                    return new ApiResponse
+                    {
+                        status = StatusCodes.Status200OK.ToString(),
+                        message = "Xác nhận booking và nhiệm vụ thành công.",
+                        data = null
+                    };
+                }
+                else
+                {
+                    return new ApiResponse
+                    {
+                        status = StatusCodes.Status400BadRequest.ToString(),
+                        message = "Vui lòng cung cấp orderid hoặc bookingid.",
+                        data = null
+                    };
+                }
+            }
+            catch (Exception ex)
+            {
+                return new ApiResponse
+                {
+                    status = StatusCodes.Status500InternalServerError.ToString(),
+                    message = "Đã xảy ra lỗi khi xác nhận.",
+                    data = ex.Message
+                };
+            }
+        }
     }
 }

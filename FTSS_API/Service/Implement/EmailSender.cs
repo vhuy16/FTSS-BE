@@ -75,4 +75,9 @@ public class EmailSender : IEmailSender
 
         return client.SendMailAsync(mailMessage);
     }
+
+    public Task RefundBookingNotificationEmailAsync(string email, string message)
+    {
+        return SendEmailAsync(email, "Refund Booking Notification", message);
+    }
 }

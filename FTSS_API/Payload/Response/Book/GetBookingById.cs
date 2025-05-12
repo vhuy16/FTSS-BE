@@ -23,11 +23,15 @@ namespace FTSS_API.Payload.Response.Book
         public decimal? TotalPrice { get; set; }
         
         public string? BookingCode { get; set; }
-        public List<string>? ImageLinks { get; set; } = new();
         public Guid? OrderId { get; set; }
      
         public bool? IsAssigned { get; set; }
+        public Guid? MissionId { get; set; }
+        public string? CancelReason { get; set; }
+        public string? Reason {  get; set; }
+
         public List<ServicePackageResponse> Services { get; set; } = new();
+        public List<MissionImageResponse> Images { get; set; } = new();
         public PaymentResponse Payment { get; set; } = new PaymentResponse();
         public SetupPackageResponse? SetupPackage { get; set; } = new SetupPackageResponse();
     }
@@ -36,5 +40,21 @@ namespace FTSS_API.Payload.Response.Book
         public Guid Id { get; set; }
         public string ServiceName { get; set; } = null!;
         public decimal Price { get; set; }
+    }
+    public class MissionImageResponse
+    {
+        public Guid Id { get; set; }
+
+        public string? LinkImage { get; set; }
+
+        public string? Status { get; set; }
+
+        public DateTime? CreateDate { get; set; }
+
+        public DateTime? ModifyDate { get; set; }
+
+        public bool? IsDelete { get; set; }
+
+        public string? Type { get; set; }
     }
 }
