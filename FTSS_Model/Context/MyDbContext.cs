@@ -103,9 +103,6 @@ public partial class MyDbContext : DbContext
             entity.Property(e => e.BookingImage)
                 .IsUnicode(false)
                 .HasColumnName("bookingImage");
-            entity.Property(e => e.CancelReason)
-                .HasMaxLength(255)
-                .HasColumnName("cancelReason");
             entity.Property(e => e.FullName)
                 .HasMaxLength(255)
                 .HasColumnName("fullName");
@@ -432,7 +429,6 @@ public partial class MyDbContext : DbContext
                 .HasMaxLength(255)
                 .HasColumnName("address");
             entity.Property(e => e.BookingId).HasColumnName("bookingId");
-            entity.Property(e => e.CancelReason).HasColumnName("cancelReason");
             entity.Property(e => e.EndMissionSchedule)
                 .HasColumnType("datetime")
                 .HasColumnName("endMissionSchedule");
@@ -552,6 +548,7 @@ public partial class MyDbContext : DbContext
                 .HasColumnName("phoneNumber");
             entity.Property(e => e.RecipientName)
                 .HasMaxLength(50)
+                .IsUnicode(false)
                 .HasColumnName("recipientName");
             entity.Property(e => e.SetupPackageId).HasColumnName("setupPackageId");
             entity.Property(e => e.Shipcost)
