@@ -531,7 +531,7 @@ public class OrderService : BaseService<OrderService>, IOrderService
             // Update order status if provided
             if (!string.IsNullOrEmpty(updateOrderRequest.Status))
             {
-                // Check if the status is being updated to CANCELLED
+                // Check if the status is being updated to CANCEL
                 if (updateOrderRequest.Status == OrderStatus.CANCELLED.ToString())
                 {
                     var payment = order.Payments?.FirstOrDefault();
@@ -772,26 +772,25 @@ public class OrderService : BaseService<OrderService>, IOrderService
 
 
 
-    public async Task<ApiResponse> GetAllOrder(int page, int size, string status, string orderCode, bool? isAscending)
+   public async Task<ApiResponse> GetAllOrder(int page, int size, string status, string orderCode, bool? isAscending)
+{
+    try
     {
-        try
+        // Xác thực người dùng
+        Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
+        var userExists = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
+            predicate: u => u.Id.Equals(userId) &&
+                            u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()));
+
+        if (userExists == null)
         {
-            // Xác thực người dùng
-            Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
-            var userExists = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
-                predicate: u => u.Id.Equals(userId) &&
-                                u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()));
-
-            if (userExists == null)
+            return new ApiResponse
             {
-                return new ApiResponse
-                {
-                    status = StatusCodes.Status401Unauthorized.ToString(),
-                    message = "Unauthorized: Token is missing or expired.",
-                    data = null
-                };
-            }
-
+                status = StatusCodes.Status401Unauthorized.ToString(),
+                message = "Unauthorized: Token is missing or expired.",
+                data = null
+            };
+        }
 
         // Đếm tổng số bản ghi trước
         var countQuery = _unitOfWork.Context.Set<Order>()
@@ -806,21 +805,18 @@ public class OrderService : BaseService<OrderService>, IOrderService
         if (totalItems == 0)
         {
             return new ApiResponse
-
             {
-                return new ApiResponse
+                status = StatusCodes.Status200OK.ToString(),
+                message = "No orders found for the specified criteria.",
+                data = new
                 {
-                    status = StatusCodes.Status200OK.ToString(),
-                    message = "No orders found for the specified criteria.",
-                    data = new
-                    {
-                        TotalItems = 0,
-                        Page = page,
-                        PageSize = size,
-                        Orders = new List<GetOrderResponse>()
-                    }
-                };
-            }
+                    TotalItems = 0,
+                    Page = page,
+                    PageSize = size,
+                    Orders = new List<GetOrderResponse>()
+                }
+            };
+        }
 
         // Tối ưu hóa query chính
         var query = _unitOfWork.Context.Set<Order>()
@@ -841,96 +837,87 @@ public class OrderService : BaseService<OrderService>, IOrderService
             .Include(o => o.SetupPackage)
                 .ThenInclude(sp => sp.SetupPackageDetails)
                     .ThenInclude(spd => spd.Product)
-
                         .ThenInclude(p => p.SubCategory)
                             .ThenInclude(sc => sc.Category)
-                .Include(o => o.OrderDetails)
-                    .ThenInclude(od => od.Product)
+            .Include(o => o.SetupPackage)
+                .ThenInclude(sp => sp.SetupPackageDetails)
+                    .ThenInclude(spd => spd.Product)
                         .ThenInclude(p => p.Images)
-                .Include(o => o.SetupPackage)
-                    .ThenInclude(sp => sp.SetupPackageDetails)
-                        .ThenInclude(spd => spd.Product)
-                            .ThenInclude(p => p.SubCategory)
-                                .ThenInclude(sc => sc.Category)
-                .Include(o => o.SetupPackage)
-                    .ThenInclude(sp => sp.SetupPackageDetails)
-                        .ThenInclude(spd => spd.Product)
-                            .ThenInclude(p => p.Images)
-                .AsSplitQuery();
+            .AsSplitQuery();
 
-            // Áp dụng sắp xếp
-            if (!isAscending.HasValue) isAscending = true;
-            query = isAscending.Value
-                ? query.OrderBy(o => o.CreateDate)
-                : query.OrderByDescending(o => o.CreateDate);
+        // Áp dụng sắp xếp
+        if (!isAscending.HasValue) isAscending = true;
+        query = isAscending.Value
+            ? query.OrderBy(o => o.CreateDate)
+            : query.OrderByDescending(o => o.CreateDate);
 
-            // Phân trang
-            var orders = await query
-                .Skip((page - 1) * size)
-                .Take(size)
-                .AsNoTracking()
-                .ToListAsync();
+        // Phân trang
+        var orders = await query
+            .Skip((page - 1) * size)
+            .Take(size)
+            .AsNoTracking()
+            .ToListAsync();
 
-            // Lấy danh sách OrderId để tìm Mission tương ứng
-            var orderIds = orders.Select(o => (Guid?)o.Id).ToList();
+        // Lấy danh sách OrderId để tìm Mission tương ứng
+        var orderIds = orders.Select(o => (Guid?)o.Id).ToList();
 
-            var missions = await _unitOfWork.GetRepository<Mission>()
-                .GetListAsync(
-                    predicate: m => orderIds.Contains(m.OrderId)
-                );
+        var missions = await _unitOfWork.GetRepository<Mission>()
+            .GetListAsync(
+                predicate: m => orderIds.Contains(m.OrderId)
+            );
 
-            // Dùng AutoMapper để ánh xạ sang DTO
-            var orderResponses = _mapper.Map<List<GetOrderResponse>>(orders);
+        // Dùng AutoMapper để ánh xạ sang DTO
+        var orderResponses = _mapper.Map<List<GetOrderResponse>>(orders);
 
-            // Gán MissionId và xử lý voucher nếu có
-            foreach (var orderResponse in orderResponses)
+        // Gán MissionId và xử lý voucher nếu có
+        foreach (var orderResponse in orderResponses)
+        {
+            var mission = missions.FirstOrDefault(m => m.OrderId == orderResponse.Id);
+            orderResponse.MissionId = mission?.Id;
+
+            var order = orders.FirstOrDefault(o => o.Id == orderResponse.Id);
+            if (order?.Voucher != null)
             {
-                var mission = missions.FirstOrDefault(m => m.OrderId == orderResponse.Id);
-                orderResponse.MissionId = mission?.Id;
+                var voucher = order.Voucher;
 
-                var order = orders.FirstOrDefault(o => o.Id == orderResponse.Id);
-                if (order?.Voucher != null)
+                if (voucher.DiscountType.Equals(VoucherTypeEnum.Percentage.GetDescriptionFromEnum()))
                 {
-                    var voucher = order.Voucher;
-
-                    if (voucher.DiscountType.Equals(VoucherTypeEnum.Percentage.GetDescriptionFromEnum()))
-                    {
-                        var discountAmount = order.TotalPrice * (voucher.Discount / 100);
-                        discountAmount = Math.Min(discountAmount, (decimal)voucher.MaximumOrderValue);
-                        // Có thể set discountAmount vào DTO nếu cần
-                    }
-                    else if (voucher.DiscountType.Trim().Equals(VoucherTypeEnum.Fixed.GetDescriptionFromEnum()))
-                    {
-                        var discountAmount = voucher.Discount;
-                        discountAmount = Math.Min(discountAmount, (decimal)voucher.MaximumOrderValue);
-                        // Có thể set discountAmount vào DTO nếu cần
-                    }
+                    var discountAmount = order.TotalPrice * (voucher.Discount / 100);
+                    discountAmount = Math.Min(discountAmount, (decimal)voucher.MaximumOrderValue);
+                    // Có thể set discountAmount vào DTO nếu cần
+                }
+                else if (voucher.DiscountType.Trim().Equals(VoucherTypeEnum.Fixed.GetDescriptionFromEnum()))
+                {
+                    var discountAmount = voucher.Discount;
+                    discountAmount = Math.Min(discountAmount, (decimal)voucher.MaximumOrderValue);
+                    // Có thể set discountAmount vào DTO nếu cần
                 }
             }
+        }
 
-            return new ApiResponse
-            {
-                status = StatusCodes.Status200OK.ToString(),
-                message = "Orders retrieved successfully.",
-                data = new
-                {
-                    TotalItems = totalItems,
-                    Page = page,
-                    PageSize = size,
-                    Orders = orderResponses
-                }
-            };
-        }
-        catch (Exception ex)
+        return new ApiResponse
         {
-            return new ApiResponse
+            status = StatusCodes.Status200OK.ToString(),
+            message = "Orders retrieved successfully.",
+            data = new
             {
-                status = StatusCodes.Status500InternalServerError.ToString(),
-                message = "An error occurred while retrieving orders.",
-                data = ex.Message
-            };
-        }
+                TotalItems = totalItems,
+                Page = page,
+                PageSize = size,
+                Orders = orderResponses
+            }
+        };
     }
+    catch (Exception ex)
+    {
+        return new ApiResponse
+        {
+            status = StatusCodes.Status500InternalServerError.ToString(),
+            message = "An error occurred while retrieving orders.",
+            data = ex.Message
+        };
+    }
+}
     public async Task<ApiResponse> GetOrderById(Guid id)
     {
         try
