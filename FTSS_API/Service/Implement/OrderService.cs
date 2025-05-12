@@ -236,7 +236,7 @@ public class OrderService : BaseService<OrderService>, IOrderService
                             {
                                 status = StatusCodes.Status400BadRequest.ToString(),
                                 message =
-                                    $"Sản phẩm '{product.ProductName}' chỉ còn {product.Quantity} trong kho, không đủ để đặt hàng.",
+                                    $"Sản phẩm trong kho, không đủ để đặt hàng.",
                                 data = null
                             };
                         }
