@@ -76,7 +76,15 @@ public class ProductService : BaseService<ProductService>, IProductService
                 data = null
             };
         }
-
+        if (createProductRequest.Price <= 0)
+        {
+            return new ApiResponse
+            {
+                status = StatusCodes.Status400BadRequest.ToString(),
+                message = "Giá gói dịch vụ phải lớn hơn 0.",
+                data = null
+            };
+        }
         // Validate quantity
         if (createProductRequest.Quantity < 0)
         {
@@ -350,11 +358,13 @@ public class ProductService : BaseService<ProductService>, IProductService
 
     public async Task<ApiResponse> GetAllProductsGroupedByCategory(int page, int size)
     {
-        // Lấy toàn bộ danh sách sản phẩm có trạng thái "Available"
+        // Lấy sản phẩm từ DB
         var products = await _unitOfWork.GetRepository<Product>().GetPagingListAsync(
-            selector: s => new 
+            selector: s => new
             {
+                CategoryId = s.SubCategory.Category.Id,
                 CategoryName = s.SubCategory.Category.CategoryName,
+                IsFishTank = s.SubCategory.Category.IsFishTank,
                 Product = new GetProductResponse
                 {
                     Id = s.Id,
@@ -370,19 +380,25 @@ public class ProductService : BaseService<ProductService>, IProductService
                     Status = s.Status
                 }
             },
-            predicate: p => p.Status.Equals(ProductStatusEnum.Available.GetDescriptionFromEnum()),
+            predicate: p =>
+                p.Status.Equals(ProductStatusEnum.Available.GetDescriptionFromEnum()) &&
+                p.SubCategory.Category.IsSolution == false &&
+                (p.IsDelete == null || p.IsDelete == false),
             page: page,
             size: size
         );
 
-        // Nhóm sản phẩm theo CategoryName
+        // Nhóm theo CategoryName + IsFishTank
         var groupedProducts = products.Items
-            .GroupBy(p => p.CategoryName)
-            .Select(g => new 
+            .GroupBy(p => new { p.CategoryId, p.CategoryName, p.IsFishTank })
+            .Select(g => new
             {
-                CategoryName = g.Key,
+                CategoryName = g.Key.CategoryName,
+                IsFishTank = g.Key.IsFishTank,
                 Products = g.Select(p => p.Product).ToList()
             })
+            // Ưu tiên nhóm có IsFishTank == true lên đầu
+            .OrderByDescending(g => g.IsFishTank == true)
             .ToList();
 
         int totalItems = products.Total;
@@ -392,7 +408,7 @@ public class ProductService : BaseService<ProductService>, IProductService
         {
             status = StatusCodes.Status200OK.ToString(),
             message = "Products retrieved successfully.",
-            data = new 
+            data = new
             {
                 Page = page,
                 Size = size,
@@ -476,7 +492,7 @@ public class ProductService : BaseService<ProductService>, IProductService
                 return new ApiResponse
                 {
                     status = StatusCodes.Status400BadRequest.ToString(),
-                    message = MessageConstant.ProductMessage.NegativeQuantity, data = null
+                    message = "Giá tiền phải lớn hơn 0.", data = null
                 };
             }
 

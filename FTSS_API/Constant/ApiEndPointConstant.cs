@@ -86,8 +86,10 @@ public static class ApiEndPointConstant
         public const string CategoryEndPoint = ApiEndpoint + "/category";
         public const string CreateCategory = CategoryEndPoint;
         public const string GetAllCategory = CategoryEndPoint;
+        public const string GetListCategory = CategoryEndPoint + "/get-list-category";
         public const string GetCategory = CategoryEndPoint + "/{id}";
         public const string UpdateCategory = CategoryEndPoint + "/{id}";
+        public const string EnableCategory = CategoryEndPoint + "/enable-category" + "/{id}";
         public const string DeleteCategory = CategoryEndPoint + "/{id}";
     }
     public static class SubCategory
@@ -97,6 +99,7 @@ public static class ApiEndPointConstant
         public const string GetAllSubCategories = SubCategoryEndPoint;
         public const string GetSubCategory = SubCategoryEndPoint + "/{id}";
         public const string UpdateSubCategory = SubCategoryEndPoint + "/{id}";
+        public const string EnableSubCategory = SubCategoryEndPoint + "/enable-subcategory" + "/{id}";
         public const string DeleteSubCategory = SubCategoryEndPoint + "/{id}";
     }
     public static class Product
@@ -130,6 +133,7 @@ public static class ApiEndPointConstant
         public const string CancelOrder = OrderEndpoint + "/cancel-order" + "/{id}";
         public const string CreateReturnRequest = OrderEndpoint + "/create-return-request";
         public const string GetReturnRequest = OrderEndpoint + "/get-return-request";
+        public const string UpdateTime = OrderEndpoint+ "/update-time" + "/{id}";
     }
 
     public static class Cart
@@ -174,7 +178,6 @@ public static class ApiEndPointConstant
         public const string GetListMissionTech = BookingEndPoint + "/list-mission-tech";
         public const string BookingSchedule = BookingEndPoint + "/booking-schedule";
         public const string AssigningTechnicianBooking = BookingEndPoint + "/assign-booking";
-        public const string GetServicePackage = BookingEndPoint + "/servicepackage";
         public const string GetListTech = BookingEndPoint + "/list-tech";
         public const string GetListMissionForManager = BookingEndPoint + "/list-mission-manager";
         public const string GetDateUnavailable = BookingEndPoint + "/date-unavailable";
@@ -186,5 +189,15 @@ public static class ApiEndPointConstant
         public const string CancelBooking = BookingEndPoint + "/cancel-booking/{bookingid}";
         public const string UpdateBookingStatus = BookingEndPoint + "/update-booking-status/{bookingid}";
         public const string GetHistoryOrder = BookingEndPoint + "/get-history-order/{orderid}";
+        public const string Confirm = BookingEndPoint + "/user-confirm";
+    }
+    public static class ServicePackage
+    {
+        public const string ServicePackageEndPoint = ApiEndpoint + "/servicepackage";
+        public const string AddServicePackage = ServicePackageEndPoint;
+        public const string GetServicePackage = ServicePackageEndPoint;
+        public const string UpdateServicePackage = ServicePackageEndPoint + "/{id}";
+        public const string EnableServicePackage = ServicePackageEndPoint + "/enable-servicepackage" + "/{id}";
+        public const string DeleteServicePackage = ServicePackageEndPoint + "/{id}";
     }
 }

@@ -1,4 +1,5 @@
-﻿using FTSS_API.Payload.Response.SetupPackage;
+﻿using FTSS_API.Payload.Response.Book;
+using FTSS_API.Payload.Response.SetupPackage;
 
 namespace FTSS_API.Payload.Response.Order
 {
@@ -17,6 +18,10 @@ namespace FTSS_API.Payload.Response.Order
         public string? PhoneNumber { get; set; }
         public string? BuyerName { get; set; }
         public DateTime? InstallationDate { get; set; }
+        public Guid? MissionId { get; set; }
+        public string? CancelReason { get; set; }
+        public List<MissionImageResponse> Images { get; set; } = new();
+
 
 
         public UserResponse userResponse { get; set; } // Fixed property declaration and removed invalid initialization

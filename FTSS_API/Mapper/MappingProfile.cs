@@ -19,7 +19,11 @@ public class MappingProfile : Profile
             // Map từ Order.User sang GetOrderResponse.userResponse
             .ForMember(dest => dest.userResponse, opt => opt.MapFrom(src => src.User))
             // Map từ Order.SetupPackage sang GetOrderResponse.SetupPackage
-            .ForMember(dest => dest.SetupPackage, opt => opt.MapFrom(src => src.SetupPackage));
+            .ForMember(dest => dest.SetupPackage, opt => opt.MapFrom(src => src.SetupPackage))
+            .ForMember(dest => dest.MissionId, opt => opt.MapFrom(src =>
+        src.Missions != null && src.Missions.Any()
+            ? src.Missions.FirstOrDefault().Id
+            : (Guid?)null)); ;
 
         CreateMap<SetupPackage, SetupPackageResponse>()
             .ForMember(dest => dest.SetupPackageId, opt => opt.MapFrom(src => src.Id))

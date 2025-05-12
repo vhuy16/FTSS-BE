@@ -46,7 +46,19 @@ namespace FTSS_API.Controller
             var response = await _categoryService.GetAllCategory(page ?? 1, size ?? 10, searchName, isAscending);
             return StatusCode(int.Parse(response.status), response);
         }
-
+        /// <summary>
+        /// API lấy thông tin tất cả loại hàng cho setup.
+        /// </summary>
+        [HttpGet(ApiEndPointConstant.Category.GetListCategory)]
+        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
+        [ProducesErrorResponseType(typeof(ProblemDetails))]
+        public async Task<IActionResult> GetListCategory([FromQuery] int? page, [FromQuery] int? size, [FromQuery] string? searchName = null,
+                                                 [FromQuery] bool? isAscending = null)
+        {
+            var response = await _categoryService.GetListCategory(page ?? 1, size ?? 10, searchName, isAscending);
+            return StatusCode(int.Parse(response.status), response);
+        }
         /// <summary>
         /// API lấy thông tin loại hàng.
         /// </summary>
@@ -71,6 +83,19 @@ namespace FTSS_API.Controller
         public async Task<IActionResult> UpdateCategory([FromRoute] Guid id, [FromForm] CategoryRequest updateCategoryRequest, [FromServices] Supabase.Client client)
         {
             var response = await _categoryService.UpdateCategory(id, updateCategoryRequest, client);
+            return StatusCode(int.Parse(response.status), response);
+        }
+        /// <summary>
+        /// API enable loại hàng.
+        /// </summary>
+        [HttpPut(ApiEndPointConstant.Category.EnableCategory)]
+        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
+        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
+        [ProducesErrorResponseType(typeof(ProblemDetails))]
+        public async Task<IActionResult> EnableCategory([FromRoute] Guid id)
+        {
+            var response = await _categoryService.EnableCategory(id);
             return StatusCode(int.Parse(response.status), response);
         }
 

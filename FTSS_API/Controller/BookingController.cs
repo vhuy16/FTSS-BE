@@ -109,22 +109,6 @@ namespace FTSS_API.Controller
             return StatusCode(int.Parse(response.status), response);
         }
         /// <summary>
-        /// API lấy danh sách service package cho booking.
-        /// </summary>
-        [HttpGet(ApiEndPointConstant.Booking.GetServicePackage)]
-        [ProducesResponseType(typeof(IPaginate<ApiResponse>), StatusCodes.Status200OK)]
-        [ProducesErrorResponseType(typeof(ProblemDetails))]
-        public async Task<IActionResult> GetServicePackage(
-            [FromQuery] int? page,
-            [FromQuery] int? size,
-            [FromQuery] bool? isAscending = null)
-        {
-            int pageNumber = page ?? 1;
-            int pageSize = size ?? 10;
-            var response = await _bookingService.GetServicePackage(pageNumber, pageSize, isAscending);
-            return StatusCode(int.Parse(response.status), response);
-        }
-        /// <summary>
         /// API lấy danh sách technician cho manager.
         /// </summary>
         /// 
@@ -240,9 +224,9 @@ namespace FTSS_API.Controller
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
         [ProducesErrorResponseType(typeof(ProblemDetails))]
-        public async Task<IActionResult> CancelBooking(Guid bookingid)
+        public async Task<IActionResult> CancelBooking(Guid bookingid, CancelBookingRequest request)
         {
-            var response = await _bookingService.CancelBooking(bookingid);
+            var response = await _bookingService.CancelBooking(bookingid, request);
             return StatusCode(int.Parse(response.status), response);
         }
         /// <summary>
@@ -254,6 +238,19 @@ namespace FTSS_API.Controller
         public async Task<IActionResult> GetHistoryOrder(Guid orderid)
         {
             var response = await _bookingService.GetHistoryOrder(orderid);
+            return StatusCode(int.Parse(response.status), response);
+        }
+        /// <summary>
+        /// API confirm cho user.
+        /// </summary>
+        [HttpPut(ApiEndPointConstant.Booking.Confirm)]
+        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
+        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
+        [ProducesErrorResponseType(typeof(ProblemDetails))]
+        public async Task<IActionResult> Confirm(Guid? orderid,Guid? bookingid)
+        {
+            var response = await _bookingService.Confirm(orderid, bookingid);
             return StatusCode(int.Parse(response.status), response);
         }
     }

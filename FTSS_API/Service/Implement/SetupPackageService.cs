@@ -89,6 +89,7 @@ namespace FTSS_API.Service.Implement
                         Id = spd.Product.Id,
                         ProductName = spd.Product.ProductName,
                         Quantity = spd.Quantity,
+                        Size = spd.Product.Size,
                         Price = spd.Product.Price,
                         InventoryQuantity = spd.Product.Quantity,
                         Status = spd.Product.Status,
@@ -193,6 +194,7 @@ namespace FTSS_API.Service.Implement
                                 Id = spd.Product.Id,
                                 ProductName = spd.Product.ProductName,
                                 Quantity = spd.Quantity,
+                                Size = spd.Product.Size,
                                 InventoryQuantity = spd.Product.Quantity,
                                 Price = spd.Product.Price,
                                 Status = spd.Product.Status,
@@ -280,6 +282,7 @@ namespace FTSS_API.Service.Implement
                         Id = spd.Product.Id,
                         ProductName = spd.Product.ProductName,
                         Quantity = spd.Quantity,
+                        Size = spd.Product.Size,
                         InventoryQuantity = spd.Product.Quantity,
                         Price = spd.Product.Price,
                         Status = spd.Product.Status,
@@ -343,6 +346,7 @@ namespace FTSS_API.Service.Implement
                                 Id = spd.Product.Id,
                                 ProductName = spd.Product.ProductName,
                                 Quantity = spd.Quantity, // Giữ nguyên số lượng của từng sản phẩm
+                                Size = spd.Product.Size,
                                 InventoryQuantity = spd.Product.Quantity,
                                 Price = spd.Product.Price,
                                 Status = spd.Product.Status,
@@ -587,36 +591,52 @@ namespace FTSS_API.Service.Implement
                     };
                 }
 
-                var requiredCategories = new List<string> { "Bể", "Lọc", "Đèn" };
-                var foundCategories = allProducts.Select(p => p.SubCategory.Category.CategoryName).Distinct().ToList();
-                var missingCategories = requiredCategories.Except(foundCategories).ToList();
+                // Lấy danh sách tất cả các category (bao gồm IsObligatory, IsFishTank)
+                var allCategoryConfigs = await _unitOfWork.GetRepository<Category>()
+                    .GetListAsync(predicate: c => c.IsDelete == false);
 
-                if (missingCategories.Any())
+                // Kiểm tra các category bắt buộc (IsObligatory == true)
+                var obligatoryCategories = allCategoryConfigs.Where(c => c.IsObligatory == true).Select(c => c.Id).ToList();
+                var foundObligatoryCategoryIds = allProducts
+                    .Select(p => p.SubCategory.Category.Id)
+                    .Distinct()
+                    .Where(id => obligatoryCategories.Contains(id))
+                    .ToList();
+
+                var missingObligatory = obligatoryCategories.Except(foundObligatoryCategoryIds).ToList();
+                if (missingObligatory.Any())
                 {
+                    var missingNames = allCategoryConfigs
+                        .Where(c => missingObligatory.Contains(c.Id))
+                        .Select(c => c.CategoryName)
+                        .ToList();
+
                     return new ApiResponse
                     {
                         status = StatusCodes.Status400BadRequest.ToString(),
-                        message = $"Missing required category: {string.Join(", ", missingCategories)}.",
+                        message = $"Missing required category: {string.Join(", ", missingNames)}.",
                         data = null
                     };
                 }
 
-                // Lọc danh sách sản phẩm có CategoryName = "Bể"
-                var categoryBeProducts = allProducts.Where(p => p.SubCategory.Category.CategoryName == "Bể").ToList();
+                // Kiểm tra sản phẩm có IsFishTank = true
+                var fishTankCategoryIds = allCategoryConfigs.Where(c => c.IsFishTank == true).Select(c => c.Id).ToList();
+                var fishTankProducts = allProducts
+                    .Where(p => fishTankCategoryIds.Contains(p.SubCategory.Category.Id))
+                    .ToList();
 
-                // Kiểm tra nếu có nhiều hơn 1 sản phẩm thuộc Category "Bể"
-                if (categoryBeProducts.Count > 1)
+                if (fishTankProducts.Count > 1)
                 {
                     return new ApiResponse
                     {
                         status = StatusCodes.Status400BadRequest.ToString(),
-                        message = "Only one product from category 'Bể' can be added.",
+                        message = "Only one product from 'Fish Tank' category can be added.",
                         data = null
                     };
                 }
 
-                // Kiểm tra nếu sản phẩm thuộc Category "Bể" có số lượng > 1
-                foreach (var product in categoryBeProducts)
+                // Kiểm tra số lượng sản phẩm FishTank không được > 1
+                foreach (var product in fishTankProducts)
                 {
                     var requestedProduct = productids.FirstOrDefault(p => p.ProductId == product.Id);
                     if (requestedProduct != null && requestedProduct.Quantity > 1)
@@ -624,8 +644,7 @@ namespace FTSS_API.Service.Implement
                         return new ApiResponse
                         {
                             status = StatusCodes.Status400BadRequest.ToString(),
-                            message =
-                                $"Product '{product.ProductName}' in category 'Bể' can only have a quantity of 1.",
+                            message = $"Product '{product.ProductName}' marked as Fish Tank can only have a quantity of 1.",
                             data = null
                         };
                     }
@@ -897,9 +916,10 @@ namespace FTSS_API.Service.Implement
 
                     // Check if the new setup name already exists for other packages
                     var isSetupNameExists = await _unitOfWork.GetRepository<SetupPackage>()
-                        .SingleOrDefaultAsync(predicate: p =>
-                            p.SetupName.Equals(request.SetupName) && p.Id != setupPackageId && p.IsDelete == false);
-
+                            .SingleOrDefaultAsync(predicate: p =>
+                                p.SetupName.Equals(request.SetupName) &&
+                                p.Id != setupPackageId &&
+                                p.IsDelete == false);
                     if (isSetupNameExists != null)
                     {
                         return new ApiResponse
@@ -967,35 +987,52 @@ namespace FTSS_API.Service.Implement
                     }
 
                     // Validate required categories
-                    var requiredCategories = new List<string> { "Bể", "Lọc", "Đèn" };
-                    var foundCategories = allProducts.Select(p => p.SubCategory.Category.CategoryName).Distinct()
+                    // Lấy danh sách tất cả các category (bao gồm IsObligatory, IsFishTank)
+                    var allCategoryConfigs = await _unitOfWork.GetRepository<Category>()
+                        .GetListAsync(predicate: c => c.IsDelete == false);
+
+                    // Kiểm tra các category bắt buộc (IsObligatory == true)
+                    var obligatoryCategories = allCategoryConfigs.Where(c => c.IsObligatory == true).Select(c => c.Id).ToList();
+                    var foundObligatoryCategoryIds = allProducts
+                        .Select(p => p.SubCategory.Category.Id)
+                        .Distinct()
+                        .Where(id => obligatoryCategories.Contains(id))
                         .ToList();
-                    var missingCategories = requiredCategories.Except(foundCategories).ToList();
 
-                    if (missingCategories.Any())
+                    var missingObligatory = obligatoryCategories.Except(foundObligatoryCategoryIds).ToList();
+                    if (missingObligatory.Any())
                     {
+                        var missingNames = allCategoryConfigs
+                            .Where(c => missingObligatory.Contains(c.Id))
+                            .Select(c => c.CategoryName)
+                            .ToList();
+
                         return new ApiResponse
                         {
                             status = StatusCodes.Status400BadRequest.ToString(),
-                            message = $"Missing required category: {string.Join(", ", missingCategories)}.",
+                            message = $"Missing required category: {string.Join(", ", missingNames)}.",
                             data = null
                         };
                     }
 
-                    // Validate "Bể" category rules
-                    var categoryBeProducts =
-                        allProducts.Where(p => p.SubCategory.Category.CategoryName == "Bể").ToList();
-                    if (categoryBeProducts.Count > 1)
+                    // Kiểm tra sản phẩm có IsFishTank = true
+                    var fishTankCategoryIds = allCategoryConfigs.Where(c => c.IsFishTank == true).Select(c => c.Id).ToList();
+                    var fishTankProducts = allProducts
+                        .Where(p => fishTankCategoryIds.Contains(p.SubCategory.Category.Id))
+                        .ToList();
+
+                    if (fishTankProducts.Count > 1)
                     {
                         return new ApiResponse
                         {
                             status = StatusCodes.Status400BadRequest.ToString(),
-                            message = "Only one product from category 'Bể' can be added.",
+                            message = "Only one product from 'Fish Tank' category can be added.",
                             data = null
                         };
                     }
 
-                    foreach (var product in categoryBeProducts)
+                    // Kiểm tra số lượng sản phẩm FishTank không được > 1
+                    foreach (var product in fishTankProducts)
                     {
                         var requestedProduct = productIds.FirstOrDefault(p => p.ProductId == product.Id);
                         if (requestedProduct != null && requestedProduct.Quantity > 1)
@@ -1003,8 +1040,7 @@ namespace FTSS_API.Service.Implement
                             return new ApiResponse
                             {
                                 status = StatusCodes.Status400BadRequest.ToString(),
-                                message =
-                                    $"Product '{product.ProductName}' in category 'Bể' can only have a quantity of 1.",
+                                message = $"Product '{product.ProductName}' marked as Fish Tank can only have a quantity of 1.",
                                 data = null
                             };
                         }

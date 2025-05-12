@@ -1,7 +1,10 @@
 ﻿using FTSS_API.Constant;
 using FTSS_API.Payload;
 using FTSS_API.Payload.Request;
+using FTSS_API.Payload.Request.Book;
+using FTSS_API.Payload.Request.Order;
 using FTSS_API.Payload.Request.Return;
+using FTSS_API.Service.Implement;
 using FTSS_API.Service.Interface;
 using FTSS_Model.Paginate;
 using Microsoft.AspNetCore.Mvc;
@@ -207,7 +210,19 @@ public class OrderController : BaseController<OrderController>
 
         return StatusCode(int.Parse(response.status), response);
     }
-
+    /// <summary>
+    /// API cập nhật thời gian lắp đặt.
+    /// </summary>
+    [HttpPut(ApiEndPointConstant.Order.UpdateTime)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
+    [ProducesErrorResponseType(typeof(ProblemDetails))]
+    public async Task<IActionResult> UpdateTime(Guid id, [FromForm] UpdateTimeRequest request)
+    {
+        var response = await _orderService.UpdateTime(id, request);
+        return StatusCode(int.Parse(response.status), response);
+    }
 
 }
 

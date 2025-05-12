@@ -14,6 +14,8 @@ using FTSS_Repository.Interface;
 using Google.Apis.Drive.v3;
 using Microsoft.IdentityModel.Tokens;
 using MRC_API.Utils;
+using Microsoft.EntityFrameworkCore;
+
 
 namespace FTSS_API.Service.Implement
 {
@@ -110,6 +112,9 @@ namespace FTSS_API.Service.Implement
                 CreateDate = TimeUtils.GetCurrentSEATime(),
                 ModifyDate = TimeUtils.GetCurrentSEATime(),
                 IsDelete = false,
+                IsFishTank = request.IsFishTank,
+                IsObligatory = request.IsObligatory,
+                IsSolution = request.IsSolution,
                 LinkImage = imageUrl // Save the image URL
             };
 
@@ -132,7 +137,10 @@ namespace FTSS_API.Service.Implement
                             category.Description,
                             category.LinkImage,
                             category.CreateDate,
-                            category.ModifyDate
+                            category.ModifyDate,
+                            category.IsFishTank,
+                            category.IsObligatory,
+                            category.IsSolution,
                         }
                     };
                 }
@@ -169,6 +177,10 @@ namespace FTSS_API.Service.Implement
                     Description = c.Description,
                     CreateDate = c.CreateDate,
                     ModifyDate = c.ModifyDate,
+                    IsFishTank = c.IsFishTank,
+                    IsObligatory = c.IsObligatory,
+                    IsSolution = c.IsSolution,
+                    IsDelete = c.IsDelete,
                     LinkImage = c.LinkImage,
                     // Dữ liệu SubCategory sẽ được ánh xạ tại đây
                     SubCategories = c.SubCategories
@@ -181,14 +193,28 @@ namespace FTSS_API.Service.Implement
                             Description = sub.Description,
                             CreateDate = sub.CreateDate,
                             ModifyDate = sub.ModifyDate,
-                            CategoryName = sub.Category.CategoryName
+                            CategoryName = sub.Category.CategoryName,
+                            IsDelete = sub.IsDelete,
                         }).ToList()
                 },
                 predicate: p => 
                                 (string.IsNullOrEmpty(searchName) || p.CategoryName.Contains(searchName)),
-                orderBy: q => isAscending.HasValue
-                    ? (isAscending.Value ? q.OrderBy(p => p.CategoryName) : q.OrderByDescending(p => p.CategoryName))
-                    : q.OrderByDescending(p => p.CreateDate),
+                orderBy: q =>
+                {
+                    var ordered = q.OrderByDescending(p => p.IsFishTank); // Ưu tiên IsFishTank = true lên đầu
+                    if (isAscending.HasValue)
+                    {
+                        ordered = isAscending.Value
+                            ? ordered.ThenBy(p => p.CategoryName)
+                            : ordered.ThenByDescending(p => p.CategoryName);
+                    }
+                    else
+                    {
+                        ordered = ordered.ThenByDescending(p => p.CreateDate);
+                    }
+
+                    return ordered;
+                },
                 size: size,
                 page: page);
 
@@ -231,6 +257,10 @@ namespace FTSS_API.Service.Implement
                     Description = c.Description,
                     CreateDate = c.CreateDate,
                     ModifyDate = c.ModifyDate,
+                    IsObligatory = c.IsObligatory,
+                    IsFishTank = c.IsFishTank,
+                    IsSolution = c.IsSolution,
+                    IsDelete = c.IsDelete,
                     LinkImage = c.LinkImage,
                     SubCategories = c.SubCategories
                         .Where(sub => sub.IsDelete != true)  // Lọc nếu cần
@@ -242,6 +272,7 @@ namespace FTSS_API.Service.Implement
                             Description = sub.Description,
                             CreateDate = sub.CreateDate,
                             ModifyDate = sub.ModifyDate,
+                            IsDelete= sub.IsDelete,
                         }).ToList()
                 },
                 predicate: c => c.Id.Equals(id) &&
@@ -267,7 +298,6 @@ namespace FTSS_API.Service.Implement
 
         public async Task<ApiResponse> UpdateCategory(Guid categoryId, CategoryRequest updateCategoryRequest, Supabase.Client client)
         {
-            // Lấy thông tin danh mục từ database
             var existingCategory = await _unitOfWork.GetRepository<Category>()
                 .SingleOrDefaultAsync(predicate: c => c.Id.Equals(categoryId) && (c.IsDelete == null || c.IsDelete == false));
 
@@ -281,10 +311,24 @@ namespace FTSS_API.Service.Implement
                 };
             }
 
-            // Kiểm tra tên danh mục nếu có thay đổi
+            // Danh sách CategoryName không được thay đổi
+            var restrictedNames = new List<string> { "Bể", "Đèn", "Lọc", "Layout" };
+
             if (!string.IsNullOrEmpty(updateCategoryRequest.CategoryName) &&
                 !existingCategory.CategoryName.Equals(updateCategoryRequest.CategoryName))
             {
+                // Nếu Category hiện tại thuộc danh sách không được đổi tên => chặn
+                if (restrictedNames.Contains(existingCategory.CategoryName))
+                {
+                    return new ApiResponse
+                    {
+                        status = StatusCodes.Status400BadRequest.ToString(),
+                        message = $"CategoryName '{existingCategory.CategoryName}' không được phép thay đổi.",
+                        data = null
+                    };
+                }
+
+                // Kiểm tra tên mới có bị trùng không
                 var categoryCheck = await _unitOfWork.GetRepository<Category>()
                     .SingleOrDefaultAsync(predicate: c => c.CategoryName.Equals(updateCategoryRequest.CategoryName) && (c.IsDelete == null || c.IsDelete == false));
                 if (categoryCheck != null)
@@ -300,21 +344,33 @@ namespace FTSS_API.Service.Implement
                 existingCategory.CategoryName = updateCategoryRequest.CategoryName;
             }
 
-            // Cập nhật mô tả nếu có
+            // Cập nhật mô tả
             if (!string.IsNullOrEmpty(updateCategoryRequest.Description))
             {
                 existingCategory.Description = updateCategoryRequest.Description;
             }
 
-            // Cập nhật hình ảnh nếu có
+            if (updateCategoryRequest.IsFishTank.HasValue)
+            {
+                existingCategory.IsFishTank = updateCategoryRequest.IsFishTank;
+            }
+
+            if (updateCategoryRequest.IsObligatory.HasValue)
+            {
+                existingCategory.IsObligatory = updateCategoryRequest.IsObligatory;
+            }
+
+            if (updateCategoryRequest.IsSolution.HasValue)
+            {
+                existingCategory.IsSolution = updateCategoryRequest.IsSolution;
+            }
+
+            // Cập nhật hình ảnh
             if (updateCategoryRequest.ImageFile != null)
             {
                 try
                 {
-                    // Upload hình ảnh mới lên Supabase
                     var imageUrls = await _supabaseImageService.SendImagesAsync(new List<IFormFile> { updateCategoryRequest.ImageFile }, client);
-
-                    // Kiểm tra xem Supabase có trả về URL hình ảnh không
                     if (imageUrls != null && imageUrls.Any())
                     {
                         existingCategory.LinkImage = imageUrls.FirstOrDefault();
@@ -340,12 +396,9 @@ namespace FTSS_API.Service.Implement
                 }
             }
 
-            // Cập nhật ngày sửa
             existingCategory.ModifyDate = TimeUtils.GetCurrentSEATime();
 
-            // Gửi yêu cầu cập nhật danh mục
             _unitOfWork.GetRepository<Category>().UpdateAsync(existingCategory);
-
             bool isSuccessful = await _unitOfWork.CommitAsync() > 0;
 
             if (!isSuccessful)
@@ -368,19 +421,24 @@ namespace FTSS_API.Service.Implement
                     existingCategory.CategoryName,
                     existingCategory.Description,
                     existingCategory.LinkImage,
+                    existingCategory.IsFishTank,
+                    existingCategory.IsObligatory,
+                    existingCategory.IsSolution,
                     existingCategory.ModifyDate
                 }
             };
         }
 
 
+
+
         public async Task<ApiResponse> DeleteCategory(Guid id)
         {
-            // Kiểm tra sự tồn tại của Category
             var category = await _unitOfWork.GetRepository<Category>()
-                .SingleOrDefaultAsync(predicate: c => c.Id == id && c.IsDelete == false);
+                .SingleOrDefaultAsync(
+                    predicate: c => c.Id == id && c.IsDelete == false,
+                    include: source => source.Include(c => c.SubCategories));
 
-            // Nếu không tìm thấy Category
             if (category == null)
             {
                 return new ApiResponse
@@ -391,14 +449,29 @@ namespace FTSS_API.Service.Implement
                 };
             }
 
-            // Cập nhật IsDelete thành true
+            // Cách 1: Dùng GetQueryable để kiểm tra sản phẩm còn sống
+            var productExists = await _unitOfWork.GetRepository<Product>()
+    .GetQueryable()
+    .Where(p => p.IsDelete == false &&
+                p.SubCategory != null &&
+                p.SubCategory.CategoryId == id)
+    .AnyAsync();
+
+            if (productExists)
+            {
+                return new ApiResponse
+                {
+                    status = StatusCodes.Status400BadRequest.ToString(),
+                    message = "Không thể xóa Category vì đang chứa sản phẩm còn hoạt động.",
+                    data = null
+                };
+            }
+
             category.IsDelete = true;
             _unitOfWork.GetRepository<Category>().UpdateAsync(category);
 
-            // Lưu thay đổi
             bool isSuccessful = await _unitOfWork.CommitAsync() > 0;
 
-            // Trả về kết quả
             if (!isSuccessful)
             {
                 return new ApiResponse
@@ -413,6 +486,119 @@ namespace FTSS_API.Service.Implement
             {
                 status = StatusCodes.Status200OK.ToString(),
                 message = "Category đã được xóa thành công.",
+                data = null
+            };
+        }
+
+        public async Task<ApiResponse> GetListCategory(int page, int size, string? searchName, bool? isAscending)
+        {
+            var categories = await _unitOfWork.GetRepository<Category>().GetPagingListAsync(
+                selector: c => new CategoryResponse
+                {
+                    Id = c.Id,
+                    CategoryName = c.CategoryName,
+                    Description = c.Description,
+                    CreateDate = c.CreateDate,
+                    ModifyDate = c.ModifyDate,
+                    IsFishTank = c.IsFishTank,
+                    IsObligatory = c.IsObligatory,
+                    IsSolution = c.IsSolution,
+                    LinkImage = c.LinkImage,
+                    IsDelete = c.IsDelete,
+                    SubCategories = c.SubCategories
+                        .Where(sub => sub.IsDelete != true)
+                        .Select(sub => new SubCategoryResponse
+                        {
+                            Id = sub.Id,
+                            SubCategoryName = sub.SubCategoryName,
+                            CategoryId = sub.CategoryId,
+                            Description = sub.Description,
+                            CreateDate = sub.CreateDate,
+                            ModifyDate = sub.ModifyDate,
+                            CategoryName = sub.Category.CategoryName,
+                            IsDelete = sub.IsDelete,
+                        }).ToList()
+                },
+                predicate: c => c.IsDelete != true &&
+                                c.IsSolution == false &&
+                                (string.IsNullOrEmpty(searchName) || c.CategoryName.Contains(searchName)),
+                orderBy: q =>
+                {
+                    var ordered = q.OrderByDescending(c => c.IsFishTank); // Ưu tiên IsFishTank = true
+
+                    if (isAscending.HasValue)
+                    {
+                        ordered = isAscending.Value
+                            ? ordered.ThenBy(c => c.CategoryName)
+                            : ordered.ThenByDescending(c => c.CategoryName);
+                    }
+                    else
+                    {
+                        ordered = ordered.ThenByDescending(c => c.CreateDate);
+                    }
+
+                    return ordered;
+                },
+                size: size,
+                page: page);
+
+            int totalItems = categories.Total;
+            int totalPages = (int)Math.Ceiling((double)totalItems / size);
+
+            return new ApiResponse
+            {
+                status = StatusCodes.Status200OK.ToString(),
+                message = "Categories retrieved successfully.",
+                data = new Paginate<CategoryResponse>
+                {
+                    Page = page,
+                    Size = size,
+                    Total = totalItems,
+                    TotalPages = totalPages,
+                    Items = categories.Items
+                }
+            };
+        }
+
+        public async Task<ApiResponse> EnableCategory(Guid id)
+        {
+            // Kiểm tra sự tồn tại của Category đã bị xóa
+            var category = await _unitOfWork.GetRepository<Category>()
+                .SingleOrDefaultAsync(predicate: c => c.Id == id && c.IsDelete == true);
+
+            // Nếu không tìm thấy Category
+            if (category == null)
+            {
+                return new ApiResponse
+                {
+                    status = StatusCodes.Status404NotFound.ToString(),
+                    message = "Category không tồn tại hoặc chưa bị xóa.",
+                    data = null
+                };
+            }
+
+            // Cập nhật IsDelete thành false
+            category.IsDelete = false;
+            _unitOfWork.GetRepository<Category>().UpdateAsync(category);
+
+            // Lưu thay đổi
+            bool isSuccessful = await _unitOfWork.CommitAsync() > 0;
+
+            // Trả về kết quả
+            if (!isSuccessful)
+            {
+                return new ApiResponse
+                {
+                    status = StatusCodes.Status500InternalServerError.ToString(),
+                    message = "Không thể kích hoạt lại Category.",
+                    data = null
+                };
+            }
+
+            return new ApiResponse
+            {
+                status = StatusCodes.Status200OK.ToString(),
+                message = "Category đã được kích hoạt lại thành công.",
                 data = null
             };
         }

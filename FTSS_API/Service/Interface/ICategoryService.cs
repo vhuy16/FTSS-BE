@@ -16,5 +16,7 @@
         Task<ApiResponse> GetCategory(Guid id);
         Task<ApiResponse> UpdateCategory(Guid id, CategoryRequest request, Supabase.Client client);
         Task<ApiResponse> DeleteCategory(Guid id);
+        Task<ApiResponse> GetListCategory(int v1, int v2, string? searchName, bool? isAscending);
+        Task<ApiResponse> EnableCategory(Guid id);
     }
 }
