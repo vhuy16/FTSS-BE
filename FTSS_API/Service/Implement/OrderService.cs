@@ -536,7 +536,15 @@ public class OrderService : BaseService<OrderService>, IOrderService
                 {
                     var payment = order.Payments?.FirstOrDefault();
                     bool isPaid = payment != null && payment.PaymentStatus == PaymentStatusEnum.Completed.ToString();
-                    string emailBody = EmailTemplatesUtils.RefundNotificationEmailTemplate(order.Id, order.OrderCode, isPaid);
+                    string emailBody = EmailTemplatesUtils.CancelNotificationEmailTemplate(order.Id, order.OrderCode, isPaid);
+                    var email = order.User.Email;
+                    await _emailSender.SendRefundNotificationEmailAsync(email, emailBody);
+                }
+                else if (updateOrderRequest.Status == OrderStatus.REFUNDED.ToString())
+                {
+                    var payment = order.Payments?.FirstOrDefault();
+                    
+                    string emailBody = EmailTemplatesUtils.RefundedNotificationEmailTemplate(order.Id, order.OrderCode);
                     var email = order.User.Email;
                     await _emailSender.SendRefundNotificationEmailAsync(email, emailBody);
                 }
