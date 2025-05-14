@@ -144,9 +144,9 @@ namespace FTSS_API.Controller
         [HttpGet(ApiEndPointConstant.Booking.GetDateUnavailable)]
         [ProducesResponseType(typeof(IPaginate<ApiResponse>), StatusCodes.Status200OK)]
         [ProducesErrorResponseType(typeof(ProblemDetails))]
-        public async Task<IActionResult> GetDateUnavailable()
+        public async Task<IActionResult> GetDateUnavailable(DateTime? date)
         {
-            var response = await _bookingService.GetDateUnavailable();
+            var response = await _bookingService.GetDateUnavailable(date);
             return StatusCode(int.Parse(response.status), response);
         }
         /// <summary>
