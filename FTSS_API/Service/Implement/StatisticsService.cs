@@ -19,63 +19,117 @@ public class StatisticsService : BaseService<StatisticsService>, IStatisticsServ
     }
 
     public async Task<MonthlyStatisticsResponse> GetMonthlyStatistics()
+{
+    var currentMonth = DateTime.UtcNow.Month;
+    var previousMonth = currentMonth == 1 ? 12 : currentMonth - 1;
+    var currentYear = DateTime.UtcNow.Year;
+    var previousYear = currentMonth == 1 ? currentYear - 1 : currentYear;
+
+    // Lấy đơn hàng của tháng hiện tại (chỉ để tính Orders, ProductsSold, Users)
+    var currentMonthOrders = await _unitOfWork.GetRepository<Order>().GetListAsync(
+        include: i => i.Include(i => i.OrderDetails),
+        predicate: o => o.CreateDate.Value.Month == currentMonth && 
+                        o.CreateDate.Value.Year == currentYear && 
+                        o.Status.Equals(OrderStatus.COMPLETED.GetDescriptionFromEnum()) && 
+                        o.IsDelete != true);
+
+    // Lấy đơn hàng của tháng trước (chỉ để tính Orders, ProductsSold, Users)
+    var previousMonthOrders = await _unitOfWork.GetRepository<Order>().GetListAsync(
+        include: i => i.Include(i => i.OrderDetails),
+        predicate: o => o.CreateDate.Value.Month == previousMonth && 
+                        o.CreateDate.Value.Year == previousYear && 
+                        o.Status.Equals(OrderStatus.COMPLETED.GetDescriptionFromEnum()) && 
+                        o.IsDelete != true);
+
+    // Lấy thanh toán của tháng hiện tại (bao gồm cả Order và Booking)
+    var currentMonthPayments = await _unitOfWork.GetRepository<Payment>().GetListAsync(
+        include: p => p.Include(p => p.Order)
+                      .Include(p => p.Booking),
+        predicate: p => p.PaymentDate.HasValue && 
+                        p.PaymentDate.Value.Month == currentMonth && 
+                        p.PaymentDate.Value.Year == currentYear && 
+                        p.PaymentStatus == PaymentStatusEnum.Completed.GetDescriptionFromEnum());
+
+    // Lấy thanh toán của tháng trước (bao gồm cả Order và Booking)
+    var previousMonthPayments = await _unitOfWork.GetRepository<Payment>().GetListAsync(
+        include: p => p.Include(p => p.Order)
+                      .Include(p => p.Booking),
+        predicate: p => p.PaymentDate.HasValue && 
+                        p.PaymentDate.Value.Month == previousMonth && 
+                        p.PaymentDate.Value.Year == previousYear && 
+                        p.PaymentStatus == PaymentStatusEnum.Completed.GetDescriptionFromEnum());
+
+    // Tính doanh thu từ Order (chỉ tính Order có Status = COMPLETED)
+    decimal currentOrderRevenue = currentMonthPayments
+        .Where(p => p.OrderId.HasValue && 
+                    p.Order != null && 
+                    p.Order.Status == OrderStatus.COMPLETED.GetDescriptionFromEnum())
+        .Sum(p => p.AmountPaid ?? 0);
+
+    decimal previousOrderRevenue = previousMonthPayments
+        .Where(p => p.OrderId.HasValue && 
+                    p.Order != null && 
+                    p.Order.Status == OrderStatus.COMPLETED.GetDescriptionFromEnum())
+        .Sum(p => p.AmountPaid ?? 0);
+
+    // Tính doanh thu từ Booking (chỉ tính Booking có Status = COMPLETED)
+    decimal currentBookingRevenue = currentMonthPayments
+        .Where(p => p.BookingId.HasValue && 
+                    p.Booking != null && 
+                    p.Booking.Status == BookingStatusEnum.COMPLETED.GetDescriptionFromEnum())
+        .Sum(p => p.AmountPaid ?? 0);
+
+    decimal previousBookingRevenue = previousMonthPayments
+        .Where(p => p.BookingId.HasValue && 
+                    p.Booking != null && 
+                    p.Booking.Status == BookingStatusEnum.COMPLETED.GetDescriptionFromEnum())
+        .Sum(p => p.AmountPaid ?? 0);
+
+    // Tổng doanh thu (Order + Booking)
+    decimal currentRevenue = currentOrderRevenue + currentBookingRevenue;
+    decimal previousRevenue = previousOrderRevenue + previousBookingRevenue;
+
+    // Tính các chỉ số khác (giữ nguyên)
+    int currentOrders = currentMonthOrders.Count;
+    int previousOrders = previousMonthOrders.Count;
+
+    int currentProductsSold = currentMonthOrders
+        .Where(o => o.OrderDetails != null && o.OrderDetails.Any())
+        .SelectMany(o => o.OrderDetails)
+        .Sum(od => od.Quantity);
+
+    int previousProductsSold = previousMonthOrders
+        .Where(o => o.OrderDetails != null && o.OrderDetails.Any())
+        .SelectMany(o => o.OrderDetails)
+        .Sum(od => od.Quantity);
+
+    int currentUsers = currentMonthOrders.Select(o => o.UserId).Distinct().Count();
+    int previousUsers = previousMonthOrders.Select(o => o.UserId).Distinct().Count();
+
+    return new MonthlyStatisticsResponse
     {
-        var currentMonth = DateTime.UtcNow.Month;
-        var previousMonth = currentMonth == 1 ? 12 : currentMonth - 1;
-        var currentYear = DateTime.UtcNow.Year;
-        var previousYear = currentMonth == 1 ? currentYear - 1 : currentYear;
-
-        var currentMonthOrders = await _unitOfWork.GetRepository<Order>().GetListAsync(
-            include: i => i.Include(i => i.OrderDetails),
-            predicate: o => o.CreateDate.Value.Month == currentMonth && o.CreateDate.Value.Year == currentYear && o.Status.Equals(OrderStatus.COMPLETED.GetDescriptionFromEnum()));
-        var previousMonthOrders = await _unitOfWork.GetRepository<Order>().GetListAsync(
-            include: i => i.Include(i => i.OrderDetails),
-            predicate: o => o.CreateDate.Value.Month == previousMonth && o.CreateDate.Value.Year == previousYear&& o.Status.Equals(OrderStatus.COMPLETED.GetDescriptionFromEnum()));
-
-        decimal currentRevenue = currentMonthOrders.Sum(o => o.TotalPrice);
-        decimal previousRevenue = previousMonthOrders.Sum(o => o.TotalPrice);
-
-        int currentOrders = currentMonthOrders.Count;
-        int previousOrders = previousMonthOrders.Count;
-
-        int currentProductsSold = currentMonthOrders
-            .Where(o => o.OrderDetails != null && o.OrderDetails.Any()) // Chỉ lấy đơn hàng có OrderDetails
-            .SelectMany(o => o.OrderDetails)
-            .Sum(od => od.Quantity);
-
-        int previousProductsSold = previousMonthOrders
-            .Where(o => o.OrderDetails != null && o.OrderDetails.Any())
-            .SelectMany(o => o.OrderDetails)
-            .Sum(od => od.Quantity);
-
-        int currentUsers = currentMonthOrders.Select(o => o.UserId).Distinct().Count();
-        int previousUsers = previousMonthOrders.Select(o => o.UserId).Distinct().Count();
-
-        return new MonthlyStatisticsResponse
+        Revenue = new StatisticItem
         {
-            Revenue = new StatisticItem
-            {
-                Value = currentRevenue,
-                ChangePercentage = CalculateChangePercentage(currentRevenue, previousRevenue)
-            },
-            Orders = new StatisticItem
-            {
-                Value = currentOrders,
-                ChangePercentage = CalculateChangePercentage(currentOrders, previousOrders)
-            },
-            ProductsSold = new StatisticItem
-            {
-                Value = currentProductsSold,
-                ChangePercentage = CalculateChangePercentage(currentProductsSold, previousProductsSold)
-            },
-            Users = new StatisticItem
-            {
-                Value = currentUsers,
-                ChangePercentage = CalculateChangePercentage(currentUsers, previousUsers)
-            }
-        };
-    }
-
+            Value = currentRevenue,
+            ChangePercentage = CalculateChangePercentage(currentRevenue, previousRevenue)
+        },
+        Orders = new StatisticItem
+        {
+            Value = currentOrders,
+            ChangePercentage = CalculateChangePercentage(currentOrders, previousOrders)
+        },
+        ProductsSold = new StatisticItem
+        {
+            Value = currentProductsSold,
+            ChangePercentage = CalculateChangePercentage(currentProductsSold, previousProductsSold)
+        },
+        Users = new StatisticItem
+        {
+            Value = currentUsers,
+            ChangePercentage = CalculateChangePercentage(currentUsers, previousUsers)
+        }
+    };
+}
     public async Task<List<RevenueResponse>> GetRevenueByDateRangeAsync(DateTime startDay, DateTime endDay)
     {
         // Đảm bảo startDay bắt đầu từ 00:00:00 (đầu ngày)
@@ -184,7 +238,7 @@ public class StatisticsService : BaseService<StatisticsService>, IStatisticsServ
 
         return salesData;
     }
-   public async Task<FinancialStatisticsResponse> GetFinancialStatistics()
+ public async Task<FinancialStatisticsResponse> GetFinancialStatistics()
 {
     // Lấy tất cả các thanh toán (bao gồm cả hoàn trả)
     var payments = await _unitOfWork.GetRepository<Payment>().GetListAsync(
@@ -200,10 +254,12 @@ public class StatisticsService : BaseService<StatisticsService>, IStatisticsServ
                     p.Order.Status == OrderStatus.COMPLETED.GetDescriptionFromEnum())
         .Sum(p => p.AmountPaid ?? 0);
 
-    // 2. Tổng tiền thực tế dịch vụ: Tổng AmountPaid của các Payment có BookingId và Completed
+    // 2. Tổng tiền thực tế dịch vụ: Tổng AmountPaid của các Payment có BookingId, Payment Completed và Booking Completed
     decimal serviceSales = payments
         .Where(p => p.BookingId.HasValue && 
-                    p.PaymentStatus == PaymentStatusEnum.Completed.GetDescriptionFromEnum())
+                    p.PaymentStatus == PaymentStatusEnum.Completed.GetDescriptionFromEnum() &&
+                    p.Booking != null && 
+                    p.Booking.Status == BookingStatusEnum.COMPLETED.GetDescriptionFromEnum()) 
         .Sum(p => p.AmountPaid ?? 0);
 
     // 3. Doanh thu thực tế: Tổng của productSales và serviceSales

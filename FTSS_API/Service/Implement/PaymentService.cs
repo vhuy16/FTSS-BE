@@ -3,6 +3,7 @@ using FTSS_API.Payload;
 using FTSS_API.Payload.Request.Pay;
 using FTSS_API.Payload.Response.Pay.Payment;
 using FTSS_API.Payload.Response.Payment;
+using FTSS_API.Service.Implement.Implement;
 using FTSS_API.Service.Interface;
 using FTSS_API.Utils;
 using FTSS_Model.Context;
@@ -20,13 +21,14 @@ public class PaymentService : BaseService<PaymentService>, IPaymentService
 {
     private readonly IPayOSService _payOSService;
     private readonly IVnPayService _vnPayService;
-
+    private readonly IEmailSender _emailSender;
     public PaymentService(IUnitOfWork<MyDbContext> unitOfWork, ILogger<PaymentService> logger, IMapper mapper,
-        IHttpContextAccessor httpContextAccessor, IPayOSService payOsService, IVnPayService vnPayService) : base(
+        IHttpContextAccessor httpContextAccessor, IPayOSService payOsService,IEmailSender emailSender, IVnPayService vnPayService) : base(
         unitOfWork, logger, mapper, httpContextAccessor)
     {
         _payOSService = payOsService;
         _vnPayService = vnPayService;
+        _emailSender = emailSender;
     }
 
   public async Task<ApiResponse> CreatePayment(CreatePaymentRequest request)
@@ -202,7 +204,8 @@ public class PaymentService : BaseService<PaymentService>, IPaymentService
         var payment = await _unitOfWork.GetRepository<Payment>()
             .SingleOrDefaultAsync(predicate: o => o.Id == PaymentId);
         var order = await _unitOfWork.GetRepository<Order>()
-            .SingleOrDefaultAsync(predicate: o => o.Id == payment.OrderId);
+            .SingleOrDefaultAsync(predicate: o => o.Id == payment.OrderId,
+                include: query => query.Include(o => o.User));
 
         if (payment == null)
         {
@@ -213,7 +216,12 @@ public class PaymentService : BaseService<PaymentService>, IPaymentService
                 data = null
             };
         }
-
+        if (newStatus == PaymentStatusEnum.Refunded.ToString())
+        {
+            string emailBody = EmailTemplatesUtils.RefundedNotificationEmailTemplate(order.Id, order.OrderCode);
+            var email = order.User.Email;
+            await _emailSender.SendRefundNotificationEmailAsync(email, emailBody);
+        }
         payment.PaymentStatus = newStatus;
        
         
