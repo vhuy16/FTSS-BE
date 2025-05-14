@@ -31,7 +31,7 @@ public class PaymentService : BaseService<PaymentService>, IPaymentService
         _emailSender = emailSender;
     }
 
-  public async Task<ApiResponse> CreatePayment(CreatePaymentRequest request)
+ public async Task<ApiResponse> CreatePayment(CreatePaymentRequest request)
 {
     Order? order = null;
     Booking? booking = null;
@@ -39,7 +39,8 @@ public class PaymentService : BaseService<PaymentService>, IPaymentService
     if (request.OrderId != null)
     {
         order = await _unitOfWork.GetRepository<Order>().SingleOrDefaultAsync(
-            predicate: o => o.Id.Equals(request.OrderId)
+            predicate: o => o.Id.Equals(request.OrderId),
+            include: o => o.Include(o => o.OrderDetails).ThenInclude(od => od.Product) // Bao gồm OrderDetails và Product
         );
 
         if (order == null)
@@ -115,6 +116,29 @@ public class PaymentService : BaseService<PaymentService>, IPaymentService
         {
             paymentUrl = await _vnPayService.CreatePaymentUrl(request.OrderId, request.BookingId);
         }
+        else if (paymentMethod == PaymenMethodEnum.COD.GetDescriptionFromEnum())
+        {
+            // COD không cần paymentUrl, chỉ cần tạo Payment với trạng thái Processing
+            if (booking != null)
+            {
+                return new ApiResponse
+                {
+                    data = string.Empty,
+                    message = "COD is not supported for bookings",
+                    status = StatusCodes.Status400BadRequest.ToString(),
+                };
+            }
+            // Có thể thêm kiểm tra nếu Order hỗ trợ COD (nếu cần)
+        }
+        else
+        {
+            return new ApiResponse
+            {
+                data = string.Empty,
+                message = "Unsupported payment method",
+                status = StatusCodes.Status400BadRequest.ToString(),
+            };
+        }
     }
 
     // Tạo mới Payment
@@ -126,12 +150,43 @@ public class PaymentService : BaseService<PaymentService>, IPaymentService
         PaymentMethod = paymentMethod,
         AmountPaid = amountToPay,
         PaymentDate = DateTime.Now,
-        PaymentStatus = paymentMethod == "FREE" ? PaymentStatusEnum.Completed.ToString() : PaymentStatusEnum.Processing.ToString(),
+        PaymentStatus = paymentMethod == PaymenMethodEnum.FREE.GetDescriptionFromEnum() 
+            ? PaymentStatusEnum.Completed.GetDescriptionFromEnum() 
+            : PaymentStatusEnum.Processing.GetDescriptionFromEnum(),
         OrderCode = orderCode
     };
 
-    // Chèn vào database
+    // Chèn Payment vào database
     await _unitOfWork.GetRepository<Payment>().InsertAsync(newPayment);
+
+    // Trừ số lượng sản phẩm nếu là COD
+    if (paymentMethod == PaymenMethodEnum.COD.GetDescriptionFromEnum() && order != null)
+    {
+        foreach (var orderDetail in order.OrderDetails)
+        {
+            if (orderDetail.Product != null)
+            {
+                // Giả định Product có trường Quantity để quản lý số lượng tồn kho
+                if (orderDetail.Product.Quantity < orderDetail.Quantity)
+                {
+                    return new ApiResponse
+                    {
+                        data = string.Empty,
+                        message = $"Not enough stock for product {orderDetail.ProductId}",
+                        status = StatusCodes.Status400BadRequest.ToString(),
+                    };
+                }
+
+                // Trừ số lượng sản phẩm
+                orderDetail.Product.Quantity -= orderDetail.Quantity;
+
+                // Cập nhật Product trong database
+                 _unitOfWork.GetRepository<Product>().UpdateAsync(orderDetail.Product);
+            }
+        }
+    }
+
+    // Commit tất cả thay đổi vào database
     await _unitOfWork.CommitAsync();
 
     // Lấy lại payment vừa lưu bằng OrderCode
@@ -152,7 +207,7 @@ public class PaymentService : BaseService<PaymentService>, IPaymentService
     };
 
     // Chỉ thêm PaymentURL nếu không phải booking FREE
-    if (paymentMethod != "FREE" && !string.IsNullOrEmpty(paymentUrl))
+    if (paymentMethod != PaymenMethodEnum.FREE.GetDescriptionFromEnum() && !string.IsNullOrEmpty(paymentUrl))
     {
         responseData["PaymentURL"] = paymentUrl;
     }
