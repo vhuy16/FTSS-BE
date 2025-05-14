@@ -952,7 +952,7 @@ namespace FTSS_API.Service.Implement
         }
 
 
-        public async Task<ApiResponse> GetDateUnavailable()
+        public async Task<ApiResponse> GetDateUnavailable(DateTime? date)
         {
             try
             {
@@ -981,16 +981,28 @@ namespace FTSS_API.Service.Implement
 
                 // Nhóm theo ngày và lọc ra những ngày có số lượng lịch đặt >= số kỹ thuật viên
                 var groupedUnavailableDates = unavailableDates
-                    .GroupBy(date => date)
+                    .GroupBy(d => d)
                     .Where(group => group.Count() >= technicianCount)
-                    .Select(group => new GetDateUnavailableResponse { ScheduleDate = group.Key })
+                    .Select(group => group.Key)
+                    .ToList();
+
+                // Nếu truyền vào ngày cụ thể => loại bỏ ngày đó khỏi danh sách nếu có trùng
+                if (date.HasValue)
+                {
+                    groupedUnavailableDates = groupedUnavailableDates
+                        .Where(d => d.Date != date.Value.Date)
+                        .ToList();
+                }
+
+                var responseData = groupedUnavailableDates
+                    .Select(d => new GetDateUnavailableResponse { ScheduleDate = d })
                     .ToList();
 
                 return new ApiResponse
                 {
                     status = StatusCodes.Status200OK.ToString(),
                     message = "Lấy danh sách ngày không khả dụng thành công.",
-                    data = groupedUnavailableDates
+                    data = responseData
                 };
             }
             catch (Exception ex)
