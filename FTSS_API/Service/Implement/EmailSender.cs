@@ -56,7 +56,7 @@ public class EmailSender : IEmailSender
     // New method for sending refund notification
     public Task SendRefundNotificationEmailAsync(string email, string message)
     {
-        return SendEmailAsync(email, "Refund Notification", message);
+        return SendEmailAsync(email, "Thông báo", message);
     }
 
     // Private helper method to send emails
