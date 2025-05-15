@@ -135,4 +135,27 @@ public class EmailTemplatesUtils
     <p>Trân trọng,<br>Đội ngũ Hỗ trợ FTSS</p>
     <p style='font-size: 12px; color: #888;'>Cảm ơn bạn đã tin tưởng và sử dụng dịch vụ của chúng tôi!</p>
 </div>";
+    public static string CancellationNotificationEmailTemplate(Guid orderId, string orderCode)
+    {
+        string subject = "Thông Báo Hủy Thanh Toán Đơn Hàng";
+        string body = $@"
+                <html>
+                <body style='font-family: Arial, sans-serif; color: #333;'>
+                    <h2>Thông Báo Hủy Thanh Toán</h2>
+                    <p>Kính gửi Quý Khách,</p>
+                    <p>Chúng tôi xin thông báo rằng thanh toán cho đơn hàng của bạn đã bị hủy do quá thời gian xử lý (30 phút).</p>
+                    <p><strong>Chi tiết đơn hàng:</strong></p>
+                    <ul>
+                        <li>Mã đơn hàng: {orderCode}</li>
+                        <li>ID đơn hàng: {orderId}</li>
+                        <li>Thời gian hủy: {DateTime.Now:dd/MM/yyyy HH:mm:ss}</li>
+                    </ul>
+                    <p>Nếu bạn vẫn muốn tiếp tục thanh toán, vui lòng tạo lại đơn hàng mới trên hệ thống của chúng tôi.</p>
+                    <p>Để được hỗ trợ thêm, vui lòng liên hệ với chúng tôi qua email [support@example.com] hoặc số điện thoại [0123 456 789].</p>
+                    <p>Trân trọng,<br/>Đội ngũ [Tên Công Ty]</p>
+                </body>
+                </html>";
+
+        return body;
+    }
 }

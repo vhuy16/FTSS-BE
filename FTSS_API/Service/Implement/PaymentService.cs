@@ -162,12 +162,22 @@ public class PaymentService : BaseService<PaymentService>, IPaymentService
     // Trừ số lượng sản phẩm nếu là COD
     if (paymentMethod == PaymenMethodEnum.COD.GetDescriptionFromEnum() && order != null)
     {
+        // Tạo dictionary để gộp số lượng cần trừ cho mỗi Product
+        var productQuantities = new Dictionary<Guid, int>();
+
+        // Tính tổng số lượng cần trừ cho mỗi Product
         foreach (var orderDetail in order.OrderDetails)
         {
             if (orderDetail.Product != null)
             {
-                // Giả định Product có trường Quantity để quản lý số lượng tồn kho
-                if (orderDetail.Product.Quantity < orderDetail.Quantity)
+                if (!productQuantities.ContainsKey(orderDetail.Product.Id))
+                {
+                    productQuantities[orderDetail.Product.Id] = 0;
+                }
+                productQuantities[orderDetail.Product.Id] += orderDetail.Quantity;
+
+                // Kiểm tra tồn kho
+                if (orderDetail.Product.Quantity < productQuantities[orderDetail.Product.Id])
                 {
                     return new ApiResponse
                     {
@@ -176,12 +186,18 @@ public class PaymentService : BaseService<PaymentService>, IPaymentService
                         status = StatusCodes.Status400BadRequest.ToString(),
                     };
                 }
+            }
+        }
 
-                // Trừ số lượng sản phẩm
-                orderDetail.Product.Quantity -= orderDetail.Quantity;
-
-                // Cập nhật Product trong database
-                 _unitOfWork.GetRepository<Product>().UpdateAsync(orderDetail.Product);
+        // Cập nhật số lượng cho từng Product
+        foreach (var productEntry in productQuantities)
+        {
+            var product = order.OrderDetails
+                .FirstOrDefault(od => od.Product.Id == productEntry.Key)?.Product;
+            if (product != null)
+            {
+                product.Quantity -= productEntry.Value;
+                _unitOfWork.GetRepository<Product>().UpdateAsync(product);
             }
         }
     }
@@ -424,4 +440,72 @@ public class PaymentService : BaseService<PaymentService>, IPaymentService
             data = payments
         };
     }
+    public async Task<ApiResponse> CancelExpiredProcessingPayments()
+        {
+            try
+            {
+                // Get payments that are in Processing status and older than 30 minutes
+                var thirtyMinutesAgo = DateTime.Now.AddMinutes(-30);
+                var processingPayments = await _unitOfWork.GetRepository<Payment>()
+                    .GetListAsync(
+                        predicate: p => p.PaymentStatus == PaymentStatusEnum.Processing.GetDescriptionFromEnum() 
+                            && p.PaymentDate <= thirtyMinutesAgo,
+                        include: query => query.Include(p => p.Order).ThenInclude(o => o.User)
+                    );
+
+                if (!processingPayments.Any())
+                {
+                    return new ApiResponse
+                    {
+                        status = StatusCodes.Status200OK.ToString(),
+                        message = "No expired processing payments found",
+                        data = null
+                    };
+                }
+
+                // Update status to Cancelled and send notification emails
+                foreach (var payment in processingPayments)
+                {
+                    payment.PaymentStatus = PaymentStatusEnum.Cancelled.GetDescriptionFromEnum();
+                    _unitOfWork.GetRepository<Payment>().UpdateAsync(payment);
+
+                    // Send cancellation email if order and user exist
+                    if (payment.Order?.User?.Email != null)
+                    {
+                        string emailBody = EmailTemplatesUtils.CancellationNotificationEmailTemplate(
+                            payment.Order.Id, 
+                            payment.Order.OrderCode
+                        );
+                        await _emailSender.SendRefundNotificationEmailAsync(
+                            payment.Order.User.Email, 
+                            emailBody
+                        );
+                    }
+                }
+
+                // Commit changes to database
+                await _unitOfWork.CommitAsync();
+
+                return new ApiResponse
+                {
+                    status = StatusCodes.Status200OK.ToString(),
+                    message = $"{processingPayments.Count()} expired processing payments cancelled successfully",
+                    data = new
+                    {
+                        CancelledCount = processingPayments.Count(),
+                        CancelledPaymentIds = processingPayments.Select(p => p.Id).ToList()
+                    }
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error occurred while cancelling expired processing payments");
+                return new ApiResponse
+                {
+                    status = StatusCodes.Status500InternalServerError.ToString(),
+                    message = "An error occurred while processing the request",
+                    data = null
+                };
+            }
+        }
 }
