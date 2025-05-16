@@ -231,11 +231,22 @@ namespace FTSS_API.Service.Implement
         {
             try
             {
-                // Lấy danh sách SetupPackage của User có Role là Manager và chưa bị xóa
+                // Lấy thông tin người dùng hiện tại
+                Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
+                var currentUser = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
+                    predicate: u => u.Id.Equals(userId) &&
+                                    u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) &&
+                                    u.IsDelete == false
+                );
+
+                // Xác định có phải là Manager không
+                bool isManager = currentUser.Role == RoleEnum.Manager.GetDescriptionFromEnum();
+
+                // Lấy danh sách SetupPackage theo điều kiện lọc
                 var setupPackagesQuery = await _unitOfWork.GetRepository<SetupPackage>().GetListAsync(
                     predicate: sp => sp.User != null &&
                                      sp.User.Role == RoleEnum.Manager.GetDescriptionFromEnum() &&
-                                     sp.IsDelete == false &&
+                                     (isManager || sp.IsDelete == false) && // Nếu là Manager thì bỏ qua điều kiện IsDelete
                                      (!minPrice.HasValue || sp.Price >= (decimal)minPrice.Value) &&
                                      (!maxPrice.HasValue || sp.Price <= (decimal)maxPrice.Value),
                     orderBy: sp => isAscending == true
