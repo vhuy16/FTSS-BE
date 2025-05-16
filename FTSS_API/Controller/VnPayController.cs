@@ -92,12 +92,12 @@ public class VnPayController : BaseController<VnPayController>
                
 
                 // Nếu không có SetupPackageId, redirect tới trang thành công mặc định
-                return Redirect("https://ftss-fe.vercel.app/paymentSuccess");
+                return Redirect("https://ftss.id.vn/paymentSuccess");
             }
             else
             {
                 // Chuyển hướng đến trang thất bại
-                return Redirect("https://ftss-fe.vercel.app/paymentError");
+                return Redirect("https://ftss.id.vn/paymentError");
             }
         }
         catch (Exception ex)

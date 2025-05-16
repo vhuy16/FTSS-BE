@@ -3,6 +3,7 @@ using FTSS_API.Payload;
 using FTSS_API.Payload.Request.Pay;
 using FTSS_API.Payload.Response.Pay.Payment;
 using FTSS_API.Payload.Response.Payment;
+using FTSS_API.Service.Implement.Implement;
 using FTSS_API.Service.Interface;
 using FTSS_API.Utils;
 using FTSS_Model.Context;
@@ -20,16 +21,17 @@ public class PaymentService : BaseService<PaymentService>, IPaymentService
 {
     private readonly IPayOSService _payOSService;
     private readonly IVnPayService _vnPayService;
-
+    private readonly IEmailSender _emailSender;
     public PaymentService(IUnitOfWork<MyDbContext> unitOfWork, ILogger<PaymentService> logger, IMapper mapper,
-        IHttpContextAccessor httpContextAccessor, IPayOSService payOsService, IVnPayService vnPayService) : base(
+        IHttpContextAccessor httpContextAccessor, IPayOSService payOsService,IEmailSender emailSender, IVnPayService vnPayService) : base(
         unitOfWork, logger, mapper, httpContextAccessor)
     {
         _payOSService = payOsService;
         _vnPayService = vnPayService;
+        _emailSender = emailSender;
     }
 
-  public async Task<ApiResponse> CreatePayment(CreatePaymentRequest request)
+ public async Task<ApiResponse> CreatePayment(CreatePaymentRequest request)
 {
     Order? order = null;
     Booking? booking = null;
@@ -37,7 +39,8 @@ public class PaymentService : BaseService<PaymentService>, IPaymentService
     if (request.OrderId != null)
     {
         order = await _unitOfWork.GetRepository<Order>().SingleOrDefaultAsync(
-            predicate: o => o.Id.Equals(request.OrderId)
+            predicate: o => o.Id.Equals(request.OrderId),
+            include: o => o.Include(o => o.OrderDetails).ThenInclude(od => od.Product) // Bao gồm OrderDetails và Product
         );
 
         if (order == null)
@@ -113,6 +116,29 @@ public class PaymentService : BaseService<PaymentService>, IPaymentService
         {
             paymentUrl = await _vnPayService.CreatePaymentUrl(request.OrderId, request.BookingId);
         }
+        else if (paymentMethod == PaymenMethodEnum.COD.GetDescriptionFromEnum())
+        {
+            // COD không cần paymentUrl, chỉ cần tạo Payment với trạng thái Processing
+            if (booking != null)
+            {
+                return new ApiResponse
+                {
+                    data = string.Empty,
+                    message = "COD is not supported for bookings",
+                    status = StatusCodes.Status400BadRequest.ToString(),
+                };
+            }
+            // Có thể thêm kiểm tra nếu Order hỗ trợ COD (nếu cần)
+        }
+        else
+        {
+            return new ApiResponse
+            {
+                data = string.Empty,
+                message = "Unsupported payment method",
+                status = StatusCodes.Status400BadRequest.ToString(),
+            };
+        }
     }
 
     // Tạo mới Payment
@@ -124,12 +150,59 @@ public class PaymentService : BaseService<PaymentService>, IPaymentService
         PaymentMethod = paymentMethod,
         AmountPaid = amountToPay,
         PaymentDate = DateTime.Now,
-        PaymentStatus = paymentMethod == "FREE" ? PaymentStatusEnum.Completed.ToString() : PaymentStatusEnum.Processing.ToString(),
+        PaymentStatus = paymentMethod == PaymenMethodEnum.FREE.GetDescriptionFromEnum() 
+            ? PaymentStatusEnum.Completed.GetDescriptionFromEnum() 
+            : PaymentStatusEnum.Processing.GetDescriptionFromEnum(),
         OrderCode = orderCode
     };
 
-    // Chèn vào database
+    // Chèn Payment vào database
     await _unitOfWork.GetRepository<Payment>().InsertAsync(newPayment);
+
+    // Trừ số lượng sản phẩm nếu là COD
+    if (paymentMethod == PaymenMethodEnum.COD.GetDescriptionFromEnum() && order != null)
+    {
+        // Tạo dictionary để gộp số lượng cần trừ cho mỗi Product
+        var productQuantities = new Dictionary<Guid, int>();
+
+        // Tính tổng số lượng cần trừ cho mỗi Product
+        foreach (var orderDetail in order.OrderDetails)
+        {
+            if (orderDetail.Product != null)
+            {
+                if (!productQuantities.ContainsKey(orderDetail.Product.Id))
+                {
+                    productQuantities[orderDetail.Product.Id] = 0;
+                }
+                productQuantities[orderDetail.Product.Id] += orderDetail.Quantity;
+
+                // Kiểm tra tồn kho
+                if (orderDetail.Product.Quantity < productQuantities[orderDetail.Product.Id])
+                {
+                    return new ApiResponse
+                    {
+                        data = string.Empty,
+                        message = $"Not enough stock for product {orderDetail.ProductId}",
+                        status = StatusCodes.Status400BadRequest.ToString(),
+                    };
+                }
+            }
+        }
+
+        // Cập nhật số lượng cho từng Product
+        foreach (var productEntry in productQuantities)
+        {
+            var product = order.OrderDetails
+                .FirstOrDefault(od => od.Product.Id == productEntry.Key)?.Product;
+            if (product != null)
+            {
+                product.Quantity -= productEntry.Value;
+                _unitOfWork.GetRepository<Product>().UpdateAsync(product);
+            }
+        }
+    }
+
+    // Commit tất cả thay đổi vào database
     await _unitOfWork.CommitAsync();
 
     // Lấy lại payment vừa lưu bằng OrderCode
@@ -150,7 +223,7 @@ public class PaymentService : BaseService<PaymentService>, IPaymentService
     };
 
     // Chỉ thêm PaymentURL nếu không phải booking FREE
-    if (paymentMethod != "FREE" && !string.IsNullOrEmpty(paymentUrl))
+    if (paymentMethod != PaymenMethodEnum.FREE.GetDescriptionFromEnum() && !string.IsNullOrEmpty(paymentUrl))
     {
         responseData["PaymentURL"] = paymentUrl;
     }
@@ -202,7 +275,8 @@ public class PaymentService : BaseService<PaymentService>, IPaymentService
         var payment = await _unitOfWork.GetRepository<Payment>()
             .SingleOrDefaultAsync(predicate: o => o.Id == PaymentId);
         var order = await _unitOfWork.GetRepository<Order>()
-            .SingleOrDefaultAsync(predicate: o => o.Id == payment.OrderId);
+            .SingleOrDefaultAsync(predicate: o => o.Id == payment.OrderId,
+                include: query => query.Include(o => o.User));
 
         if (payment == null)
         {
@@ -213,7 +287,12 @@ public class PaymentService : BaseService<PaymentService>, IPaymentService
                 data = null
             };
         }
-
+        if (newStatus == PaymentStatusEnum.Refunded.ToString())
+        {
+            string emailBody = EmailTemplatesUtils.RefundedNotificationEmailTemplate(order.Id, order.OrderCode);
+            var email = order.User.Email;
+            await _emailSender.SendRefundNotificationEmailAsync(email, emailBody);
+        }
         payment.PaymentStatus = newStatus;
        
         
@@ -361,4 +440,72 @@ public class PaymentService : BaseService<PaymentService>, IPaymentService
             data = payments
         };
     }
+    public async Task<ApiResponse> CancelExpiredProcessingPayments()
+        {
+            try
+            {
+                // Get payments that are in Processing status and older than 30 minutes
+                var thirtyMinutesAgo = DateTime.Now.AddMinutes(-30);
+                var processingPayments = await _unitOfWork.GetRepository<Payment>()
+                    .GetListAsync(
+                        predicate: p => p.PaymentStatus == PaymentStatusEnum.Processing.GetDescriptionFromEnum() 
+                            && p.PaymentDate <= thirtyMinutesAgo,
+                        include: query => query.Include(p => p.Order).ThenInclude(o => o.User)
+                    );
+
+                if (!processingPayments.Any())
+                {
+                    return new ApiResponse
+                    {
+                        status = StatusCodes.Status200OK.ToString(),
+                        message = "No expired processing payments found",
+                        data = null
+                    };
+                }
+
+                // Update status to Cancelled and send notification emails
+                foreach (var payment in processingPayments)
+                {
+                    payment.PaymentStatus = PaymentStatusEnum.Cancelled.GetDescriptionFromEnum();
+                    _unitOfWork.GetRepository<Payment>().UpdateAsync(payment);
+
+                    // Send cancellation email if order and user exist
+                    if (payment.Order?.User?.Email != null)
+                    {
+                        string emailBody = EmailTemplatesUtils.CancellationNotificationEmailTemplate(
+                            payment.Order.Id, 
+                            payment.Order.OrderCode
+                        );
+                        await _emailSender.SendRefundNotificationEmailAsync(
+                            payment.Order.User.Email, 
+                            emailBody
+                        );
+                    }
+                }
+
+                // Commit changes to database
+                await _unitOfWork.CommitAsync();
+
+                return new ApiResponse
+                {
+                    status = StatusCodes.Status200OK.ToString(),
+                    message = $"{processingPayments.Count()} expired processing payments cancelled successfully",
+                    data = new
+                    {
+                        CancelledCount = processingPayments.Count(),
+                        CancelledPaymentIds = processingPayments.Select(p => p.Id).ToList()
+                    }
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error occurred while cancelling expired processing payments");
+                return new ApiResponse
+                {
+                    status = StatusCodes.Status500InternalServerError.ToString(),
+                    message = "An error occurred while processing the request",
+                    data = null
+                };
+            }
+        }
 }
