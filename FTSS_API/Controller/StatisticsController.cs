@@ -40,13 +40,30 @@ namespace FTSS_API.Controller
                 return StatusCode(500, "Internal server error.");
             }
         }
+        /// <summary>
+        /// Lấy thống kê doanh số bán sản phẩm theo danh mục trong khoảng thời gian chỉ định.
+        /// </summary>
+        /// <param name="startDay">Ngày bắt đầu của khoảng thời gian (định dạng: yyyy-MM-dd).</param>
+        /// <param name="endDay">Ngày kết thúc của khoảng thời gian (城镇: yyyy-MM-dd).</param>
+        /// <returns>Trả về danh sách thống kê doanh số sản phẩm theo danh mục.</returns>
+        /// <response code="200">Lấy thống kê doanh số theo danh mục thành công.</response>
+        /// <response code="400">Khoảng thời gian không hợp lệ (ví dụ: startDay lớn hơn endDay).</response>
+        /// <response code="500">Lỗi hệ thống khi truy xuất dữ liệu thống kê.</response>
         [HttpGet("category-sales")]
         public async Task<IActionResult> GetProductSalesByCategory([FromQuery] DateTime startDay, [FromQuery] DateTime endDay)
         {
             var result = await _statisticsService.GetProductSalesByCategory(startDay, endDay);
             return Ok(result);
         }
-
+        /// <summary>
+        /// Lấy thống kê doanh thu theo khoảng thời gian chỉ định.
+        /// </summary>
+        /// <param name="startDay">Ngày bắt đầu của khoảng thời gian (định dạng: yyyy-MM-dd).</param>
+        /// <param name="endDay">Ngày kết thúc của khoảng thời gian (định dạng: yyyy-MM-dd).</param>
+        /// <returns>Trả về thống kê doanh thu (MonthlyStatisticsResponse) trong khoảng thời gian.</returns>
+        /// <response code="200">Lấy thống kê doanh thu thành công.</response>
+        /// <response code="400">Khoảng thời gian không hợp lệ (ví dụ: startDay lớn hơn endDay).</response>
+        /// <response code="500">Lỗi hệ thống khi truy xuất dữ liệu doanh thu.</response>
         [HttpGet("revenue")]
         [ProducesResponseType(typeof(MonthlyStatisticsResponse), StatusCodes.Status200OK)]
         [ProducesErrorResponseType(typeof(ProblemDetails))]

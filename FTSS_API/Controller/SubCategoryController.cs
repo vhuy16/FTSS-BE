@@ -30,7 +30,17 @@ namespace FTSS_API.Controller
             var response = await _subCategoryService.CreateSubCategory(createSubCategoryRequest);
             return StatusCode(int.Parse(response.status), response);
         }
-
+        /// <summary>
+        /// Lấy danh sách tất cả danh mục phụ (subcategories) với phân trang và tùy chọn tìm kiếm, sắp xếp.
+        /// </summary>
+        /// <param name="page">Số trang của danh sách danh mục phụ (mặc định: 1).</param>
+        /// <param name="size">Số lượng danh mục phụ mỗi trang (mặc định: 10).</param>
+        /// <param name="searchName">Tên danh mục phụ để tìm kiếm (tùy chọn).</param>
+        /// <param name="isAscending">Sắp xếp theo thứ tự tăng dần (true) hoặc giảm dần (false) (tùy chọn).</param>
+        /// <returns>Trả về danh sách danh mục phụ với thông tin phân trang.</returns>
+        /// <response code="200">Lấy danh sách danh mục phụ thành công.</response>
+        /// <response code="404">Không tìm thấy danh mục phụ nào phù hợp.</response>
+        /// <response code="500">Lỗi hệ thống khi truy xuất danh sách danh mục phụ.</response>
         [HttpGet(ApiEndPointConstant.SubCategory.GetAllSubCategories)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
@@ -41,7 +51,14 @@ namespace FTSS_API.Controller
             var response = await _subCategoryService.GetAllSubCategories(page ?? 1, size ?? 10, searchName, isAscending);
             return StatusCode(int.Parse(response.status), response);
         }
-
+        /// <summary>
+        /// Lấy thông tin chi tiết của một danh mục phụ theo ID.
+        /// </summary>
+        /// <param name="id">ID của danh mục phụ cần truy xuất.</param>
+        /// <returns>Trả về thông tin chi tiết của danh mục phụ.</returns>
+        /// <response code="200">Lấy thông tin danh mục phụ thành công.</response>
+        /// <response code="404">Không tìm thấy danh mục phụ với ID cung cấp.</response>
+        /// <response code="500">Lỗi hệ thống khi truy xuất thông tin danh mục phụ.</response>
         [HttpGet(ApiEndPointConstant.SubCategory.GetSubCategory)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]

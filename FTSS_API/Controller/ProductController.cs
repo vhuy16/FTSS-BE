@@ -246,39 +246,47 @@ public class ProductController : BaseController<ProductController>
 
         return StatusCode(int.Parse(response.status), response);
     }
-    [HttpGet("proxy-image")]
-    [ProducesResponseType(typeof(FileResult), StatusCodes.Status200OK)]
-    [ProducesErrorResponseType(typeof(ProblemDetails))]
-    public async Task<IActionResult> ProxyImage([FromQuery] string url)
-    {
-        try
-        {
-            using var httpClient = new HttpClient();
-            httpClient.Timeout = TimeSpan.FromSeconds(30);
-
-            var request = new HttpRequestMessage(HttpMethod.Get, url);
-            request.Headers.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64)");
-            request.Headers.Referrer = new Uri("https://thuysinhtim.vn");
-
-            var response = await httpClient.SendAsync(request);
-
-            if (!response.IsSuccessStatusCode)
-            {
-                _logger.LogWarning("Failed to fetch image from url {Url} - Status code: {StatusCode}", url, response.StatusCode);
-                return Problem($"Cannot fetch image from url: {url}");
-            }
-
-            var contentType = response.Content.Headers.ContentType?.ToString() ?? "application/octet-stream";
-            var imageBytes = await response.Content.ReadAsByteArrayAsync();
-
-            return File(imageBytes, contentType);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to fetch image from url {Url}", url);
-            return Problem($"Cannot fetch image from url: {url}");
-        }
-    }
+    // [HttpGet("proxy-image")]
+    // [ProducesResponseType(typeof(FileResult), StatusCodes.Status200OK)]
+    // [ProducesErrorResponseType(typeof(ProblemDetails))]
+    // public async Task<IActionResult> ProxyImage([FromQuery] string url)
+    // {
+    //     try
+    //     {
+    //         using var httpClient = new HttpClient();
+    //         httpClient.Timeout = TimeSpan.FromSeconds(30);
+    //
+    //         var request = new HttpRequestMessage(HttpMethod.Get, url);
+    //         request.Headers.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64)");
+    //         request.Headers.Referrer = new Uri("https://thuysinhtim.vn");
+    //
+    //         var response = await httpClient.SendAsync(request);
+    //
+    //         if (!response.IsSuccessStatusCode)
+    //         {
+    //             _logger.LogWarning("Failed to fetch image from url {Url} - Status code: {StatusCode}", url, response.StatusCode);
+    //             return Problem($"Cannot fetch image from url: {url}");
+    //         }
+    //
+    //         var contentType = response.Content.Headers.ContentType?.ToString() ?? "application/octet-stream";
+    //         var imageBytes = await response.Content.ReadAsByteArrayAsync();
+    //
+    //         return File(imageBytes, contentType);
+    //     }
+    //     catch (Exception ex)
+    //     {
+    //         _logger.LogError(ex, "Failed to fetch image from url {Url}", url);
+    //         return Problem($"Cannot fetch image from url: {url}");
+    //     }
+    // }
+    /// <summary>
+    /// Gợi ý sản phẩm phù hợp cho bể cá dựa trên thông tin yêu cầu.
+    /// </summary>
+    /// <param name="request">Thông tin yêu cầu, bao gồm kích thước bể và các tiêu chí khác.</param>
+    /// <returns>Trả về danh sách sản phẩm được gợi ý.</returns>
+    /// <response code="200">Gợi ý sản phẩm thành công.</response>
+    /// <response code="400">Yêu cầu không hợp lệ hoặc không tìm thấy sản phẩm phù hợp.</response>
+    /// <response code="500">Lỗi hệ thống khi xử lý gợi ý sản phẩm.</response>
     [HttpPost("recommend-products")]
     public async Task<IActionResult> RecommendProducts([FromBody] TankRequest request)
     {
