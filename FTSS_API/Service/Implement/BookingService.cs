@@ -952,7 +952,7 @@ namespace FTSS_API.Service.Implement
         }
 
 
-        public async Task<ApiResponse> GetDateUnavailable()
+        public async Task<ApiResponse> GetDateUnavailable(DateTime? date)
         {
             try
             {
@@ -964,33 +964,67 @@ namespace FTSS_API.Service.Implement
                              && u.Status == UserStatusEnum.Available.GetDescriptionFromEnum())
                     .CountAsync();
 
-                // Trạng thái booking cần lọc
-                var validStatuses = new[]
+                // Danh sách trạng thái hợp lệ cho Booking
+                var validBookingStatuses = new[]
                 {
             BookingStatusEnum.NOTASSIGN.ToString(),
             BookingStatusEnum.ASSIGNED.ToString(),
             BookingStatusEnum.PROCESSING.ToString()
         };
 
-                // Lấy danh sách ngày từ các booking hợp lệ
-                var unavailableDates = await _unitOfWork.GetRepository<Booking>()
+                // Danh sách trạng thái KHÔNG hợp lệ cho Order (bị loại)
+                var excludedOrderStatuses = new[]
+                {
+            OrderStatus.NOTDONE.ToString(),
+            OrderStatus.DONE.ToString(),
+            OrderStatus.REPORTED.ToString(),
+            OrderStatus.COMPLETED.ToString(),
+            OrderStatus.RETURNED.ToString(),
+            OrderStatus.RETURNING.ToString(),
+            OrderStatus.CANCELLED.ToString()
+        };
+
+                // Lấy danh sách ngày từ Booking hợp lệ
+                var bookingDates = await _unitOfWork.GetRepository<Booking>()
                     .GetListAsync(
-                        predicate: b => b.ScheduleDate != null && validStatuses.Contains(b.Status),
+                        predicate: b => b.ScheduleDate != null && validBookingStatuses.Contains(b.Status),
                         selector: b => b.ScheduleDate.Value.Date
                     );
 
-                // Nhóm theo ngày và lọc ra những ngày có số lượng lịch đặt >= số kỹ thuật viên
-                var groupedUnavailableDates = unavailableDates
-                    .GroupBy(date => date)
+                // Lấy danh sách ngày từ Order hợp lệ
+                var orderDates = await _unitOfWork.GetRepository<Order>()
+                    .GetListAsync(
+                        predicate: o => o.InstallationDate != null && !excludedOrderStatuses.Contains(o.Status),
+                        selector: o => o.InstallationDate.Value.Date
+                    );
+
+                // Gộp cả 2 danh sách ngày Booking và Order
+                var allDates = bookingDates.Concat(orderDates).ToList();
+
+                // Nhóm theo ngày và lọc ra những ngày không khả dụng
+                var groupedUnavailableDates = allDates
+                    .GroupBy(d => d)
                     .Where(group => group.Count() >= technicianCount)
-                    .Select(group => new GetDateUnavailableResponse { ScheduleDate = group.Key })
+                    .Select(group => group.Key)
+                    .ToList();
+
+                // Nếu truyền vào ngày cụ thể => loại bỏ ngày đó khỏi danh sách nếu có
+                if (date.HasValue)
+                {
+                    groupedUnavailableDates = groupedUnavailableDates
+                        .Where(d => d.Date != date.Value.Date)
+                        .ToList();
+                }
+
+                var responseData = groupedUnavailableDates
+                    .Select(d => new GetDateUnavailableResponse { ScheduleDate = d })
                     .ToList();
 
                 return new ApiResponse
                 {
                     status = StatusCodes.Status200OK.ToString(),
                     message = "Lấy danh sách ngày không khả dụng thành công.",
-                    data = groupedUnavailableDates
+                    data = responseData
                 };
             }
             catch (Exception ex)

@@ -270,36 +270,56 @@ public class PaymentService : BaseService<PaymentService>, IPaymentService
         };
     }
 
-    public async Task<ApiResponse> UpdatePaymentStatus(Guid PaymentId, string newStatus)
+    public async Task<ApiResponse> UpdatePaymentStatus(Guid paymentId, string newStatus)
     {
         var payment = await _unitOfWork.GetRepository<Payment>()
-            .SingleOrDefaultAsync(predicate: o => o.Id == PaymentId);
-        var order = await _unitOfWork.GetRepository<Order>()
-            .SingleOrDefaultAsync(predicate: o => o.Id == payment.OrderId,
-                include: query => query.Include(o => o.User));
+            .SingleOrDefaultAsync(predicate: o => o.Id == paymentId);
 
         if (payment == null)
         {
             return new ApiResponse
             {
                 status = StatusCodes.Status404NotFound.ToString(),
-                message = "Order not found",
+                message = "Payment not found",
                 data = null
             };
         }
+
         if (newStatus == PaymentStatusEnum.Refunded.ToString())
         {
-            string emailBody = EmailTemplatesUtils.RefundedNotificationEmailTemplate(order.Id, order.OrderCode);
-            var email = order.User.Email;
-            await _emailSender.SendRefundNotificationEmailAsync(email, emailBody);
+            if (payment.OrderId.HasValue && !payment.BookingId.HasValue)
+            {
+                // Case: Order-only
+                var order = await _unitOfWork.GetRepository<Order>()
+                    .SingleOrDefaultAsync(predicate: o => o.Id == payment.OrderId,
+                        include: query => query.Include(o => o.User));
+
+                if (order != null && order.User != null)
+                {
+                    string emailBody = EmailTemplatesUtils.RefundedNotificationEmailTemplate(orderCode: order.OrderCode);
+                    await _emailSender.SendRefundNotificationEmailAsync(order.User.Email, emailBody);
+                }
+            }
+            else if (payment.BookingId.HasValue && !payment.OrderId.HasValue)
+            {
+                // Case: Booking-only
+                var booking = await _unitOfWork.GetRepository<Booking>()
+                    .SingleOrDefaultAsync(predicate: b => b.Id == payment.BookingId,
+                        include: q => q.Include(b => b.User));
+
+                if (booking != null && booking.User != null)
+                {
+                    string emailBody = EmailTemplatesUtils.RefundedNotificationEmailTemplate(bookingCode: booking.BookingCode);
+                    await _emailSender.SendRefundNotificationEmailAsync(booking.User.Email, emailBody);
+                }
+            }
         }
+
         payment.PaymentStatus = newStatus;
-       
-        
+
         _unitOfWork.GetRepository<Payment>().UpdateAsync(payment);
         await _unitOfWork.CommitAsync();
 
-        // Ánh xạ sang DTO
         var paymentDto = new PaymentDto
         {
             Id = payment.Id,
@@ -310,7 +330,7 @@ public class PaymentService : BaseService<PaymentService>, IPaymentService
         return new ApiResponse
         {
             status = StatusCodes.Status200OK.ToString(),
-            message = "Order status updated successfully",
+            message = "Payment status updated successfully",
             data = paymentDto
         };
     }

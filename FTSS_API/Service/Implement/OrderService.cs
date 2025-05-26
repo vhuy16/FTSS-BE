@@ -544,7 +544,7 @@ public class OrderService : BaseService<OrderService>, IOrderService
                 {
                     var payment = order.Payments?.FirstOrDefault();
                     
-                    string emailBody = EmailTemplatesUtils.RefundedNotificationEmailTemplate(order.Id, order.OrderCode);
+                    string emailBody = EmailTemplatesUtils.RefundedNotificationEmailTemplate(orderCode: order.OrderCode);
                     var email = order.User.Email;
                     await _emailSender.SendRefundNotificationEmailAsync(email, emailBody);
                 }
