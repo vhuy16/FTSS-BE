@@ -170,6 +170,9 @@ public class OrderController : BaseController<OrderController>
         var response = await _orderService.CancelOrder(id);
         return StatusCode(int.Parse(response.status), response);
     }
+    /// <summary>
+    /// API tạo yêu cầu trả hàng
+    /// </summary>
     [HttpPost(ApiEndPointConstant.Order.CreateReturnRequest)]
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]

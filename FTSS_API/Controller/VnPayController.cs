@@ -37,6 +37,13 @@ public class VnPayController : BaseController<VnPayController>
     //         return Problem(MessageConstant.PaymentMessage.CreatePaymentFail);
     //     }
     // }
+    /// <summary>
+    /// Xử lý callback từ VNPay để cập nhật trạng thái giao dịch thanh toán.
+    /// </summary>
+    /// <returns>Chuyển hướng đến trang thành công hoặc thất bại dựa trên trạng thái giao dịch.</returns>
+    /// <response code="302">Chuyển hướng đến trang thành công (https://ftss.id.vn/paymentSuccess) hoặc thất bại (https://ftss.id.vn/paymentError).</response>
+    /// <response code="400">Thiếu tham số vnp_TxnRef, vnp_TransactionStatus, hoặc Order ID không hợp lệ.</response>
+    /// <response code="500">Lỗi hệ thống khi xử lý callback VNPay.</response>
     [HttpGet("callback")]
     public async Task<IActionResult> VnPayCallBack()
     {
@@ -111,6 +118,12 @@ public class VnPayController : BaseController<VnPayController>
             });
         }
     }
+    /// <summary>
+    /// Hủy các giao dịch VNPay đang ở trạng thái pending quá thời gian cho phép.
+    /// </summary>
+    /// <returns>Trả về kết quả hủy các giao dịch pending.</returns>
+    /// <response code="200">Hủy giao dịch pending thành công.</response>
+    /// <response code="500">Lỗi hệ thống khi hủy các giao dịch pending.</response>
     [HttpPost("cancel-pending-transactions")]
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
     [ProducesErrorResponseType(typeof(ProblemDetails))]

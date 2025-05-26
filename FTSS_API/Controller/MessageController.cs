@@ -34,7 +34,18 @@ public class ChatController : ControllerBase
         _logger = logger;
         _supabaseImageService = supabaseImageService;
     }
-
+    /// <summary>
+    /// Lấy danh sách tin nhắn trong một phòng chat hoặc tất cả tin nhắn của người dùng.
+    /// </summary>
+    /// <param name="roomId">ID của phòng chat để lọc tin nhắn (tùy chọn).</param>
+    /// <param name="page">Số trang của danh sách tin nhắn (mặc định: 1).</param>
+    /// <param name="size">Số lượng tin nhắn mỗi trang (mặc định: 50).</param>
+    /// <returns>Trả về danh sách tin nhắn (MessageDto) và thời gian tin nhắn mới nhất.</returns>
+    /// <response code="200">Lấy danh sách tin nhắn thành công.</response>
+    /// <response code="401">Người dùng không hợp lệ hoặc không có trạng thái Available.</response>
+    /// <response code="403">Người dùng không phải Customer hoặc Manager, hoặc không có quyền truy cập phòng.</response>
+    /// <response code="404">Phòng chat không tồn tại.</response>
+    /// <response code="500">Lỗi hệ thống khi truy xuất tin nhắn.</response>
     [HttpGet("messages")]
     public async Task<IActionResult> GetMessages(Guid? roomId, int page = 1, int size = 50)
     {
@@ -157,7 +168,16 @@ public class ChatController : ControllerBase
             return StatusCode(500, "An error occurred while retrieving messages.");
         }
     }
-
+    /// <summary>
+    /// Gửi một tin nhắn mới (văn bản hoặc media) vào một phòng chat.
+    /// </summary>
+    /// <param name="request">Thông tin tin nhắn, bao gồm nội dung văn bản, file media, và RoomId.</param>
+    /// <returns>Trả về thông tin tin nhắn vừa gửi.</returns>
+    /// <response code="200">Tin nhắn được gửi thành công.</response>
+    /// <response code="400">Thiếu nội dung/file, nội dung quá dài, RoomId không hợp lệ, hoặc file không đúng định dạng/kích thước.</response>
+    /// <response code="401">Người dùng không hợp lệ hoặc không có trạng thái Available.</response>
+    /// <response code="403">Người dùng không phải Customer hoặc Manager.</response>
+    /// <response code="500">Lỗi hệ thống khi gửi tin nhắn hoặc tải file.</response>
     [HttpPost("messages")]
     public async Task<IActionResult> SendMessage([FromForm] MessageRequest request)
     {
@@ -258,7 +278,16 @@ public class ChatController : ControllerBase
             return StatusCode(500, "An error occurred while sending the message.");
         }
     }
-
+    /// <summary>
+    /// Tạo một phòng chat mới giữa Customer và Manager.
+    /// </summary>
+    /// <param name="request">Thông tin yêu cầu, bao gồm ID của Manager.</param>
+    /// <returns>Trả về thông tin phòng chat vừa tạo hoặc phòng hiện có.</returns>
+    /// <response code="200">Phòng chat được tạo thành công hoặc phòng hiện có được trả về.</response>
+    /// <response code="400">Manager không hợp lệ hoặc không có trạng thái Available.</response>
+    /// <response code="401">Người dùng không hợp lệ hoặc không có trạng thái Available.</response>
+    /// <response code="403">Người dùng không phải Customer.</response>
+    /// <response code="500">Lỗi hệ thống khi tạo phòng chat.</response>
     [HttpPost("rooms")]
     public async Task<IActionResult> CreateRoom([FromBody] CreateRoomRequest request)
     {
@@ -325,7 +354,14 @@ public class ChatController : ControllerBase
             return StatusCode(500, "An error occurred while creating the room.");
         }
     }
-
+    /// <summary>
+    /// Lấy danh sách các phòng chat của người dùng (Customer hoặc Manager).
+    /// </summary>
+    /// <returns>Trả về danh sách các phòng chat (RoomDto) với thông tin tin nhắn mới nhất.</returns>
+    /// <response code="200">Lấy danh sách phòng chat thành công.</response>
+    /// <response code="401">Người dùng không hợp lệ hoặc không có trạng thái Available.</response>
+    /// <response code="403">Người dùng không phải Customer hoặc Manager.</response>
+    /// <response code="500">Lỗi hệ thống khi truy xuất danh sách phòng chat.</response>
     [HttpGet("rooms")]
     public async Task<IActionResult> GetRooms()
     {
@@ -412,7 +448,14 @@ public class ChatController : ControllerBase
             return StatusCode(500, "An error occurred while retrieving rooms.");
         }
     }
-
+    /// <summary>
+    /// Lấy danh sách các Manager hiện có và đang hoạt động.
+    /// </summary>
+    /// <returns>Trả về danh sách các Manager (ManagerDto).</returns>
+    /// <response code="200">Lấy danh sách Manager thành công.</response>
+    /// <response code="401">Người dùng không hợp lệ hoặc không có trạng thái Available.</response>
+    /// <response code="403">Người dùng không phải Customer.</response>
+    /// <response code="500">Lỗi hệ thống khi truy xuất danh sách Manager.</response>
     [HttpGet("users/managers")]
     public async Task<IActionResult> GetManagers()
     {
