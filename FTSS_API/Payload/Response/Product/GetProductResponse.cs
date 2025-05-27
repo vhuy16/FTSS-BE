@@ -13,4 +13,5 @@ public class GetProductResponse
     public decimal? Price { get; set; }
     public string Status { get; set; }
     public List<string> Images { get; set; } = new List<string>();
+    public int? TotalSold { get; set; }
 }

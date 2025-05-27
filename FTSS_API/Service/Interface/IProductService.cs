@@ -31,4 +31,8 @@ public interface IProductService
     Task<ApiResponse> RecommendProducts(TankRequest request);
 
     Task<ApiResponse> UpImageForDescription(IFormFile formFile);
+
+    Task<ApiResponse> GetTopSellingProducts(int page, int size, bool? isAscending, string? subcategoryName,
+        string? productName, string? cateName, decimal? minPrice, decimal? maxPrice);
+
 }

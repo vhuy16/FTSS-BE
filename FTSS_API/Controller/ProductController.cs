@@ -293,4 +293,42 @@ public class ProductController : BaseController<ProductController>
         var response = await _productService.RecommendProducts(request);
         return StatusCode(int.Parse(response.status), response);
     }
+    
+    /// <summary>
+    /// API lấy danh sách sản phẩm bán chạy (dành cho người dùng). Chỉ hiển thị các sản phẩm có trạng thái Available.
+    /// </summary>
+    /// <returns>Danh sách sản phẩm phân trang, sắp xếp theo số lượng bán được.</returns>
+    [HttpGet(ApiEndPointConstant.Product.GetTopSellingProducts)]
+    [ProducesResponseType(typeof(IPaginate<GetProductResponse>), StatusCodes.Status200OK)]
+    [ProducesErrorResponseType(typeof(ProblemDetails))]
+    public async Task<IActionResult> GetTopSellingProducts(
+        [FromQuery] int? page = 1,
+        [FromQuery] int? size = 10,
+        [FromQuery] bool? isAscending = null,
+        [FromQuery] string? subcategoryName = null,
+        [FromQuery] string? productName = null,
+        [FromQuery] string? cateName = null,
+        [FromQuery] decimal? minPrice = null,
+        [FromQuery] decimal? maxPrice = null)
+    {
+        int pageNumber = page ?? 1;
+        int pageSize = size ?? 10;
+
+        var response = await _productService.GetTopSellingProducts(
+            pageNumber,
+            pageSize,
+            isAscending,
+            subcategoryName,
+            productName,
+            cateName,
+            minPrice,
+            maxPrice);
+
+        if (response == null || response.data == null)
+        {
+            return Problem(detail: MessageConstant.ProductMessage.ProductIsEmpty, statusCode: StatusCodes.Status404NotFound);
+        }
+
+        return Ok(response);
+    }
 }

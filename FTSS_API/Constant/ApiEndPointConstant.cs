@@ -114,6 +114,7 @@ public static class ApiEndPointConstant
         public const string EnableProduct = ProductEndpoint + "/enable-product" + "/{id}"  ;
         public const string DeleteProduct = ProductEndpoint + "/{id}";
         public const string UploadImg = "upload-img";
+        public const string GetTopSellingProducts = "api/products/top-selling";
     }
     public static class GoogleAuthentication
     {
