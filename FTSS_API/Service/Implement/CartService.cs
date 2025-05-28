@@ -390,7 +390,18 @@ namespace FTSS_API.Service.Implement
 
                     existingCartItem.Quantity = (int)newQuantity;
                     existingCartItem.ModifyDate = TimeUtils.GetCurrentSEATime();
-                    _unitOfWork.GetRepository<CartItem>().UpdateAsync(existingCartItem);
+                     _unitOfWork.GetRepository<CartItem>().UpdateAsync(existingCartItem);
+
+                    cartItemResponses.Add(new AddCartItemResponse()
+                    {
+                        CartItemId = existingCartItem.Id,
+                        ProductId = product.Id,
+                        ProductName = product.ProductName,
+                        Price = product.Price * packageItem.Quantity,
+                        Quantity = (int)packageItem.Quantity,
+                        UnitPrice = product.Price,
+                        LinkImage = product.Images.FirstOrDefault()?.LinkImage
+                    });
                 }
                 else
                 {
@@ -415,18 +426,21 @@ namespace FTSS_API.Service.Implement
                         CreateDate = TimeUtils.GetCurrentSEATime(),
                         ModifyDate = TimeUtils.GetCurrentSEATime()
                     };
-                }
 
-                cartItemResponses.Add(new AddCartItemResponse()
-                {
-                    CartItemId = existingCartItem?.Id ?? Guid.NewGuid(),
-                    ProductId = product.Id,
-                    ProductName = product.ProductName,
-                    Price = product.Price * packageItem.Quantity,
-                    Quantity = (int)packageItem.Quantity,
-                    UnitPrice = product.Price,
-                    LinkImage = product.Images.FirstOrDefault()?.LinkImage
-                });
+                    // ✅ Thêm cart item vào database
+                    await _unitOfWork.GetRepository<CartItem>().InsertAsync(cartItem);
+
+                    cartItemResponses.Add(new AddCartItemResponse()
+                    {
+                        CartItemId = cartItem.Id,
+                        ProductId = product.Id,
+                        ProductName = product.ProductName,
+                        Price = product.Price * packageItem.Quantity,
+                        Quantity = (int)packageItem.Quantity,
+                        UnitPrice = product.Price,
+                        LinkImage = product.Images.FirstOrDefault()?.LinkImage
+                    });
+                }
             }
 
             bool isSuccessfully = await _unitOfWork.CommitAsync() > 0;
