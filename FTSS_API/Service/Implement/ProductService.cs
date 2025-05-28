@@ -634,7 +634,7 @@ public class ProductService : BaseService<ProductService>, IProductService
 
     public async Task<ApiResponse> GetProductById(Guid productId)
     {
-        
+
         var product = await _unitOfWork.GetRepository<Product>().SingleOrDefaultAsync(
             selector: s => new GetProductResponse
             {
@@ -648,11 +648,18 @@ public class ProductService : BaseService<ProductService>, IProductService
                 Size = s.Size,
                 Power = s.Power,
                 Price = s.Price,
-                Status = s.Status
+                Status = s.Status,
+                TotalSold = s.OrderDetails
+                    .Where(od => od.Order.Status.Equals(OrderStatus.COMPLETED.GetDescriptionFromEnum())) // Chỉ tính OrderDetail của đơn hàng Complete
+                    .Sum(od => od.Quantity) // Tính tổng số lượng đã bán
             },
             predicate: p =>
-                p.Id.Equals(productId) && p.Status.Equals(ProductStatusEnum.Available.GetDescriptionFromEnum()));
-
+                p.Id.Equals(productId) && p.Status.Equals(ProductStatusEnum.Available.GetDescriptionFromEnum()),
+            include: q => q.Include(p => p.SubCategory)
+                .ThenInclude(sc => sc.Category)
+                .Include(p => p.Images)
+                .Include(p => p.OrderDetails)
+                .ThenInclude(od => od.Order));
         if (product == null)
         {
             return new ApiResponse
@@ -812,7 +819,7 @@ public class ProductService : BaseService<ProductService>, IProductService
                 try
                 {
                     var powerValue = filter.Power; // Sử dụng cột power
-                    if (powerValue >= filterPower * 0.3 && powerValue <= filterPower * 2.0)
+                    if (powerValue >= filterPower * 0.7 && powerValue <= filterPower * 1.3) // 70%–130% của filterPower
                     {
                         filtersWithPower.Add(filter);
                         _logger.LogDebug($"Lọc {filter.ProductName}: công suất {powerValue}L/h, chênh lệch {Math.Abs(powerValue - filterPower)}L/h");
@@ -990,7 +997,83 @@ public class ProductService : BaseService<ProductService>, IProductService
     }
 }
     #endregion
+public async Task<ApiResponse> GetTopSellingProducts(int page, int size, bool? isAscending, string? subcategoryName, string? productName, string? cateName, decimal? minPrice, decimal? maxPrice)
+{
+    page = page > 0 ? page : 1;
+    size = size > 0 ? size : 10;
 
+    // Tạo cache key
+    var cacheKey = $"GetTopSellingProducts_{page}_{size}_{isAscending}_{subcategoryName}_{productName}_{cateName}_{minPrice}_{maxPrice}".GetHashCode();
+    if (_memoryCache.TryGetValue(cacheKey, out ApiResponse cachedResponse))
+    {
+        return cachedResponse;
+    }
+
+    var products = await _unitOfWork.GetRepository<Product>().GetPagingListAsync(
+        selector: s => new GetProductResponse
+        {
+            Id = s.Id,
+            SubCategoryName = s.SubCategory != null ? s.SubCategory.SubCategoryName : null,
+            CategoryName = s.SubCategory != null && s.SubCategory.Category != null ? s.SubCategory.Category.CategoryName : null,
+            Description = s.Description,
+            Images = s.Images.Where(i => i.IsDelete == false)
+                            .OrderBy(i => i.CreateDate)
+                            .Select(i => i.LinkImage)
+                            .Take(1)
+                            .ToList(),
+            ProductName = s.ProductName,
+            Quantity = s.Quantity,
+            Price = s.Price,
+            Size = s.Size,
+            Power = s.Power,
+            Status = s.Status,
+            TotalSold = s.OrderDetails
+                .Where(od => od.Order.Status.Equals(OrderStatus.COMPLETED.GetDescriptionFromEnum())) // Sử dụng enum
+                .Sum(od => od.Quantity) // Tính tổng số lượng đã bán
+        },
+        include: i => i.Include(p => p.Images)
+                       .Include(p => p.SubCategory)
+                           .ThenInclude(sc => sc.Category)
+                       .Include(p => p.OrderDetails)
+                           .ThenInclude(od => od.Order), // Bao gồm Order để kiểm tra trạng thái
+        predicate: p =>
+            (string.IsNullOrEmpty(productName) || EF.Functions.Like(p.ProductName, $"%{productName}%")) &&
+            (string.IsNullOrEmpty(cateName) || EF.Functions.Like(p.SubCategory.Category.CategoryName, $"%{cateName}%")) &&
+            (string.IsNullOrEmpty(subcategoryName) || EF.Functions.Like(p.SubCategory.SubCategoryName, $"%{subcategoryName}%")) &&
+            (!minPrice.HasValue || p.Price >= minPrice.Value) &&
+            (!maxPrice.HasValue || p.Price <= maxPrice.Value) &&
+            p.IsDelete == false &&
+            p.Quantity > 0 &&
+            p.Status.Equals(ProductStatusEnum.Available.GetDescriptionFromEnum()),
+        orderBy: q => isAscending.HasValue
+            ? (isAscending.Value
+                ? q.OrderBy(p => p.OrderDetails.Where(od => od.Order.Status.Equals(OrderStatus.COMPLETED.GetDescriptionFromEnum())).Sum(od => od.Quantity))
+                : q.OrderByDescending(p => p.OrderDetails.Where(od => od.Order.Status.Equals(OrderStatus.COMPLETED.GetDescriptionFromEnum())).Sum(od => od.Quantity)))
+            : q.OrderByDescending(p => p.OrderDetails.Where(od => od.Order.Status.Equals(OrderStatus.COMPLETED.GetDescriptionFromEnum())).Sum(od => od.Quantity)),
+        page: page,
+        size: size
+    );
+
+    int totalItems = products.Total;
+    int totalPages = (int)Math.Ceiling((double)totalItems / size);
+
+    var response = new ApiResponse
+    {
+        status = StatusCodes.Status200OK.ToString(),
+        message = totalItems > 0 ? "Top selling products retrieved successfully." : "No products found.",
+        data = new Paginate<GetProductResponse>
+        {
+            Page = page,
+            Size = size,
+            Total = totalItems,
+            TotalPages = totalPages,
+            Items = products.Items.ToList()
+        }
+    };
+
+    _memoryCache.Set(cacheKey, response, TimeSpan.FromMinutes(10));
+    return response;
+}
     public Task<ApiResponse> UpImageForDescription(IFormFile formFile)
     {
         throw new NotImplementedException();

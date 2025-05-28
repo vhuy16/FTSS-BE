@@ -36,7 +36,7 @@ namespace FTSS_API.Utils;
             new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
             new Claim(JwtRegisteredClaimNames.NameId, account.Id.ToString()),
             new Claim(JwtRegisteredClaimNames.Name, account.UserName.ToString()),
-            new Claim(ClaimTypes.Role, account.Role),
+            new Claim("role", account.Role ?? "User"),
             new Claim(ClaimTypes.Name, account.UserName)
         };
             if (guidClaim != null) claims.Add(new Claim(guidClaim.Item1, guidClaim.Item2.ToString()));
