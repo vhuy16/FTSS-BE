@@ -22,8 +22,10 @@ public class PaymentService : BaseService<PaymentService>, IPaymentService
     private readonly IPayOSService _payOSService;
     private readonly IVnPayService _vnPayService;
     private readonly IEmailSender _emailSender;
+
     public PaymentService(IUnitOfWork<MyDbContext> unitOfWork, ILogger<PaymentService> logger, IMapper mapper,
-        IHttpContextAccessor httpContextAccessor, IPayOSService payOsService,IEmailSender emailSender, IVnPayService vnPayService) : base(
+        IHttpContextAccessor httpContextAccessor, IPayOSService payOsService, IEmailSender emailSender,
+        IVnPayService vnPayService) : base(
         unitOfWork, logger, mapper, httpContextAccessor)
     {
         _payOSService = payOsService;
@@ -31,230 +33,199 @@ public class PaymentService : BaseService<PaymentService>, IPaymentService
         _emailSender = emailSender;
     }
 
- public async Task<ApiResponse> CreatePayment(CreatePaymentRequest request)
-{
-    Order? order = null;
-    Booking? booking = null;
-
-    if (request.OrderId != null)
+    public async Task<ApiResponse> CreatePayment(CreatePaymentRequest request)
     {
-        order = await _unitOfWork.GetRepository<Order>().SingleOrDefaultAsync(
-            predicate: o => o.Id.Equals(request.OrderId),
-            include: o => o.Include(o => o.OrderDetails).ThenInclude(od => od.Product)
-        );
+        Order? order = null;
+        Booking? booking = null;
 
-        if (order == null)
+        if (request.OrderId != null)
         {
-            return new ApiResponse
-            {
-                data = string.Empty,
-                message = "Order not found",
-                status = StatusCodes.Status404NotFound.ToString(),
-            };
-        }
-    }
-
-    if (request.BookingId != null)
-    {
-        booking = await _unitOfWork.GetRepository<Booking>().SingleOrDefaultAsync(
-            predicate: b => b.Id.Equals(request.BookingId)
-        );
-
-        if (booking == null)
-        {
-            return new ApiResponse
-            {
-                data = string.Empty,
-                message = "Booking not found",
-                status = StatusCodes.Status404NotFound.ToString(),
-            };
-        }
-    }
-
-    if (order == null && booking == null)
-    {
-        return new ApiResponse
-        {
-            data = string.Empty,
-            message = "Invalid payment request",
-            status = StatusCodes.Status400BadRequest.ToString(),
-        };
-    }
-
-    decimal amountToPay = order?.TotalPrice ?? booking?.TotalPrice ?? 0;
-    string paymentMethod = request.PaymentMethod;
-    string paymentUrl = string.Empty;
-    long orderCode = DateTime.Now.Ticks % 1000000000000000L * 10 + new Random().Next(0, 1000);
-
-    // Xử lý trường hợp booking miễn phí
-    if (paymentMethod == PaymenMethodEnum.FREE.GetDescriptionFromEnum())
-    {
-        amountToPay = 0;
-    }
-    else if (amountToPay <= 0)
-    {
-        return new ApiResponse
-        {
-            data = string.Empty,
-            message = "No payment required",
-            status = StatusCodes.Status400BadRequest.ToString(),
-        };
-    }
-    else
-    {
-        if (paymentMethod == PaymenMethodEnum.VnPay.GetDescriptionFromEnum())
-        {
-            paymentUrl = await _vnPayService.CreatePaymentUrl(request.OrderId, request.BookingId);
-        }
-        else if (paymentMethod == PaymenMethodEnum.COD.GetDescriptionFromEnum())
-        {
-            if (booking != null)
+            order = await _unitOfWork.Context.Set<Order>()
+                .AsNoTracking()
+                .Include(o => o.OrderDetails)
+                .ThenInclude(od => od.Product)
+                .FirstOrDefaultAsync(o => o.Id == request.OrderId);
+            if (order == null)
             {
                 return new ApiResponse
                 {
                     data = string.Empty,
-                    message = "COD is not supported for bookings",
-                    status = StatusCodes.Status400BadRequest.ToString(),
+                    message = "Order not found",
+                    status = StatusCodes.Status404NotFound.ToString(),
                 };
             }
         }
-        else
+
+        if (request.BookingId != null)
+        {
+            booking = await _unitOfWork.GetRepository<Booking>().SingleOrDefaultAsync(
+                predicate: b => b.Id.Equals(request.BookingId)
+            );
+
+            if (booking == null)
+            {
+                return new ApiResponse
+                {
+                    data = string.Empty,
+                    message = "Booking not found",
+                    status = StatusCodes.Status404NotFound.ToString(),
+                };
+            }
+        }
+
+        if (order == null && booking == null)
         {
             return new ApiResponse
             {
                 data = string.Empty,
-                message = "Unsupported payment method",
+                message = "Invalid payment request",
                 status = StatusCodes.Status400BadRequest.ToString(),
             };
         }
-    }
 
-    // Tạo mới Payment
-    var newPayment = new Payment
-    {
-        Id = Guid.NewGuid(),
-        OrderId = order?.Id,
-        BookingId = booking?.Id,
-        PaymentMethod = paymentMethod,
-        AmountPaid = amountToPay,
-        PaymentDate = TimeUtils.GetCurrentSEATime(),
-        PaymentStatus = paymentMethod == PaymenMethodEnum.FREE.GetDescriptionFromEnum()
-            ? PaymentStatusEnum.Completed.GetDescriptionFromEnum()
-            : PaymentStatusEnum.Processing.GetDescriptionFromEnum(),
-        OrderCode = orderCode
-    };
+        decimal amountToPay = order?.TotalPrice ?? booking?.TotalPrice ?? 0;
+        string paymentMethod = request.PaymentMethod;
+        string paymentUrl = string.Empty;
+        long orderCode = DateTime.Now.Ticks % 1000000000000000L * 10 + new Random().Next(0, 1000);
 
-    // Chèn Payment vào database
-    await _unitOfWork.GetRepository<Payment>().InsertAsync(newPayment);
-
-    // Trừ số lượng sản phẩm nếu là COD
-    if (paymentMethod == PaymenMethodEnum.COD.GetDescriptionFromEnum() && order != null)
-    {
-        var productQuantities = new Dictionary<Guid, int>();
-        foreach (var orderDetail in order.OrderDetails)
+        // Handle free booking case
+        if (paymentMethod == PaymenMethodEnum.FREE.GetDescriptionFromEnum())
         {
-            if (orderDetail.Product != null)
+            amountToPay = 0; // Set payment amount to 0 for FREE booking
+        }
+        else if (amountToPay <= 0)
+        {
+            return new ApiResponse
             {
-                if (!productQuantities.ContainsKey(orderDetail.Product.Id))
+                data = string.Empty,
+                message = "No payment required",
+                status = StatusCodes.Status400BadRequest.ToString(),
+            };
+        }
+        else
+        {
+            // Handle payment URL creation for other payment methods
+            if (paymentMethod == PaymenMethodEnum.PayOs.GetDescriptionFromEnum())
+            {
+                var result = await _payOSService.CreatePaymentUrlRegisterCreator(request.OrderId, request.BookingId);
+                if (result.IsSuccess && result.Value != null)
                 {
-                    productQuantities[orderDetail.Product.Id] = 0;
+                    paymentUrl = result.Value.checkoutUrl;
+                    orderCode = result.Value.orderCode;
                 }
-                productQuantities[orderDetail.Product.Id] += orderDetail.Quantity;
-
-                if (orderDetail.Product.Quantity < productQuantities[orderDetail.Product.Id])
+            }
+            else if (paymentMethod == PaymenMethodEnum.VnPay.GetDescriptionFromEnum())
+            {
+                paymentUrl = await _vnPayService.CreatePaymentUrl(request.OrderId, request.BookingId);
+            }
+            else if (paymentMethod == PaymenMethodEnum.COD.GetDescriptionFromEnum())
+            {
+                // COD is not supported for bookings
+                if (booking != null)
                 {
                     return new ApiResponse
                     {
                         data = string.Empty,
-                        message = $"Not enough stock for product {orderDetail.ProductId}",
+                        message = "COD is not supported for bookings",
                         status = StatusCodes.Status400BadRequest.ToString(),
                     };
                 }
-            }
-        }
 
-        foreach (var productEntry in productQuantities)
-        {
-            var product = order.OrderDetails
-                .FirstOrDefault(od => od.Product.Id == productEntry.Key)?.Product;
-            if (product != null)
+                // Deduct product quantities for COD
+                if (order != null && order.OrderDetails != null)
+                {
+                    foreach (var orderDetail in order.OrderDetails)
+                    {
+                        var product = await _unitOfWork.Context.Set<Product>()
+                            .FirstOrDefaultAsync(p => p.Id == orderDetail.ProductId);
+                        if (product == null)
+                        {
+                            return new ApiResponse
+                            {
+                                data = string.Empty,
+                                message = $"Product with ID {orderDetail.ProductId} not found",
+                                status = StatusCodes.Status404NotFound.ToString(),
+                            };
+                        }
+
+                        if (product.Quantity < orderDetail.Quantity)
+                        {
+                            return new ApiResponse
+                            {
+                                data = string.Empty,
+                                message = $"Insufficient quantity for product {product.ProductName}",
+                                status = StatusCodes.Status400BadRequest.ToString(),
+                            };
+                        }
+
+                        product.Quantity -= orderDetail.Quantity;
+                        _unitOfWork.Context.Set<Product>().Update(product);
+                    }
+                }
+            }
+            else
             {
-                product.Quantity -= productEntry.Value;
-                _unitOfWork.GetRepository<Product>().UpdateAsync(product);
+                return new ApiResponse
+                {
+                    data = string.Empty,
+                    message = "Unsupported payment method",
+                    status = StatusCodes.Status400BadRequest.ToString(),
+                };
             }
         }
-    }
 
-    // Commit với retry
-    bool isSuccess = false;
-    int retryCount = 3;
-    while (retryCount > 0)
-    {
-        try
+        // Create new Payment
+        var newPayment = new Payment
         {
-            isSuccess = await _unitOfWork.CommitAsync() > 0;
-            if (isSuccess) break;
-        }
-        catch (DbUpdateConcurrencyException ex)
-        {
-            _logger.LogError($"Concurrency conflict in CreatePayment, retrying... ({3 - retryCount + 1}/3) - Error: {ex.Message}");
-            retryCount--;
-            await Task.Delay(200);
-           
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError($"Commit failed in CreatePayment, retrying... ({3 - retryCount + 1}/3) - Error: {ex.Message}");
-            retryCount--;
-            await Task.Delay(200);
-        }
-    }
+            Id = Guid.NewGuid(),
+            OrderId = order?.Id,
+            BookingId = booking?.Id,
+            PaymentMethod = paymentMethod,
+            AmountPaid = amountToPay,
+            PaymentDate = DateTime.Now,
+            PaymentStatus = paymentMethod == PaymenMethodEnum.FREE.GetDescriptionFromEnum()
+                ? PaymentStatusEnum.Completed.GetDescriptionFromEnum()
+                : PaymentStatusEnum.Processing.GetDescriptionFromEnum(),
+            OrderCode = orderCode
+        };
 
-    if (!isSuccess)
-    {
+        // Insert Payment into database
+        await _unitOfWork.GetRepository<Payment>().InsertAsync(newPayment);
+
+        // Commit all changes to the database (including product quantity updates)
+        await _unitOfWork.CommitAsync();
+
+        // Retrieve the saved payment by OrderCode
+        var savedPayment = await _unitOfWork.GetRepository<Payment>().SingleOrDefaultAsync(
+            predicate: p => p.OrderCode == orderCode
+        );
+
+        if (savedPayment == null)
+        {
+            return new ApiResponse { message = "Failed to retrieve saved payment" };
+        }
+
+        // Return payment information
+        var responseData = new Dictionary<string, object>
+        {
+            ["PaymentId"] = savedPayment.Id,
+            ["Amount"] = savedPayment.AmountPaid
+        };
+
+        // Only add PaymentURL if not a FREE booking
+        if (paymentMethod != PaymenMethodEnum.FREE.GetDescriptionFromEnum() && !string.IsNullOrEmpty(paymentUrl))
+        {
+            responseData["PaymentURL"] = paymentUrl;
+        }
+
         return new ApiResponse
         {
-            status = StatusCodes.Status500InternalServerError.ToString(),
-            message = "Failed to save payment",
-            data = null
+            status = StatusCodes.Status200OK.ToString(),
+            message = "Payment successful",
+            data = responseData
         };
     }
 
-    // Lấy lại payment vừa lưu
-    var savedPayment = await _unitOfWork.GetRepository<Payment>().SingleOrDefaultAsync(
-        predicate: p => p.OrderCode == orderCode
-    );
-
-    if (savedPayment == null)
-    {
-        return new ApiResponse
-        {
-            message = "Failed to retrieve saved payment",
-            status = StatusCodes.Status500InternalServerError.ToString(),
-            data = null
-        };
-    }
-
-    // Trả về thông tin payment
-    var responseData = new Dictionary<string, object>
-    {
-        ["PaymentId"] = savedPayment.Id,
-        ["Amount"] = savedPayment.AmountPaid,
-        ["PaymentStatus"] = savedPayment.PaymentStatus
-    };
-
-    if (paymentMethod != PaymenMethodEnum.FREE.GetDescriptionFromEnum() && !string.IsNullOrEmpty(paymentUrl))
-    {
-        responseData["PaymentURL"] = paymentUrl;
-    }
-
-    return new ApiResponse
-    {
-        status = StatusCodes.Status200OK.ToString(),
-        message = "Payment created successfully",
-        data = responseData
-    };
-}
     public async Task<ApiResponse> GetPaymentsByStatus(string status, int page, int size)
     {
         var payments = await _unitOfWork.GetRepository<Payment>().GetPagingListAsync(
@@ -316,7 +287,8 @@ public class PaymentService : BaseService<PaymentService>, IPaymentService
 
                 if (order != null && order.User != null)
                 {
-                    string emailBody = EmailTemplatesUtils.RefundedNotificationEmailTemplate(orderCode: order.OrderCode);
+                    string emailBody =
+                        EmailTemplatesUtils.RefundedNotificationEmailTemplate(orderCode: order.OrderCode);
                     await _emailSender.SendRefundNotificationEmailAsync(order.User.Email, emailBody);
                 }
             }
@@ -329,7 +301,8 @@ public class PaymentService : BaseService<PaymentService>, IPaymentService
 
                 if (booking != null && booking.User != null)
                 {
-                    string emailBody = EmailTemplatesUtils.RefundedNotificationEmailTemplate(bookingCode: booking.BookingCode);
+                    string emailBody =
+                        EmailTemplatesUtils.RefundedNotificationEmailTemplate(bookingCode: booking.BookingCode);
                     await _emailSender.SendRefundNotificationEmailAsync(booking.User.Email, emailBody);
                 }
             }
@@ -354,7 +327,9 @@ public class PaymentService : BaseService<PaymentService>, IPaymentService
             data = paymentDto
         };
     }
-    public async Task<ApiResponse> UpdateBankInfor(Guid paymentId, string bankNumber, string bankName, string bankHolder)
+
+    public async Task<ApiResponse> UpdateBankInfor(Guid paymentId, string bankNumber, string bankName,
+        string bankHolder)
     {
         var payment = await _unitOfWork.GetRepository<Payment>()
             .SingleOrDefaultAsync(predicate: p => p.Id == paymentId);
@@ -377,6 +352,7 @@ public class PaymentService : BaseService<PaymentService>, IPaymentService
                 data = null
             };
         }
+
         payment.BankNumber = bankNumber;
         payment.BankName = bankName;
         payment.BankHolder = bankHolder;
@@ -480,72 +456,73 @@ public class PaymentService : BaseService<PaymentService>, IPaymentService
             data = payments
         };
     }
+
     public async Task<ApiResponse> CancelExpiredProcessingPayments()
+    {
+        try
         {
-            try
+            // Get payments that are in Processing status and older than 30 minutes
+            var thirtyMinutesAgo = DateTime.Now.AddMinutes(-30);
+            var processingPayments = await _unitOfWork.GetRepository<Payment>()
+                .GetListAsync(
+                    predicate: p => p.PaymentStatus == PaymentStatusEnum.Processing.GetDescriptionFromEnum()
+                                    && p.PaymentDate <= thirtyMinutesAgo,
+                    include: query => query.Include(p => p.Order).ThenInclude(o => o.User)
+                );
+
+            if (!processingPayments.Any())
             {
-                // Get payments that are in Processing status and older than 30 minutes
-                var thirtyMinutesAgo = DateTime.Now.AddMinutes(-30);
-                var processingPayments = await _unitOfWork.GetRepository<Payment>()
-                    .GetListAsync(
-                        predicate: p => p.PaymentStatus == PaymentStatusEnum.Processing.GetDescriptionFromEnum() 
-                            && p.PaymentDate <= thirtyMinutesAgo,
-                        include: query => query.Include(p => p.Order).ThenInclude(o => o.User)
-                    );
-
-                if (!processingPayments.Any())
-                {
-                    return new ApiResponse
-                    {
-                        status = StatusCodes.Status200OK.ToString(),
-                        message = "No expired processing payments found",
-                        data = null
-                    };
-                }
-
-                // Update status to Cancelled and send notification emails
-                foreach (var payment in processingPayments)
-                {
-                    payment.PaymentStatus = PaymentStatusEnum.Cancelled.GetDescriptionFromEnum();
-                    _unitOfWork.GetRepository<Payment>().UpdateAsync(payment);
-
-                    // Send cancellation email if order and user exist
-                    if (payment.Order?.User?.Email != null)
-                    {
-                        string emailBody = EmailTemplatesUtils.CancellationNotificationEmailTemplate(
-                            payment.Order.Id, 
-                            payment.Order.OrderCode
-                        );
-                        await _emailSender.SendRefundNotificationEmailAsync(
-                            payment.Order.User.Email, 
-                            emailBody
-                        );
-                    }
-                }
-
-                // Commit changes to database
-                await _unitOfWork.CommitAsync();
-
                 return new ApiResponse
                 {
                     status = StatusCodes.Status200OK.ToString(),
-                    message = $"{processingPayments.Count()} expired processing payments cancelled successfully",
-                    data = new
-                    {
-                        CancelledCount = processingPayments.Count(),
-                        CancelledPaymentIds = processingPayments.Select(p => p.Id).ToList()
-                    }
-                };
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error occurred while cancelling expired processing payments");
-                return new ApiResponse
-                {
-                    status = StatusCodes.Status500InternalServerError.ToString(),
-                    message = "An error occurred while processing the request",
+                    message = "No expired processing payments found",
                     data = null
                 };
             }
+
+            // Update status to Cancelled and send notification emails
+            foreach (var payment in processingPayments)
+            {
+                payment.PaymentStatus = PaymentStatusEnum.Cancelled.GetDescriptionFromEnum();
+                _unitOfWork.GetRepository<Payment>().UpdateAsync(payment);
+
+                // Send cancellation email if order and user exist
+                if (payment.Order?.User?.Email != null)
+                {
+                    string emailBody = EmailTemplatesUtils.CancellationNotificationEmailTemplate(
+                        payment.Order.Id,
+                        payment.Order.OrderCode
+                    );
+                    await _emailSender.SendRefundNotificationEmailAsync(
+                        payment.Order.User.Email,
+                        emailBody
+                    );
+                }
+            }
+
+            // Commit changes to database
+            await _unitOfWork.CommitAsync();
+
+            return new ApiResponse
+            {
+                status = StatusCodes.Status200OK.ToString(),
+                message = $"{processingPayments.Count()} expired processing payments cancelled successfully",
+                data = new
+                {
+                    CancelledCount = processingPayments.Count(),
+                    CancelledPaymentIds = processingPayments.Select(p => p.Id).ToList()
+                }
+            };
         }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error occurred while cancelling expired processing payments");
+            return new ApiResponse
+            {
+                status = StatusCodes.Status500InternalServerError.ToString(),
+                message = "An error occurred while processing the request",
+                data = null
+            };
+        }
+    }
 }
