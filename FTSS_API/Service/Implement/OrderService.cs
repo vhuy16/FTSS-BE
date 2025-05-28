@@ -131,9 +131,10 @@ public class OrderService : BaseService<OrderService>, IOrderService
 
                 // Get all product IDs from setup items
                 List<Guid> productIds = setupItems.Select(x => x.ProductId).ToList();
-                var products = await _unitOfWork.GetRepository<Product>()
-                    .GetListAsync(predicate: p => productIds.Contains(p.Id) && p.IsDelete.Equals(false));
-
+                // var products = await _unitOfWork.GetRepository<Product>()
+                //     .GetListAsync(predicate: p => productIds.Contains(p.Id) && p.IsDelete.Equals(false));
+                    var products = await _unitOfWork.Context.Set<Product>().AsNoTracking().AsQueryable()
+                        .Where(x => productIds.Contains(x.Id)&& x.IsDelete.Equals(false)).ToListAsync();
                 var productsDict = products.ToDictionary(x => x.Id, x => x);
 
                 // Create order details from setup items
@@ -167,8 +168,23 @@ public class OrderService : BaseService<OrderService>, IOrderService
                         orderDetails.Add(newOrderDetail);
 
                         // Update product quantity
-                        product.Quantity -= setupItem.Quantity;
-                        _unitOfWork.GetRepository<Product>().UpdateAsync(product);
+                        // Lấy lại sản phẩm từ DbContext để đảm bảo chỉ có một thực thể được theo dõi
+                        var productToUpdate = await _unitOfWork.GetRepository<Product>()
+                            .SingleOrDefaultAsync(predicate: p => p.Id == setupItem.ProductId && p.IsDelete == false);
+                        if (productToUpdate != null)
+                        {
+                            productToUpdate.Quantity -= setupItem.Quantity;
+                            _unitOfWork.GetRepository<Product>().UpdateAsync(productToUpdate);
+                        }
+                        else
+                        {
+                            return new ApiResponse
+                            {
+                                status = StatusCodes.Status400BadRequest.ToString(),
+                                message = $"Sản phẩm với ID {setupItem.ProductId} không tồn tại hoặc đã bị xóa.",
+                                data = null
+                            };
+                        }
                     }
                     else
                     {
@@ -219,9 +235,10 @@ public class OrderService : BaseService<OrderService>, IOrderService
 
                 // Get all product IDs from cart items
                 List<Guid> productIds = cartItems.Select(x => x.ProductId).ToList();
-                var products = await _unitOfWork.GetRepository<Product>()
-                    .GetListAsync(predicate: p => productIds.Contains(p.Id) && p.IsDelete.Equals(false));
-
+                // var products = await _unitOfWork.GetRepository<Product>()
+                //     .GetListAsync(predicate: p => productIds.Contains(p.Id) && p.IsDelete.Equals(false));
+                    var products = await _unitOfWork.Context.Set<Product>().AsNoTracking().AsQueryable()
+                        .Where(x => productIds.Contains(x.Id)&& x.IsDelete.Equals(false)).ToListAsync();
                 var productsDict = products.ToDictionary(x => x.Id, x => x);
 
                 // Create order details from cart items
@@ -255,8 +272,23 @@ public class OrderService : BaseService<OrderService>, IOrderService
                         orderDetails.Add(newOrderDetail);
 
                         // Update product quantity
-                        product.Quantity -= cartItem.Quantity;
-                        _unitOfWork.GetRepository<Product>().UpdateAsync(product);
+                        // Lấy lại sản phẩm từ DbContext để đảm bảo chỉ có một thực thể được theo dõi
+                        var productToUpdate = await _unitOfWork.GetRepository<Product>()
+                            .SingleOrDefaultAsync(predicate: p => p.Id == cartItem.ProductId && p.IsDelete == false);
+                        if (productToUpdate != null)
+                        {
+                            productToUpdate.Quantity -= cartItem.Quantity;
+                            _unitOfWork.GetRepository<Product>().UpdateAsync(productToUpdate);
+                        }
+                        else
+                        {
+                            return new ApiResponse
+                            {
+                                status = StatusCodes.Status400BadRequest.ToString(),
+                                message = $"Sản phẩm với ID {cartItem.ProductId} không tồn tại hoặc đã bị xóa.",
+                                data = null
+                            };
+                        }
                     }
                     else
                     {
