@@ -40,7 +40,7 @@ public class PaymentService : BaseService<PaymentService>, IPaymentService
     {
         order = await _unitOfWork.GetRepository<Order>().SingleOrDefaultAsync(
             predicate: o => o.Id.Equals(request.OrderId),
-            include: o => o.Include(o => o.OrderDetails).ThenInclude(od => od.Product) // Bao gồm OrderDetails và Product
+            include: o => o.Include(o => o.OrderDetails).ThenInclude(od => od.Product)
         );
 
         if (order == null)
@@ -89,7 +89,7 @@ public class PaymentService : BaseService<PaymentService>, IPaymentService
     // Xử lý trường hợp booking miễn phí
     if (paymentMethod == PaymenMethodEnum.FREE.GetDescriptionFromEnum())
     {
-        amountToPay = 0; // Đặt số tiền thanh toán là 0 cho booking FREE
+        amountToPay = 0;
     }
     else if (amountToPay <= 0)
     {
@@ -102,23 +102,12 @@ public class PaymentService : BaseService<PaymentService>, IPaymentService
     }
     else
     {
-        // Xử lý tạo Payment URL cho các phương thức thanh toán khác
-        if (paymentMethod == PaymenMethodEnum.PayOs.GetDescriptionFromEnum())
-        {
-            var result = await _payOSService.CreatePaymentUrlRegisterCreator(request.OrderId, request.BookingId);
-            if (result.IsSuccess && result.Value != null)
-            {
-                paymentUrl = result.Value.checkoutUrl;
-                orderCode = result.Value.orderCode;
-            }
-        }
-        else if (paymentMethod == PaymenMethodEnum.VnPay.GetDescriptionFromEnum())
+        if (paymentMethod == PaymenMethodEnum.VnPay.GetDescriptionFromEnum())
         {
             paymentUrl = await _vnPayService.CreatePaymentUrl(request.OrderId, request.BookingId);
         }
         else if (paymentMethod == PaymenMethodEnum.COD.GetDescriptionFromEnum())
         {
-            // COD không cần paymentUrl, chỉ cần tạo Payment với trạng thái Processing
             if (booking != null)
             {
                 return new ApiResponse
@@ -128,7 +117,6 @@ public class PaymentService : BaseService<PaymentService>, IPaymentService
                     status = StatusCodes.Status400BadRequest.ToString(),
                 };
             }
-            // Có thể thêm kiểm tra nếu Order hỗ trợ COD (nếu cần)
         }
         else
         {
@@ -149,9 +137,9 @@ public class PaymentService : BaseService<PaymentService>, IPaymentService
         BookingId = booking?.Id,
         PaymentMethod = paymentMethod,
         AmountPaid = amountToPay,
-        PaymentDate = DateTime.Now,
-        PaymentStatus = paymentMethod == PaymenMethodEnum.FREE.GetDescriptionFromEnum() 
-            ? PaymentStatusEnum.Completed.GetDescriptionFromEnum() 
+        PaymentDate = TimeUtils.GetCurrentSEATime(),
+        PaymentStatus = paymentMethod == PaymenMethodEnum.FREE.GetDescriptionFromEnum()
+            ? PaymentStatusEnum.Completed.GetDescriptionFromEnum()
             : PaymentStatusEnum.Processing.GetDescriptionFromEnum(),
         OrderCode = orderCode
     };
@@ -162,10 +150,7 @@ public class PaymentService : BaseService<PaymentService>, IPaymentService
     // Trừ số lượng sản phẩm nếu là COD
     if (paymentMethod == PaymenMethodEnum.COD.GetDescriptionFromEnum() && order != null)
     {
-        // Tạo dictionary để gộp số lượng cần trừ cho mỗi Product
         var productQuantities = new Dictionary<Guid, int>();
-
-        // Tính tổng số lượng cần trừ cho mỗi Product
         foreach (var orderDetail in order.OrderDetails)
         {
             if (orderDetail.Product != null)
@@ -176,7 +161,6 @@ public class PaymentService : BaseService<PaymentService>, IPaymentService
                 }
                 productQuantities[orderDetail.Product.Id] += orderDetail.Quantity;
 
-                // Kiểm tra tồn kho
                 if (orderDetail.Product.Quantity < productQuantities[orderDetail.Product.Id])
                 {
                     return new ApiResponse
@@ -189,7 +173,6 @@ public class PaymentService : BaseService<PaymentService>, IPaymentService
             }
         }
 
-        // Cập nhật số lượng cho từng Product
         foreach (var productEntry in productQuantities)
         {
             var product = order.OrderDetails
@@ -202,27 +185,64 @@ public class PaymentService : BaseService<PaymentService>, IPaymentService
         }
     }
 
-    // Commit tất cả thay đổi vào database
-    await _unitOfWork.CommitAsync();
+    // Commit với retry
+    bool isSuccess = false;
+    int retryCount = 3;
+    while (retryCount > 0)
+    {
+        try
+        {
+            isSuccess = await _unitOfWork.CommitAsync() > 0;
+            if (isSuccess) break;
+        }
+        catch (DbUpdateConcurrencyException ex)
+        {
+            _logger.LogError($"Concurrency conflict in CreatePayment, retrying... ({3 - retryCount + 1}/3) - Error: {ex.Message}");
+            retryCount--;
+            await Task.Delay(200);
+           
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError($"Commit failed in CreatePayment, retrying... ({3 - retryCount + 1}/3) - Error: {ex.Message}");
+            retryCount--;
+            await Task.Delay(200);
+        }
+    }
 
-    // Lấy lại payment vừa lưu bằng OrderCode
+    if (!isSuccess)
+    {
+        return new ApiResponse
+        {
+            status = StatusCodes.Status500InternalServerError.ToString(),
+            message = "Failed to save payment",
+            data = null
+        };
+    }
+
+    // Lấy lại payment vừa lưu
     var savedPayment = await _unitOfWork.GetRepository<Payment>().SingleOrDefaultAsync(
         predicate: p => p.OrderCode == orderCode
     );
 
     if (savedPayment == null)
     {
-        return new ApiResponse { message = "Failed to retrieve saved payment" };
+        return new ApiResponse
+        {
+            message = "Failed to retrieve saved payment",
+            status = StatusCodes.Status500InternalServerError.ToString(),
+            data = null
+        };
     }
 
-    // Trả về thông tin payment vừa lưu
+    // Trả về thông tin payment
     var responseData = new Dictionary<string, object>
     {
         ["PaymentId"] = savedPayment.Id,
-        ["Amount"] = savedPayment.AmountPaid
+        ["Amount"] = savedPayment.AmountPaid,
+        ["PaymentStatus"] = savedPayment.PaymentStatus
     };
 
-    // Chỉ thêm PaymentURL nếu không phải booking FREE
     if (paymentMethod != PaymenMethodEnum.FREE.GetDescriptionFromEnum() && !string.IsNullOrEmpty(paymentUrl))
     {
         responseData["PaymentURL"] = paymentUrl;
@@ -231,7 +251,7 @@ public class PaymentService : BaseService<PaymentService>, IPaymentService
     return new ApiResponse
     {
         status = StatusCodes.Status200OK.ToString(),
-        message = "Payment successful",
+        message = "Payment created successfully",
         data = responseData
     };
 }
