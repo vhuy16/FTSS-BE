@@ -182,7 +182,8 @@ public class UserService : BaseService<UserService>, IUserService
     Expression<Func<User, bool>> searchFilter = p =>
         p.UserName.Equals(loginRequest.Username) &&
         p.Password.Equals(PasswordUtil.HashPassword(loginRequest.Password)) &&
-        (p.IsDelete == false);
+        (p.IsDelete == false) 
+        && (p.Status != UserStatusEnum.Baned.GetDescriptionFromEnum());
 
     // Retrieve the user based on the search filter
     User user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(predicate: searchFilter);
