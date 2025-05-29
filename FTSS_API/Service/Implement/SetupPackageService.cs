@@ -233,20 +233,27 @@ namespace FTSS_API.Service.Implement
             {
                 // Lấy thông tin người dùng hiện tại
                 Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
-                var currentUser = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
-                    predicate: u => u.Id.Equals(userId) &&
-                                    u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) &&
-                                    u.IsDelete == false
-                );
+
+                string currentUserRole = null;
+                if (userId.HasValue)
+                {
+                    var currentUser = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
+                        predicate: u => u.Id.Equals(userId) &&
+                                        u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) &&
+                                        u.IsDelete == false
+                    );
+
+                    currentUserRole = currentUser?.Role;
+                }
 
                 // Xác định có phải là Manager không
-                bool isManager = currentUser.Role == RoleEnum.Manager.GetDescriptionFromEnum();
+                bool isManager = currentUserRole == RoleEnum.Manager.GetDescriptionFromEnum();
 
                 // Lấy danh sách SetupPackage theo điều kiện lọc
                 var setupPackagesQuery = await _unitOfWork.GetRepository<SetupPackage>().GetListAsync(
                     predicate: sp => sp.User != null &&
                                      sp.User.Role == RoleEnum.Manager.GetDescriptionFromEnum() &&
-                                     (isManager || sp.IsDelete == false) && // Nếu là Manager thì bỏ qua điều kiện IsDelete
+                                     (isManager || sp.IsDelete == false) && // Nếu không phải Manager thì chỉ lấy IsDelete == false
                                      (!minPrice.HasValue || sp.Price >= (decimal)minPrice.Value) &&
                                      (!maxPrice.HasValue || sp.Price <= (decimal)maxPrice.Value),
                     orderBy: sp => isAscending == true
