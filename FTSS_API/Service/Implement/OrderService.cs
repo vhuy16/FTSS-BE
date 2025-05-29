@@ -441,7 +441,40 @@ public class OrderService : BaseService<OrderService>, IOrderService
                     }
                 }
             }
+// Xóa CartItem nếu phương thức thanh toán là COD và đơn hàng được tạo từ Cart
+            if (createOrderRequest.PaymentMethod == PaymenMethodEnum.COD.GetDescriptionFromEnum() &&
+                createOrderRequest.CartItem != null && createOrderRequest.CartItem.Any())
+            {
+                try
+                {
+                    // Lấy danh sách CartItem cần xóa
+                    var cartItemsToDelete = await _unitOfWork.GetRepository<CartItem>()
+                        .GetListAsync(predicate: ci => createOrderRequest.CartItem.Contains(ci.Id) && ci.IsDelete == false);
 
+                    if (cartItemsToDelete.Any())
+                    {
+                        // Xóa các CartItem bằng cách đánh dấu IsDelete = true hoặc xóa vật lý tùy theo yêu cầu
+                        foreach (var cartItem in cartItemsToDelete)
+                        {
+                            cartItem.IsDelete = true; // Đánh dấu xóa mềm
+                            _unitOfWork.GetRepository<CartItem>().UpdateAsync(cartItem);
+                        }
+
+                        // Commit thay đổi
+                        bool isCartItemsDeleted = await _unitOfWork.CommitAsync() > 0;
+                        if (!isCartItemsDeleted)
+                        {
+                            _logger.LogError("Failed to delete CartItems after creating COD order.");
+                            // Không trả về lỗi ngay, chỉ ghi log vì đơn hàng đã được tạo thành công
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError($"Error occurred while deleting CartItems for COD order: {ex.Message}");
+                    // Không trả về lỗi ngay, chỉ ghi log vì đơn hàng đã được tạo thành công
+                }
+            }
             // Prepare order details for response
             var orderDetailsResponse = new List<CreateOrderResponse.OrderDetailCreateResponse>();
             foreach (var od in orderDetails)
