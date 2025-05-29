@@ -61,6 +61,9 @@ public class PaymentController : BaseController<PaymentController>
 
         return result.status == StatusCodes.Status200OK.ToString() ? Ok(result) : BadRequest(result);
     }
+    /// <summary>
+    /// API cập nhập thông tin ngân hàng cho user.
+    /// </summary>
     [HttpPut(ApiEndPointConstant.Payment.UpdateBankInfor)]
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
@@ -104,6 +107,9 @@ public class PaymentController : BaseController<PaymentController>
         var result = await _paymentService.GetPayments(page, size);
         return Ok(result);
     }
+    /// <summary>
+    /// API cập nhập trạng thái thanh toán
+    /// </summary>
     [HttpGet(ApiEndPointConstant.Payment.GetPaymentByStatus)]
     public async Task<IActionResult> GetPaymentsByStatus([FromQuery] string paymentStatus , [FromQuery] int page = 1, [FromQuery] int size = 10)
     {

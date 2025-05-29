@@ -116,7 +116,7 @@ namespace FTSS_API.Service.Implement
                 {
                     status = StatusCodes.Status500InternalServerError.ToString(),
                     message = "An error occurred while retrieving setup packages.",
-                    data = ex.Message
+                    data = null
                 };
             }
         }
@@ -222,7 +222,7 @@ namespace FTSS_API.Service.Implement
                 {
                     status = StatusCodes.Status500InternalServerError.ToString(),
                     message = "An error occurred while retrieving setup packages.",
-                    data = ex.Message
+                    data = null
                 };
             }
         }
@@ -327,7 +327,7 @@ namespace FTSS_API.Service.Implement
                 {
                     status = StatusCodes.Status500InternalServerError.ToString(),
                     message = "An error occurred while retrieving setup packages.",
-                    data = ex.Message
+                    data = null
                 };
             }
         }
@@ -405,7 +405,7 @@ namespace FTSS_API.Service.Implement
                 {
                     status = StatusCodes.Status500InternalServerError.ToString(),
                     message = "An error occurred while retrieving setup package details.",
-                    data = ex.Message
+                    data = null
                 };
             }
         }

@@ -150,8 +150,8 @@ public class IssueService : BaseService<IssueService>, IIssueService
         };
     }
 
-    public async Task<ApiResponse> GetAllIssues(int page, int size, bool? isAscending, Guid? issueCategoryId = null,
-        string issueTitle = null)
+    public async Task<ApiResponse> GetAllIssues(int page, int size, bool? isAscending, Guid? issueCategoryId = null, 
+        string issueTitle = null, bool includeDeletedSolutions = false)
     {
         Expression<Func<Issue, bool>> predicate = i => true;
 
@@ -160,7 +160,6 @@ public class IssueService : BaseService<IssueService>, IIssueService
             predicate = predicate.And(i => i.IssueCategoryId == issueCategoryId.Value);
         }
 
-        // Lọc theo tên của IssueCategory
         if (!string.IsNullOrEmpty(issueTitle))
         {
             predicate = predicate.And(i => i.Title.Contains(issueTitle));
@@ -179,8 +178,8 @@ public class IssueService : BaseService<IssueService>, IIssueService
                 predicate,
                 orderBy,
                 include: i => i
-                    .Include(i => i.IssueCategory) // ✅ Cần include để filter theo Name
-                    .Include(i => i.Solutions.Where(s => s.IsDelete == false))
+                    .Include(i => i.IssueCategory)
+                    .Include(i => includeDeletedSolutions ? i.Solutions : i.Solutions.Where(s => s.IsDelete == false))
                     .ThenInclude(s => s.SolutionProducts)
                     .ThenInclude(sp => sp.Product)
                     .ThenInclude(p => p.Images),
@@ -189,10 +188,9 @@ public class IssueService : BaseService<IssueService>, IIssueService
 
         var mapped = _mapper.Map<List<IssueResponse>>(issues.Items);
 
-        int totalItems = issues.Total; // Total number of items without pagination
-        int totalPages = (int)Math.Ceiling((double)totalItems / size); // Calculate total pages
+        int totalItems = issues.Total;
+        int totalPages = (int)Math.Ceiling((double)totalItems / size);
 
-        // Paginate result
         var paginatedResult = new Paginate<IssueResponse>
         {
             Page = page,
@@ -205,7 +203,7 @@ public class IssueService : BaseService<IssueService>, IIssueService
         return new ApiResponse
         {
             status = StatusCodes.Status200OK.ToString(),
-            message = "Issues retrieved successfully.",
+            message = "Lấy danh sách vấn đề thành công.",
             data = paginatedResult
         };
     }

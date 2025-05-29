@@ -43,6 +43,13 @@ namespace FTSS_API.Controller
         /// <summary>
         /// API lấy danh sách tất cả các sự cố
         /// </summary>
+        /// <param name="issueTitle">Tiêu đề sự cố để lọc (tùy chọn)</param>
+        /// <param name="page">Số trang (mặc định: 1)</param>
+        /// <param name="size">Kích thước trang (mặc định: 10)</param>
+        /// <param name="isAscending">Sắp xếp theo thứ tự tăng dần (true) hoặc giảm dần (false) (tùy chọn)</param>
+        /// <param name="issueCategoryId">ID danh mục sự cố để lọc (tùy chọn)</param>
+        /// <param name="includeDeletedIssues">Lấy cả các sự cố đã bị xóa mềm (mặc định: false)</param>
+        /// <returns>Danh sách các sự cố với phân trang</returns>
         [HttpGet(ApiEndPointConstant.Issue.GetAllIssues)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
         [ProducesErrorResponseType(typeof(ProblemDetails))]
@@ -51,9 +58,10 @@ namespace FTSS_API.Controller
             [FromQuery] int page = 1,
             [FromQuery] int size = 10,
             [FromQuery] bool? isAscending = null,
-            [FromQuery] Guid? issueCategoryId = null)
+            [FromQuery] Guid? issueCategoryId = null,
+            [FromQuery] bool includeDeletedIssues = false)
         {
-            var response = await _issueService.GetAllIssues(page, size, isAscending, issueCategoryId, issueTitle);
+            var response = await _issueService.GetAllIssues(page, size, isAscending, issueCategoryId, issueTitle, includeDeletedIssues);
             return Ok(response);
         }
 
