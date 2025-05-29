@@ -2398,7 +2398,8 @@ namespace FTSS_API.Service.Implement
             try
             {
                 var bookings = await _unitOfWork.GetRepository<Booking>().GetListAsync(
-                    predicate: b => b.OrderId == orderId,
+                    predicate: b => b.OrderId == orderId &&
+                                    b.Status == BookingStatusEnum.COMPLETED.GetDescriptionFromEnum(), // Chỉ lấy Booking có Status COMPLETED
                     include: b => b.Include(bk => bk.BookingDetails)
                                    .ThenInclude(bd => bd.ServicePackage)
                 );
@@ -2408,7 +2409,7 @@ namespace FTSS_API.Service.Implement
                     return new ApiResponse
                     {
                         status = StatusCodes.Status200OK.ToString(),
-                        message = "Không tìm thấy lịch sử đặt lịch cho đơn hàng này.",
+                        message = "Không tìm thấy lịch sử đặt lịch hoàn tất cho đơn hàng này.",
                         data = null
                     };
                 }
