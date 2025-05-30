@@ -1552,10 +1552,74 @@ namespace FTSS_API.Service.Implement
                 {
                     return new ApiResponse
                     {
-                        status = StatusCodes.Status404NotFound.ToString(),
+                        status = StatusCodes.Status404NotFound.GetDescriptionFromEnum(),
                         message = "Không tìm thấy nhiệm vụ.",
                         data = null
                     };
+                }
+
+                // Danh sách status được phép cập nhật
+                var allowedStatuses = new[]
+                {
+            MissionStatusEnum.Completed.GetDescriptionFromEnum(),
+            MissionStatusEnum.NotDone.GetDescriptionFromEnum(),
+            MissionStatusEnum.Reported.GetDescriptionFromEnum(),
+            MissionStatusEnum.NotStarted.GetDescriptionFromEnum()
+        };
+
+                if (!string.IsNullOrWhiteSpace(request.Status))
+                {
+                    if (!allowedStatuses.Contains(request.Status))
+                    {
+                        return new ApiResponse
+                        {
+                            status = StatusCodes.Status400BadRequest.GetDescriptionFromEnum(),
+                            message = "Chỉ được phép cập nhật trạng thái: NotStarted, Completed, NotDone, hoặc Reported.",
+                            data = null
+                        };
+                    }
+
+                    if (request.Status == MissionStatusEnum.Completed.GetDescriptionFromEnum() &&
+                        mission.Status != MissionStatusEnum.Done.GetDescriptionFromEnum())
+                    {
+                        return new ApiResponse
+                        {
+                            status = StatusCodes.Status400BadRequest.GetDescriptionFromEnum(),
+                            message = "Chỉ được cập nhật sang trạng thái Completed nếu nhiệm vụ đang ở trạng thái Done.",
+                            data = null
+                        };
+                    }
+
+                    if (request.Status == MissionStatusEnum.NotStarted.GetDescriptionFromEnum() &&
+                        mission.Status != MissionStatusEnum.NotStarted.GetDescriptionFromEnum())
+                    {
+                        return new ApiResponse
+                        {
+                            status = StatusCodes.Status400BadRequest.GetDescriptionFromEnum(),
+                            message = "Chỉ được cập nhật sang trạng thái NotStarted nếu nhiệm vụ hiện tại cũng đang là NotStarted.",
+                            data = null
+                        };
+                    }
+                }
+
+                // Kiểm tra nếu truyền các field khác thì trạng thái hiện tại phải là NotStarted
+                bool isUpdatingOtherFields =
+                    (!string.IsNullOrWhiteSpace(request.MissionName) && request.MissionName != mission.MissionName) ||
+                    (!string.IsNullOrWhiteSpace(request.MissionDescription) && request.MissionDescription != mission.MissionDescription) ||
+                    (request.TechnicianId.HasValue && request.TechnicianId.Value != mission.Userid);
+
+                if (isUpdatingOtherFields)
+                {
+                    if (mission.Status != MissionStatusEnum.NotStarted.GetDescriptionFromEnum() ||
+                        request.Status != MissionStatusEnum.NotStarted.GetDescriptionFromEnum())
+                    {
+                        return new ApiResponse
+                        {
+                            status = StatusCodes.Status400BadRequest.GetDescriptionFromEnum(),
+                            message = "Chỉ được phép thay đổi thông tin khác khi nhiệm vụ đang ở trạng thái NotStarted và cập nhật trạng thái là NotStarted.",
+                            data = null
+                        };
+                    }
                 }
 
                 // Validate MissionName
@@ -1563,7 +1627,7 @@ namespace FTSS_API.Service.Implement
                 {
                     return new ApiResponse
                     {
-                        status = StatusCodes.Status400BadRequest.ToString(),
+                        status = StatusCodes.Status400BadRequest.GetDescriptionFromEnum(),
                         message = "Tên nhiệm vụ phải có ít nhất 3 ký tự.",
                         data = null
                     };
@@ -1574,7 +1638,7 @@ namespace FTSS_API.Service.Implement
                 {
                     return new ApiResponse
                     {
-                        status = StatusCodes.Status400BadRequest.ToString(),
+                        status = StatusCodes.Status400BadRequest.GetDescriptionFromEnum(),
                         message = "Mô tả nhiệm vụ phải có ít nhất 10 ký tự.",
                         data = null
                     };
@@ -1584,13 +1648,13 @@ namespace FTSS_API.Service.Implement
                 bool isSameName = string.IsNullOrWhiteSpace(request.MissionName) || request.MissionName == mission.MissionName;
                 bool isSameDesc = string.IsNullOrWhiteSpace(request.MissionDescription) || request.MissionDescription == mission.MissionDescription;
                 bool isSameTech = !request.TechnicianId.HasValue || request.TechnicianId.Value == mission.Userid;
-                bool isSameStatus = string.IsNullOrWhiteSpace(request.Status);
+                bool isSameStatus = string.IsNullOrWhiteSpace(request.Status) || request.Status == mission.Status;
 
                 if (isSameName && isSameDesc && isSameTech && isSameStatus)
                 {
                     return new ApiResponse
                     {
-                        status = StatusCodes.Status400BadRequest.ToString(),
+                        status = StatusCodes.Status400BadRequest.GetDescriptionFromEnum(),
                         message = "Vui lòng thay đổi thông tin để cập nhật.",
                         data = null
                     };
@@ -1609,7 +1673,7 @@ namespace FTSS_API.Service.Implement
                     {
                         return new ApiResponse
                         {
-                            status = StatusCodes.Status400BadRequest.ToString(),
+                            status = StatusCodes.Status400BadRequest.GetDescriptionFromEnum(),
                             message = "Kỹ thuật viên không hợp lệ, không tồn tại hoặc không phải là kỹ thuật viên.",
                             data = null
                         };
@@ -1624,7 +1688,7 @@ namespace FTSS_API.Service.Implement
                     {
                         return new ApiResponse
                         {
-                            status = StatusCodes.Status400BadRequest.ToString(),
+                            status = StatusCodes.Status400BadRequest.GetDescriptionFromEnum(),
                             message = $"Kỹ thuật viên đã có nhiệm vụ vào ngày {mission.MissionSchedule.Value.Date:dd/MM/yyyy}.",
                             data = null
                         };
@@ -1637,8 +1701,6 @@ namespace FTSS_API.Service.Implement
                 mission.MissionName = !string.IsNullOrWhiteSpace(request.MissionName) ? request.MissionName : mission.MissionName;
                 mission.MissionDescription = !string.IsNullOrWhiteSpace(request.MissionDescription) ? request.MissionDescription : mission.MissionDescription;
 
-                // Nếu có cập nhật Status
-                // Nếu có cập nhật Status
                 if (!string.IsNullOrWhiteSpace(request.Status))
                 {
                     mission.Status = request.Status;
@@ -1646,22 +1708,22 @@ namespace FTSS_API.Service.Implement
                     if (mission.OrderId.HasValue && !mission.BookingId.HasValue)
                     {
                         var order = await _unitOfWork.GetRepository<Order>()
-                            .SingleOrDefaultAsync(selector: x => x, predicate: o => o.Id == mission.OrderId.Value);
+                    .SingleOrDefaultAsync(selector: x => x, predicate: o => o.Id == mission.OrderId.Value);
 
                         if (order != null)
                         {
                             switch (request.Status)
                             {
-                                case nameof(MissionStatusEnum.Cancel):
-                                    order.Status = OrderStatus.CANCELLED.ToString(); break;
-                                case nameof(MissionStatusEnum.NotDone):
-                                    order.Status = OrderStatus.NOTDONE.ToString();
-                                    order.IsAssigned = false; 
+                                case var s when s == MissionStatusEnum.Cancel.GetDescriptionFromEnum():
+                                    order.Status = OrderStatus.CANCELLED.GetDescriptionFromEnum(); break;
+                                case var s when s == MissionStatusEnum.NotDone.GetDescriptionFromEnum():
+                                    order.Status = OrderStatus.NOTDONE.GetDescriptionFromEnum();
+                                    order.IsAssigned = false;
                                     break;
-                                case nameof(MissionStatusEnum.Completed):
-                                    order.Status = OrderStatus.COMPLETED.ToString(); break;
-                                case nameof(MissionStatusEnum.Reported):
-                                    order.Status = OrderStatus.NOTDONE.ToString();
+                                case var s when s == MissionStatusEnum.Completed.GetDescriptionFromEnum():
+                                    order.Status = OrderStatus.COMPLETED.GetDescriptionFromEnum(); break;
+                                case var s when s == MissionStatusEnum.Reported.GetDescriptionFromEnum():
+                                    order.Status = OrderStatus.NOTDONE.GetDescriptionFromEnum();
                                     order.IsAssigned = false;
                                     break;
                             }
@@ -1672,21 +1734,21 @@ namespace FTSS_API.Service.Implement
                     else if (mission.BookingId.HasValue && !mission.OrderId.HasValue)
                     {
                         var booking = await _unitOfWork.GetRepository<Booking>()
-                            .SingleOrDefaultAsync(selector: x => x, predicate: b => b.Id == mission.BookingId.Value);
+                    .SingleOrDefaultAsync(selector: x => x, predicate: b => b.Id == mission.BookingId.Value);
                         if (booking != null)
                         {
                             switch (request.Status)
                             {
-                                case nameof(MissionStatusEnum.Cancel):
-                                    booking.Status = BookingStatusEnum.MISSED.ToString(); break;
-                                case nameof(MissionStatusEnum.NotDone):
-                                    booking.Status = BookingStatusEnum.NOTDONE.ToString();
-                                    booking.IsAssigned = false; 
+                                case var s when s == MissionStatusEnum.Cancel.GetDescriptionFromEnum():
+                                    booking.Status = BookingStatusEnum.MISSED.GetDescriptionFromEnum(); break;
+                                case var s when s == MissionStatusEnum.NotDone.GetDescriptionFromEnum():
+                                    booking.Status = BookingStatusEnum.NOTDONE.GetDescriptionFromEnum();
+                                    booking.IsAssigned = false;
                                     break;
-                                case nameof(MissionStatusEnum.Completed):
-                                    booking.Status = BookingStatusEnum.COMPLETED.ToString(); break;
-                                case nameof(MissionStatusEnum.Reported):
-                                    booking.Status = BookingStatusEnum.NOTDONE.ToString();
+                                case var s when s == MissionStatusEnum.Completed.GetDescriptionFromEnum():
+                                    booking.Status = BookingStatusEnum.COMPLETED.GetDescriptionFromEnum(); break;
+                                case var s when s == MissionStatusEnum.Reported.GetDescriptionFromEnum():
+                                    booking.Status = BookingStatusEnum.NOTDONE.GetDescriptionFromEnum();
                                     booking.IsAssigned = false;
                                     break;
                             }
@@ -1701,7 +1763,7 @@ namespace FTSS_API.Service.Implement
 
                 return new ApiResponse
                 {
-                    status = StatusCodes.Status200OK.ToString(),
+                    status = StatusCodes.Status200OK.GetDescriptionFromEnum(),
                     message = "Cập nhật nhiệm vụ thành công.",
                     data = null
                 };
@@ -1710,7 +1772,7 @@ namespace FTSS_API.Service.Implement
             {
                 return new ApiResponse
                 {
-                    status = StatusCodes.Status500InternalServerError.ToString(),
+                    status = StatusCodes.Status500InternalServerError.GetDescriptionFromEnum(),
                     message = "Đã xảy ra lỗi khi cập nhật nhiệm vụ.",
                     data = ex.Message
                 };
