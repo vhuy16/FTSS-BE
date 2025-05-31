@@ -1683,20 +1683,6 @@ namespace FTSS_API.Service.Implement
                         };
                     }
 
-                    var existingMission = await _unitOfWork.GetRepository<Mission>().SingleOrDefaultAsync(
-                        predicate: m => m.Userid.Equals(request.TechnicianId) &&
-                                        m.MissionSchedule.Value.Date == mission.MissionSchedule.Value.Date &&
-                                        m.IsDelete == false);
-
-                    if (existingMission != null)
-                    {
-                        return new ApiResponse
-                        {
-                            status = StatusCodes.Status400BadRequest.GetDescriptionFromEnum(),
-                            message = $"Kỹ thuật viên đã có nhiệm vụ vào ngày {mission.MissionSchedule.Value.Date:dd/MM/yyyy}.",
-                            data = null
-                        };
-                    }
 
                     mission.Userid = request.TechnicianId;
                 }
