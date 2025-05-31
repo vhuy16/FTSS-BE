@@ -1561,11 +1561,11 @@ namespace FTSS_API.Service.Implement
                 // Danh sách status được phép cập nhật
                 var allowedStatuses = new[]
                 {
-            MissionStatusEnum.Completed.GetDescriptionFromEnum(),
-            MissionStatusEnum.NotDone.GetDescriptionFromEnum(),
-            MissionStatusEnum.Reported.GetDescriptionFromEnum(),
-            MissionStatusEnum.NotStarted.GetDescriptionFromEnum()
-        };
+    MissionStatusEnum.Completed.GetDescriptionFromEnum(),
+    MissionStatusEnum.NotDone.GetDescriptionFromEnum(),
+    MissionStatusEnum.Reported.GetDescriptionFromEnum(),
+    MissionStatusEnum.NotStarted.GetDescriptionFromEnum()
+};
 
                 if (!string.IsNullOrWhiteSpace(request.Status))
                 {
@@ -1574,35 +1574,13 @@ namespace FTSS_API.Service.Implement
                         return new ApiResponse
                         {
                             status = StatusCodes.Status400BadRequest.GetDescriptionFromEnum(),
-                            message = "Chỉ được phép cập nhật trạng thái: NotStarted, Completed, NotDone, hoặc Reported.",
-                            data = null
-                        };
-                    }
-
-                    if (request.Status == MissionStatusEnum.Completed.GetDescriptionFromEnum() &&
-                        mission.Status != MissionStatusEnum.Done.GetDescriptionFromEnum())
-                    {
-                        return new ApiResponse
-                        {
-                            status = StatusCodes.Status400BadRequest.GetDescriptionFromEnum(),
-                            message = "Chỉ được cập nhật sang trạng thái Completed nếu nhiệm vụ đang ở trạng thái Done.",
-                            data = null
-                        };
-                    }
-
-                    if (request.Status == MissionStatusEnum.NotStarted.GetDescriptionFromEnum() &&
-                        mission.Status != MissionStatusEnum.NotStarted.GetDescriptionFromEnum())
-                    {
-                        return new ApiResponse
-                        {
-                            status = StatusCodes.Status400BadRequest.GetDescriptionFromEnum(),
-                            message = "Chỉ được cập nhật sang trạng thái NotStarted nếu nhiệm vụ hiện tại cũng đang là NotStarted.",
+                            message = "Chỉ được phép cập nhật trạng thái: Chưa xong, Hoàn tất, hoặc Báo cáo.",
                             data = null
                         };
                     }
                 }
 
-                // Kiểm tra nếu truyền các field khác thì trạng thái hiện tại phải là NotStarted
+                // 🟡 Di chuyển phần kiểm tra các trường khác lên trước
                 bool isUpdatingOtherFields =
                     (!string.IsNullOrWhiteSpace(request.MissionName) && request.MissionName != mission.MissionName) ||
                     (!string.IsNullOrWhiteSpace(request.MissionDescription) && request.MissionDescription != mission.MissionDescription) ||
@@ -1616,7 +1594,33 @@ namespace FTSS_API.Service.Implement
                         return new ApiResponse
                         {
                             status = StatusCodes.Status400BadRequest.GetDescriptionFromEnum(),
-                            message = "Chỉ được phép thay đổi thông tin khác khi nhiệm vụ đang ở trạng thái NotStarted và cập nhật trạng thái là NotStarted.",
+                            message = "Chỉ được phép thay đổi thông tin khác khi nhiệm vụ đang ở trạng thái Chưa bắt đầu.",
+                            data = null
+                        };
+                    }
+                }
+
+                // 🟡 Tiếp theo kiểm tra Completed sau
+                if (!string.IsNullOrWhiteSpace(request.Status))
+                {
+                    if (request.Status == MissionStatusEnum.Completed.GetDescriptionFromEnum() &&
+                        mission.Status != MissionStatusEnum.Done.GetDescriptionFromEnum())
+                    {
+                        return new ApiResponse
+                        {
+                            status = StatusCodes.Status400BadRequest.GetDescriptionFromEnum(),
+                            message = "Chỉ được cập nhật sang trạng thái Hoàn tất nếu nhiệm vụ đang ở trạng thái Xong công việc.",
+                            data = null
+                        };
+                    }
+
+                    if (request.Status == MissionStatusEnum.NotStarted.GetDescriptionFromEnum() &&
+                        mission.Status != MissionStatusEnum.NotStarted.GetDescriptionFromEnum())
+                    {
+                        return new ApiResponse
+                        {
+                            status = StatusCodes.Status400BadRequest.GetDescriptionFromEnum(),
+                            message = "Không được phép cập nhật.",
                             data = null
                         };
                     }
