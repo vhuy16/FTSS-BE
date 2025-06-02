@@ -466,7 +466,8 @@ namespace FTSS_API.Service.Implement
                                     !new[] {
                         BookingStatusEnum.DONE.ToString(),
                         BookingStatusEnum.CANCELLED.ToString(),
-                        BookingStatusEnum.MISSED.ToString()
+                        BookingStatusEnum.MISSED.ToString(),
+                        BookingStatusEnum.COMPLETED.ToString(),
                                     }.Contains(b.Status)
                 );
 
