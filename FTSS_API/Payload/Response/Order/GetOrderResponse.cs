@@ -19,6 +19,7 @@ namespace FTSS_API.Payload.Response.Order
         public string? BuyerName { get; set; }
         public DateTime? InstallationDate { get; set; }
         public Guid? MissionId { get; set; }
+        public string? BookingStatus { get; set; }
         public string? CancelReason { get; set; }
         public List<MissionImageResponse> Images { get; set; } = new();
 
