@@ -504,7 +504,7 @@ namespace FTSS_API.Service.Implement
                     return new ApiResponse
                     {
                         status = StatusCodes.Status400BadRequest.ToString(),
-                        message = "SetupName cannot be empty, must be uppercase, and must be less than 10 characters.",
+                        message = "SetupName cannot be empty, must be uppercase.",
                         data = null
                     };
                 }
@@ -922,12 +922,12 @@ namespace FTSS_API.Service.Implement
                 // Validate setup name if provided
                 if (!string.IsNullOrWhiteSpace(request.SetupName))
                 {
-                    if (request.SetupName.Length > 10 || !char.IsUpper(request.SetupName.Trim()[0]))
+                    if (!char.IsUpper(request.SetupName.Trim()[0]))
                     {
                         return new ApiResponse
                         {
                             status = StatusCodes.Status400BadRequest.ToString(),
-                            message = "SetupName must be uppercase and less than 10 characters.",
+                            message = "SetupName must be uppercase.",
                             data = null
                         };
                     }

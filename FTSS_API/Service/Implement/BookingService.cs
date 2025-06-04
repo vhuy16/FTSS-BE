@@ -1321,13 +1321,13 @@ namespace FTSS_API.Service.Implement
         {
             Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
 
-            var userr = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
+            var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
                 predicate: u => u.Id.Equals(userId) &&
                                 u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) &&
                                 u.IsDelete == false &&
                                 u.Role.Equals(RoleEnum.Technician.GetDescriptionFromEnum()));
 
-            if (userr == null)
+            if (user == null)
             {
                 return new ApiResponse
                 {
@@ -1465,6 +1465,10 @@ namespace FTSS_API.Service.Implement
                     }
                 }
 
+                // Trả về BookingCode hoặc OrderCode theo yêu cầu
+                string responseBookingCode = t.BookingId.HasValue && t.Booking != null ? t.Booking.BookingCode ?? "Không có" : "Không có";
+                string responseOrderCode = t.OrderId.HasValue && t.Order != null ? t.Order.OrderCode ?? "Không có" : "Không có";
+
                 response.Add(new GetListTaskTechResponse
                 {
                     Id = t.Id,
@@ -1476,14 +1480,14 @@ namespace FTSS_API.Service.Implement
                     EndMissionSchedule = t.EndMissionSchedule,
                     CancelReason = t.CancelReason,
                     FullName = fullName,
-                    Address = t.Address,
-                    PhoneNumber = t.PhoneNumber,
+                    Address = string.IsNullOrEmpty(t.Address) ? "Không có" : t.Address,
+                    PhoneNumber = string.IsNullOrEmpty(t.PhoneNumber) ? "Không có" : t.PhoneNumber,
                     BookingId = t.BookingId,
-                    OrderId = finalOrderId, // ✅ Dữ liệu từ Order nếu có hoặc từ Booking nếu không có
-                    BookingCode = t.Booking?.BookingCode,
-                    BookingImage = t.Booking?.BookingImage,
-                    OrderCode = orderCode, // ✅
-                    InstallationDate = installationDate, // ✅
+                    OrderId = finalOrderId,
+                    BookingCode = responseBookingCode,
+                    BookingImage = t.BookingId.HasValue && t.Booking != null ? t.Booking.BookingImage ?? "Không có" : "Không có",
+                    OrderCode = responseOrderCode,
+                    InstallationDate = installationDate,
                     Services = servicePackages,
                     SetupPackage = setupPackage
                 });
@@ -2046,7 +2050,7 @@ namespace FTSS_API.Service.Implement
                 SetupPackageResponse setupPackageResponse = null;
                 Order? orderInfo = null;
 
-                // Trường hợp 1: Có OrderId, không có BookingId → lấy Order trực tiếp
+                // Trường hợp 1: Có OrderId, không có BookingId
                 if (mission.OrderId.HasValue && !mission.BookingId.HasValue)
                 {
                     orderInfo = await _unitOfWork.GetRepository<Order>().SingleOrDefaultAsync(
@@ -2063,7 +2067,7 @@ namespace FTSS_API.Service.Implement
 
                     setupPackageResponse = GenerateSetupPackageResponse(orderInfo?.SetupPackage);
                 }
-                // Trường hợp 2: Có BookingId, không có OrderId → lấy Order từ Booking
+                // Trường hợp 2: Có BookingId, không có OrderId
                 else if (mission.BookingId.HasValue && !mission.OrderId.HasValue)
                 {
                     var booking = await _unitOfWork.GetRepository<Booking>().SingleOrDefaultAsync(
@@ -2084,7 +2088,7 @@ namespace FTSS_API.Service.Implement
                     setupPackageResponse = GenerateSetupPackageResponse(orderInfo?.SetupPackage);
                 }
 
-                // Lấy danh sách dịch vụ nếu có Booking
+                // Dịch vụ từ booking nếu có
                 var servicePackages = new List<ServicePackageResponse>();
                 if (mission.Booking != null)
                 {
@@ -2099,6 +2103,19 @@ namespace FTSS_API.Service.Implement
                     }
                 }
 
+                // Xử lý các giá trị trả về để không null
+                string responseBookingCode = mission.BookingId.HasValue && mission.Booking != null
+                    ? mission.Booking.BookingCode ?? "Không có"
+                    : "Không có";
+
+                string responseOrderCode = mission.OrderId.HasValue && orderInfo != null
+                    ? orderInfo.OrderCode ?? "Không có"
+                    : "Không có";
+
+                string responseBookingImage = mission.BookingId.HasValue && mission.Booking != null
+                    ? mission.Booking.BookingImage ?? "Không có"
+                    : "Không có";
+
                 // Tạo phản hồi
                 var response = new GetListTaskTechResponse
                 {
@@ -2111,13 +2128,13 @@ namespace FTSS_API.Service.Implement
                     EndMissionSchedule = mission.EndMissionSchedule,
                     CancelReason = mission.CancelReason,
                     FullName = fullName,
-                    Address = mission.Address,
-                    PhoneNumber = mission.PhoneNumber,
+                    Address = string.IsNullOrEmpty(mission.Address) ? "Không có" : mission.Address,
+                    PhoneNumber = string.IsNullOrEmpty(mission.PhoneNumber) ? "Không có" : mission.PhoneNumber,
                     BookingId = mission.BookingId,
                     OrderId = mission.OrderId ?? orderInfo?.Id,
-                    BookingCode = mission.Booking?.BookingCode,
-                    BookingImage = mission.Booking?.BookingImage,
-                    OrderCode = orderInfo?.OrderCode,
+                    BookingCode = responseBookingCode,
+                    BookingImage = responseBookingImage,
+                    OrderCode = responseOrderCode,
                     InstallationDate = orderInfo?.InstallationDate,
                     Services = servicePackages,
                     SetupPackage = setupPackageResponse
