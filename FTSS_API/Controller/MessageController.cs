@@ -34,6 +34,7 @@ public class ChatController : ControllerBase
         _logger = logger;
         _supabaseImageService = supabaseImageService;
     }
+
     /// <summary>
     /// Lấy danh sách tin nhắn trong một phòng chat hoặc tất cả tin nhắn của người dùng.
     /// </summary>
@@ -168,6 +169,7 @@ public class ChatController : ControllerBase
             return StatusCode(500, "An error occurred while retrieving messages.");
         }
     }
+
     /// <summary>
     /// Gửi một tin nhắn mới (văn bản hoặc media) vào một phòng chat.
     /// </summary>
@@ -278,6 +280,7 @@ public class ChatController : ControllerBase
             return StatusCode(500, "An error occurred while sending the message.");
         }
     }
+
     /// <summary>
     /// Tạo một phòng chat mới giữa Customer và Manager.
     /// </summary>
@@ -354,6 +357,7 @@ public class ChatController : ControllerBase
             return StatusCode(500, "An error occurred while creating the room.");
         }
     }
+
     /// <summary>
     /// Lấy danh sách các phòng chat của người dùng (Customer hoặc Manager).
     /// </summary>
@@ -362,92 +366,101 @@ public class ChatController : ControllerBase
     /// <response code="401">Người dùng không hợp lệ hoặc không có trạng thái Available.</response>
     /// <response code="403">Người dùng không phải Customer hoặc Manager.</response>
     /// <response code="500">Lỗi hệ thống khi truy xuất danh sách phòng chat.</response>
-    [HttpGet("rooms")]
-    public async Task<IActionResult> GetRooms()
+   [HttpGet("rooms")]
+public async Task<IActionResult> GetRooms()
+{
+    try
     {
-        try
+        var userId = UserUtil.GetAccountId(HttpContext);
+        if (!userId.HasValue)
         {
-            var userId = UserUtil.GetAccountId(HttpContext);
-            if (!userId.HasValue)
-            {
-                _logger.LogWarning("Unauthorized access attempt: Invalid user.");
-                return Unauthorized("Invalid user.");
-            }
-
-            var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
-                predicate: u =>
-                    u.Id == userId.Value && u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()));
-            if (user == null)
-            {
-                _logger.LogWarning($"User {userId} not found or not available.");
-                return Unauthorized("User not found or not available.");
-            }
-
-            if (user.Role != RoleEnum.Customer.GetDescriptionFromEnum() &&
-                user.Role != RoleEnum.Manager.GetDescriptionFromEnum())
-            {
-                _logger.LogWarning($"User {user.UserName} with role {user.Role} attempted to access rooms.");
-                return Forbid("Only Customers and Managers can access rooms.");
-            }
-
-            IPostgrestTable<Room> query = _supabase.From<Room>();
-            if (user.Role == RoleEnum.Customer.GetDescriptionFromEnum())
-            {
-                query = query.Filter("customer_id", Constants.Operator.Equals, user.Id.ToString());
-            }
-            else
-            {
-                query = query.Filter("manager_id", Constants.Operator.Equals, user.Id.ToString());
-            }
-
-            var response = await query.Get();
-            var rooms = response.Models;
-
-            var roomDtos = new List<RoomDto>();
-            foreach (var room in rooms)
-            {
-                // Lấy tin nhắn mới nhất
-                var latestMessage = await _supabase.From<Message>()
-                    .Filter("room_id", Constants.Operator.Equals, room.Id.ToString())
-                    .Order("timestamp", Constants.Ordering.Descending)
-                    .Limit(1)
-                    .Get();
-
-                // Nếu không có tin nhắn thì bỏ qua room này
-                if (!latestMessage.Models.Any())
-                {
-                    continue;
-                }
-
-                var manager = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
-                    predicate: u => u.Id == room.ManagerId);
-
-                var customer = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
-                    predicate: u => u.Id == room.CustomerId);
-
-                DateTime? latestMessageTime = TimeUtils.ConvertToSEATime(latestMessage.Models.First().Timestamp);
-
-                roomDtos.Add(new RoomDto
-                {
-                    Id = room.Id,
-                    CustomerId = room.CustomerId,
-                    ManagerId = room.ManagerId,
-                    ManagerName = manager?.UserName ?? "Unknown",
-                    CustomerName = customer?.UserName ?? "Unknown",
-                    CreatedAt = TimeUtils.ConvertToSEATime(room.CreatedAt),
-                    LatestMessageTime = latestMessageTime
-                });
-            }
-
-            _logger.LogInformation($"Retrieved {roomDtos.Count} rooms for user {user.UserName}.");
-            return Ok(roomDtos);
+            _logger.LogWarning("Unauthorized access attempt: Invalid user.");
+            return Unauthorized("Invalid user.");
         }
-        catch (Exception ex)
+
+        var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
+            predicate: u => u.Id == userId.Value && u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()));
+        if (user == null)
         {
-            _logger.LogError(ex, "Error retrieving rooms.");
-            return StatusCode(500, "An error occurred while retrieving rooms.");
+            _logger.LogWarning($"User {userId} not found or not available.");
+            return Unauthorized("User not found or not available.");
         }
+
+        if (user.Role != RoleEnum.Customer.GetDescriptionFromEnum() &&
+            user.Role != RoleEnum.Manager.GetDescriptionFromEnum())
+        {
+            _logger.LogWarning($"User {user.UserName} with role {user.Role} attempted to access rooms.");
+            return Forbid("Only Customers and Managers can access rooms.");
+        }
+
+        IPostgrestTable<Room> query = _supabase.From<Room>();
+        if (user.Role == RoleEnum.Customer.GetDescriptionFromEnum())
+        {
+            query = query.Filter("customer_id", Constants.Operator.Equals, user.Id.ToString());
+        }
+        else
+        {
+            query = query.Filter("manager_id", Constants.Operator.Equals, user.Id.ToString());
+        }
+
+        var response = await query.Get();
+        var rooms = response.Models;
+
+        var roomDtos = new List<RoomDto>();
+        foreach (var room in rooms)
+        {
+            var latestMessage = await _supabase.From<Message>()
+                .Filter("room_id", Constants.Operator.Equals, room.Id.ToString())
+                .Order("timestamp", Constants.Ordering.Descending)
+                .Limit(1)
+                .Get();
+
+            if (!latestMessage.Models.Any())
+            {
+                continue;
+            }
+
+            var manager = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
+                predicate: u => u.Id == room.ManagerId);
+
+            var customer = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
+                predicate: u => u.Id == room.CustomerId);
+
+            // Log giá trị thô để debug
+            DateTime rawTimestamp = latestMessage.Models.First().Timestamp;
+            _logger.LogInformation($"GetRooms - Raw Timestamp for Room {room.Id}: {rawTimestamp}, Kind: {rawTimestamp.Kind}");
+
+            // Đảm bảo thời gian là UTC trước khi chuyển đổi
+            DateTime utcTimestamp = rawTimestamp.Kind == DateTimeKind.Utc
+                ? rawTimestamp
+                : DateTime.SpecifyKind(rawTimestamp, DateTimeKind.Utc);
+
+            // Chuyển đổi từ UTC sang SEA
+            DateTime? latestMessageTime = rawTimestamp;
+
+            roomDtos.Add(new RoomDto
+            {
+                Id = room.Id,
+                CustomerId = room.CustomerId,
+                ManagerId = room.ManagerId,
+                ManagerName = manager?.UserName ?? "Unknown",
+                CustomerName = customer?.UserName ?? "Unknown",
+                CreatedAt = room.CreatedAt,
+                LatestMessageTime = latestMessageTime
+            });
+        }
+
+        roomDtos = roomDtos.OrderByDescending(r => r.LatestMessageTime).ToList();
+
+        _logger.LogInformation($"Retrieved {roomDtos.Count} rooms for user {user.UserName}.");
+        return Ok(roomDtos);
     }
+    catch (Exception ex)
+    {
+        _logger.LogError(ex, "Error retrieving rooms.");
+        return StatusCode(500, "An error occurred while retrieving rooms.");
+    }
+}
     /// <summary>
     /// Lấy danh sách các Manager hiện có và đang hoạt động.
     /// </summary>

@@ -25,7 +25,8 @@ public class ProductService : BaseService<ProductService>, IProductService
 
     public ProductService(IUnitOfWork<MyDbContext> unitOfWork, ILogger<ProductService> logger, IMapper mapper,
         IHttpContextAccessor httpContextAccessor, HtmlSanitizerUtils htmlSanitizer,
-        GoogleUtils.GoogleDriveService driveService, SupabaseUltils supabaseImageService, IMemoryCache memoryCache) : base(unitOfWork, logger,
+        GoogleUtils.GoogleDriveService driveService, SupabaseUltils supabaseImageService,
+        IMemoryCache memoryCache) : base(unitOfWork, logger,
         mapper,
         httpContextAccessor)
     {
@@ -76,6 +77,7 @@ public class ProductService : BaseService<ProductService>, IProductService
                 data = null
             };
         }
+
         if (createProductRequest.Price <= 0)
         {
             return new ApiResponse
@@ -85,6 +87,7 @@ public class ProductService : BaseService<ProductService>, IProductService
                 data = null
             };
         }
+
         // Validate quantity
         if (createProductRequest.Quantity < 0)
         {
@@ -210,151 +213,160 @@ public class ProductService : BaseService<ProductService>, IProductService
     }
 
 
-   public async Task<ApiResponse> GetListProduct(int page, int size, bool? isAscending, string? SubcategoryName,
-    string? productName, string? cateName, string? status, decimal? minPrice, decimal? maxPrice)
-{
-    Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
-    var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
-        predicate: u => u.Id.Equals(userId) &&
-                        u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) && u.IsDelete == false &&
-                        (u.Role == RoleEnum.Admin.GetDescriptionFromEnum() || u.Role == RoleEnum.Manager.GetDescriptionFromEnum()));
-
-    if (user == null)
+    public async Task<ApiResponse> GetListProduct(int page, int size, bool? isAscending, string? SubcategoryName,
+        string? productName, string? cateName, string? status, decimal? minPrice, decimal? maxPrice)
     {
-        throw new BadHttpRequestException("You don't have permission to do this.");
-    }
+        Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
+        var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
+            predicate: u => u.Id.Equals(userId) &&
+                            u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) && u.IsDelete == false &&
+                            (u.Role == RoleEnum.Admin.GetDescriptionFromEnum() ||
+                             u.Role == RoleEnum.Manager.GetDescriptionFromEnum()));
 
-    var products = await _unitOfWork.GetRepository<Product>().GetPagingListAsync(
-        selector: s => new GetProductResponse
+        if (user == null)
         {
-            Id = s.Id,
-            SubCategoryName = s.SubCategory != null ? s.SubCategory.SubCategoryName : null,
-            CategoryName = s.SubCategory != null && s.SubCategory.Category != null ? s.SubCategory.Category.CategoryName : null,
-            Description = s.Description,
-            Images = s.Images.Take(1).Select(i => i.LinkImage).ToList(),
-            ProductName = s.ProductName,
-            Quantity = s.Quantity,
-            Price = s.Price,
-            Size = s.Size,
-            Power = s.Power,
-            Status = s.Status
-        },
-        include: i => i.Include(p => p.Images),
-        predicate: p =>
-            (string.IsNullOrEmpty(productName) || p.ProductName.Contains(productName)) &&
-            (string.IsNullOrEmpty(cateName) || p.SubCategory.Category.CategoryName.Contains(cateName)) &&
-            (string.IsNullOrEmpty(SubcategoryName) || p.SubCategory.SubCategoryName.Contains(SubcategoryName)) &&
-            (string.IsNullOrEmpty(status) || p.Status.Equals(status)) &&
-            (!minPrice.HasValue || p.Price >= minPrice.Value) &&
-            (!maxPrice.HasValue || p.Price <= maxPrice.Value),
-        orderBy: q => isAscending.HasValue
-            ? (isAscending.Value ? q.OrderBy(p => p.Price) : q.OrderByDescending(p => p.Price))
-            : q.OrderByDescending(p => p.CreateDate),
-        page: page,
-        size: size
-    );
+            throw new BadHttpRequestException("You don't have permission to do this.");
+        }
 
-    int totalItems = products.Total;
-    int totalPages = (int)Math.Ceiling((double)totalItems / size);
+        var products = await _unitOfWork.GetRepository<Product>().GetPagingListAsync(
+            selector: s => new GetProductResponse
+            {
+                Id = s.Id,
+                SubCategoryName = s.SubCategory != null ? s.SubCategory.SubCategoryName : null,
+                CategoryName = s.SubCategory != null && s.SubCategory.Category != null
+                    ? s.SubCategory.Category.CategoryName
+                    : null,
+                Description = s.Description,
+                Images = s.Images.Take(1).Select(i => i.LinkImage).ToList(),
+                ProductName = s.ProductName,
+                Quantity = s.Quantity,
+                Price = s.Price,
+                Size = s.Size,
+                Power = s.Power,
+                Status = s.Status
+            },
+            include: i => i.Include(p => p.Images),
+            predicate: p =>
+                (string.IsNullOrEmpty(productName) || p.ProductName.Contains(productName)) &&
+                (string.IsNullOrEmpty(cateName) || p.SubCategory.Category.CategoryName.Contains(cateName)) &&
+                (string.IsNullOrEmpty(SubcategoryName) || p.SubCategory.SubCategoryName.Contains(SubcategoryName)) &&
+                (string.IsNullOrEmpty(status) || p.Status.Equals(status)) &&
+                (!minPrice.HasValue || p.Price >= minPrice.Value) &&
+                (!maxPrice.HasValue || p.Price <= maxPrice.Value),
+            orderBy: q => isAscending.HasValue
+                ? (isAscending.Value ? q.OrderBy(p => p.Price) : q.OrderByDescending(p => p.Price))
+                : q.OrderByDescending(p => p.CreateDate),
+            page: page,
+            size: size
+        );
 
-    if (products == null || products.Items.Count == 0)
-    {
+        int totalItems = products.Total;
+        int totalPages = (int)Math.Ceiling((double)totalItems / size);
+
+        if (products == null || products.Items.Count == 0)
+        {
+            return new ApiResponse
+            {
+                status = StatusCodes.Status200OK.ToString(),
+                message = "Products retrieved successfully.",
+                data = new Paginate<Product>()
+                {
+                    Page = page,
+                    Size = size,
+                    Total = totalItems,
+                    TotalPages = totalPages,
+                    Items = new List<Product>()
+                }
+            };
+        }
+
         return new ApiResponse
         {
             status = StatusCodes.Status200OK.ToString(),
             message = "Products retrieved successfully.",
-            data = new Paginate<Product>()
+            data = products
+        };
+    }
+
+
+    public async Task<ApiResponse> GetAllProduct(int page, int size, bool? isAscending, string? SubcategoryName,
+        string? productName, string? cateName, decimal? minPrice, decimal? maxPrice)
+    {
+        page = page > 0 ? page : 1;
+        size = size > 0 ? size : 10;
+
+        // Dùng hash key cache để gọn và an toàn hơn
+        var cacheKey =
+            $"GetAllProduct_{page}_{size}_{isAscending}_{SubcategoryName}_{productName}_{cateName}_{minPrice}_{maxPrice}"
+                .GetHashCode();
+        if (_memoryCache.TryGetValue(cacheKey, out ApiResponse cachedResponse))
+        {
+            return cachedResponse;
+        }
+
+        var products = await _unitOfWork.GetRepository<Product>().GetPagingListAsync(
+            selector: s => new GetProductResponse
+            {
+                Id = s.Id,
+                SubCategoryName = s.SubCategory != null ? s.SubCategory.SubCategoryName : null,
+                CategoryName = s.SubCategory != null && s.SubCategory.Category != null
+                    ? s.SubCategory.Category.CategoryName
+                    : null,
+                Description = s.Description,
+                Images = s.Images.Where(i => i.IsDelete == false)
+                    .OrderBy(i => i.CreateDate)
+                    .Select(i => i.LinkImage)
+                    .Take(1)
+                    .ToList(),
+                ProductName = s.ProductName,
+                Quantity = s.Quantity,
+                Price = s.Price,
+                Size = s.Size,
+                Power = s.Power,
+                Status = s.Status
+            },
+            include: i => i.Include(p => p.Images)
+                .Include(p => p.SubCategory)
+                .ThenInclude(sc => sc.Category),
+            predicate: p =>
+                (string.IsNullOrEmpty(productName) || EF.Functions.Like(p.ProductName, $"%{productName}%")) &&
+                (string.IsNullOrEmpty(cateName) ||
+                 EF.Functions.Like(p.SubCategory.Category.CategoryName, $"%{cateName}%")) &&
+                (string.IsNullOrEmpty(SubcategoryName) ||
+                 EF.Functions.Like(p.SubCategory.SubCategoryName, $"%{SubcategoryName}%")) &&
+                (!minPrice.HasValue || p.Price >= minPrice.Value) &&
+                (!maxPrice.HasValue || p.Price <= maxPrice.Value) &&
+                p.IsDelete == false &&
+                p.Quantity > 0 &&
+                p.Status.Equals(ProductStatusEnum.Available.GetDescriptionFromEnum()),
+            orderBy: q => isAscending.HasValue
+                ? (isAscending.Value ? q.OrderBy(p => p.Price) : q.OrderByDescending(p => p.Price))
+                : q.OrderByDescending(p => p.CreateDate),
+            page: page,
+            size: size
+            // <-- bật AsNoTracking() cho query read-only
+        );
+
+        int totalItems = products.Total;
+        int totalPages = (int)Math.Ceiling((double)totalItems / size);
+
+        var response = new ApiResponse
+        {
+            status = StatusCodes.Status200OK.ToString(),
+            message = totalItems > 0 ? "Products retrieved successfully." : "No products found.",
+            data = new Paginate<GetProductResponse>
             {
                 Page = page,
                 Size = size,
                 Total = totalItems,
                 TotalPages = totalPages,
-                Items = new List<Product>()
+                Items = products.Items.ToList()
             }
         };
+
+        _memoryCache.Set(cacheKey, response, TimeSpan.FromMinutes(10));
+        return response;
     }
-
-    return new ApiResponse
-    {
-        status = StatusCodes.Status200OK.ToString(),
-        message = "Products retrieved successfully.",
-        data = products
-    };
-}
-
-
- public async Task<ApiResponse> GetAllProduct(int page, int size, bool? isAscending, string? SubcategoryName,
-    string? productName, string? cateName, decimal? minPrice, decimal? maxPrice)
-{
-    page = page > 0 ? page : 1;
-    size = size > 0 ? size : 10;
-
-    // Dùng hash key cache để gọn và an toàn hơn
-    var cacheKey = $"GetAllProduct_{page}_{size}_{isAscending}_{SubcategoryName}_{productName}_{cateName}_{minPrice}_{maxPrice}".GetHashCode();
-    if (_memoryCache.TryGetValue(cacheKey, out ApiResponse cachedResponse))
-    {
-        return cachedResponse;
-    }
-
-    var products = await _unitOfWork.GetRepository<Product>().GetPagingListAsync(
-        selector: s => new GetProductResponse
-        {
-            Id = s.Id,
-            SubCategoryName = s.SubCategory != null ? s.SubCategory.SubCategoryName : null,
-            CategoryName = s.SubCategory != null && s.SubCategory.Category != null ? s.SubCategory.Category.CategoryName : null,
-            Description = s.Description,
-            Images = s.Images.Where(i => i.IsDelete == false)
-                             .OrderBy(i => i.CreateDate)
-                             .Select(i => i.LinkImage)
-                             .Take(1)
-                             .ToList(),
-            ProductName = s.ProductName,
-            Quantity = s.Quantity,
-            Price = s.Price,
-            Size = s.Size,
-            Power = s.Power,
-            Status = s.Status
-        },
-        include: i => i.Include(p => p.Images)
-                       .Include(p => p.SubCategory)
-                           .ThenInclude(sc => sc.Category),
-        predicate: p =>
-            (string.IsNullOrEmpty(productName) || EF.Functions.Like(p.ProductName, $"%{productName}%")) &&
-            (string.IsNullOrEmpty(cateName) || EF.Functions.Like(p.SubCategory.Category.CategoryName, $"%{cateName}%")) &&
-            (string.IsNullOrEmpty(SubcategoryName) || EF.Functions.Like(p.SubCategory.SubCategoryName, $"%{SubcategoryName}%")) &&
-            (!minPrice.HasValue || p.Price >= minPrice.Value) &&
-            (!maxPrice.HasValue || p.Price <= maxPrice.Value) &&
-            p.IsDelete == false &&
-            p.Quantity > 0 &&
-            p.Status.Equals(ProductStatusEnum.Available.GetDescriptionFromEnum()),
-        orderBy: q => isAscending.HasValue
-            ? (isAscending.Value ? q.OrderBy(p => p.Price) : q.OrderByDescending(p => p.Price))
-            : q.OrderByDescending(p => p.CreateDate),
-        page: page,
-        size: size
-        // <-- bật AsNoTracking() cho query read-only
-    );
-
-    int totalItems = products.Total;
-    int totalPages = (int)Math.Ceiling((double)totalItems / size);
-
-    var response = new ApiResponse
-    {
-        status = StatusCodes.Status200OK.ToString(),
-        message = totalItems > 0 ? "Products retrieved successfully." : "No products found.",
-        data = new Paginate<GetProductResponse>
-        {
-            Page = page,
-            Size = size,
-            Total = totalItems,
-            TotalPages = totalPages,
-            Items = products.Items.ToList()
-        }
-    };
-
-    _memoryCache.Set(cacheKey, response, TimeSpan.FromMinutes(10));
-    return response;
-}
 
     public async Task<ApiResponse> GetAllProductsGroupedByCategory(int page, int size)
     {
@@ -427,12 +439,14 @@ public class ProductService : BaseService<ProductService>, IProductService
         var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
             predicate: u => u.Id.Equals(userId) &&
                             u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) && u.IsDelete == false &&
-                            (u.Role == RoleEnum.Admin.GetDescriptionFromEnum() || u.Role == RoleEnum.Manager.GetDescriptionFromEnum()));
+                            (u.Role == RoleEnum.Admin.GetDescriptionFromEnum() ||
+                             u.Role == RoleEnum.Manager.GetDescriptionFromEnum()));
 
         if (user == null)
         {
             throw new BadHttpRequestException("You don't have permission to do this.");
         }
+
         var existingProduct = await _unitOfWork.GetRepository<Product>()
             .SingleOrDefaultAsync(predicate: p => p.Id.Equals(productId));
         if (existingProduct == null)
@@ -599,12 +613,14 @@ public class ProductService : BaseService<ProductService>, IProductService
         var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
             predicate: u => u.Id.Equals(userId) &&
                             u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) && u.IsDelete == false &&
-                            (u.Role == RoleEnum.Admin.GetDescriptionFromEnum() || u.Role == RoleEnum.Manager.GetDescriptionFromEnum()));
+                            (u.Role == RoleEnum.Admin.GetDescriptionFromEnum() ||
+                             u.Role == RoleEnum.Manager.GetDescriptionFromEnum()));
 
         if (user == null)
         {
             throw new BadHttpRequestException("You don't have permission to do this.");
         }
+
         if (productId == Guid.Empty)
         {
             throw new BadHttpRequestException(MessageConstant.ProductMessage.ProductIdEmpty);
@@ -634,7 +650,6 @@ public class ProductService : BaseService<ProductService>, IProductService
 
     public async Task<ApiResponse> GetProductById(Guid productId)
     {
-
         var product = await _unitOfWork.GetRepository<Product>().SingleOrDefaultAsync(
             selector: s => new GetProductResponse
             {
@@ -650,7 +665,9 @@ public class ProductService : BaseService<ProductService>, IProductService
                 Price = s.Price,
                 Status = s.Status,
                 TotalSold = s.OrderDetails
-                    .Where(od => od.Order.Status.Equals(OrderStatus.COMPLETED.GetDescriptionFromEnum())) // Chỉ tính OrderDetail của đơn hàng Complete
+                    .Where(od =>
+                        od.Order.Status.Equals(OrderStatus.COMPLETED
+                            .GetDescriptionFromEnum())) // Chỉ tính OrderDetail của đơn hàng Complete
                     .Sum(od => od.Quantity) // Tính tổng số lượng đã bán
             },
             predicate: p =>
@@ -679,33 +696,33 @@ public class ProductService : BaseService<ProductService>, IProductService
 
     public async Task<ApiResponse> EnableProduct(Guid productId)
     {
-       var prodcut = await _unitOfWork.GetRepository<Product>().SingleOrDefaultAsync(predicate: p => p.Id.Equals(productId));
-       
-         
-      
+        var prodcut = await _unitOfWork.GetRepository<Product>()
+            .SingleOrDefaultAsync(predicate: p => p.Id.Equals(productId));
 
-           if (prodcut.IsDelete == true || prodcut.Status == ProductStatusEnum.Unavailable.GetDescriptionFromEnum())
-           {
-               prodcut.Status = ProductStatusEnum.Available.GetDescriptionFromEnum();
-               prodcut.IsDelete = false;
-               _unitOfWork.GetRepository<Product>().UpdateAsync(prodcut);
-               await _unitOfWork.CommitAsync();
-               return new ApiResponse()
-               {
-                   status = StatusCodes.Status200OK.ToString(),
-                   message = "successfully enabled product.",
-                   data = null
-               };
-           }   
-           return new ApiResponse
-           {
-               status = StatusCodes.Status404NotFound.ToString(),
-               message = MessageConstant.ProductMessage.ProductNotExist, data = null
 
-           };
+        if (prodcut.IsDelete == true || prodcut.Status == ProductStatusEnum.Unavailable.GetDescriptionFromEnum())
+        {
+            prodcut.Status = ProductStatusEnum.Available.GetDescriptionFromEnum();
+            prodcut.IsDelete = false;
+            _unitOfWork.GetRepository<Product>().UpdateAsync(prodcut);
+            await _unitOfWork.CommitAsync();
+            return new ApiResponse()
+            {
+                status = StatusCodes.Status200OK.ToString(),
+                message = "successfully enabled product.",
+                data = null
+            };
+        }
+
+        return new ApiResponse
+        {
+            status = StatusCodes.Status404NotFound.ToString(),
+            message = MessageConstant.ProductMessage.ProductNotExist, data = null
+        };
     }
 
     #region Recommendations
+
     // Phương thức kiểm tra kích thước
     private (float Length, float Width, float Height) ValidateSize(string size)
     {
@@ -746,334 +763,391 @@ public class ProductService : BaseService<ProductService>, IProductService
         return (0, 0);
     }
 
-   public async Task<ApiResponse> RecommendProducts(TankRequest request)
-{
-    try
+    public async Task<ApiResponse> RecommendProducts(TankRequest request)
     {
-        _logger.LogInformation($"=== Bắt đầu xử lý yêu cầu với kích thước={request.Size} ===");
-
-        // Kiểm tra quyền người dùng
-        Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
-        var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
-            predicate: u => u.Id.Equals(userId) &&
-                            u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) &&
-                            u.IsDelete == false);
-
-        if (user == null)
+        try
         {
-            throw new BadHttpRequestException("Bạn không có quyền thực hiện hành động này.");
-        }
+            // Ghi log để theo dõi quá trình xử lý yêu cầu
+            _logger.LogInformation($"=== Bắt đầu xử lý yêu cầu với kích thước={request.Size} ===");
 
-        // Kiểm tra và tính toán tham số bể
-        var (length, width, height) = ValidateSize(request.Size);
-        var volume = (length * width * height) / 1000; // Thể tích (L)
-        var filterPower = volume * 4; // Công suất lọc (L/h)
-        var substrateArea = (length * width) / 10000; // Diện tích đáy (m2)
-        var substrateVolume = substrateArea * 0.04 * 1000; // Thể tích phân nền (L)
+            // 1. Kiểm tra quyền người dùng
+            // Lấy UserId từ HttpContext để xác định người dùng hiện tại
+            Guid? userId = UserUtil.GetAccountId(_httpContextAccessor.HttpContext);
+            var user = await _unitOfWork.GetRepository<User>().SingleOrDefaultAsync(
+                predicate: u => u.Id.Equals(userId) &&
+                                u.Status.Equals(UserStatusEnum.Available.GetDescriptionFromEnum()) &&
+                                u.IsDelete == false);
 
-        _logger.LogInformation($"Thể tích: {volume:F1}L");
-        _logger.LogInformation($"Công suất lọc cần thiết: {filterPower:F1}L/h");
-        _logger.LogInformation($"Thể tích phân nền: {substrateVolume:F1}L");
-
-        var resultData = new RecommendationResponse();
-
-        // Truy vấn sản phẩm từ cơ sở dữ liệu
-        var products = await _unitOfWork.GetRepository<Product>().GetListAsync(
-            selector: p => new ProductRecommendation
+            // Nếu không tìm thấy người dùng hoặc người dùng không hợp lệ, ném ngoại lệ
+            if (user == null)
             {
-                Id = p.Id,
-                ProductName = p.ProductName,
-                Description = p.Description,
-                Price = p.Price,
-                Size = p.Size,
-                SubCategoryName = p.SubCategory.SubCategoryName,
-                CategoryName = p.SubCategory.Category.CategoryName,
-                Images = p.Images.Select(i => i.LinkImage).ToList(),
-                Power = p.Power ?? 0 // Lấy giá trị power, mặc định là 0 nếu null
-            },
-            predicate: p => p.Status.Equals(ProductStatusEnum.Available.GetDescriptionFromEnum()) &&
-                            p.IsDelete == false,
-            include: q => q.Include(p => p.SubCategory)
-                           .ThenInclude(sc => sc.Category)
-                           .Include(p => p.Images)
-        );
+                throw new BadHttpRequestException("Bạn không có quyền thực hiện hành động này.");
+            }
 
-        var productList = products.ToList();
-        _logger.LogInformation($"Tổng số sản phẩm tìm thấy: {productList.Count}");
+            // 2. Kiểm tra và tính toán thông số bể
+            // Xác thực kích thước bể (dạng XxYxZ) và trả về chiều dài, chiều rộng, chiều cao
+            var (length, width, height) = ValidateSize(request.Size);
+            // Tính thể tích bể (Lít) bằng công thức: dài x rộng x cao / 1000
+            var volume = (length * width * height) / 1000;
+            // Tính công suất lọc cần thiết (L/h), giả định cần gấp 4 lần thể tích
+            var filterPower = volume * 4;
+            // Tính diện tích đáy (m2) để tính thể tích phân nền
+            var substrateArea = (length * width) / 10000;
+            // Tính thể tích phân nền (Lít), giả định độ dày lớp phân là 4cm
+            var substrateVolume = substrateArea * 0.04 * 1000;
 
-        // Phân loại sản phẩm dựa trên CategoryName
-        var filters = productList.Where(p => p.CategoryName.ToLower().Contains("lọc")).ToList();
-        var lights = productList.Where(p => p.CategoryName.ToLower().Contains("đèn")).ToList();
-        var substrates = productList.Where(p => p.CategoryName.ToLower().Contains("phân nền")).ToList();
+            // Ghi log các thông số đã tính toán
+            _logger.LogInformation($"Thể tích: {volume:F1}L");
+            _logger.LogInformation($"Công suất lọc cần thiết: {filterPower:F1}L/h");
+            _logger.LogInformation($"Thể tích phân nền: {substrateVolume:F1}L");
 
-        _logger.LogInformation($"Số lượng lọc tìm thấy: {filters.Count}, Đèn: {lights.Count}, Phân nền: {substrates.Count}");
+            // 3. Khởi tạo đối tượng kết quả để chứa danh sách sản phẩm được gợi ý
+            var resultData = new RecommendationResponse();
 
-        // Chọn lọc
-        if (filters.Any())
-        {
-            var filtersWithPower = new List<ProductRecommendation>();
-            var tankType = volume < 50 ? "Mini" : volume > 200 ? "Hồ lớn" : "Trung bình";
-
-            foreach (var filter in filters)
-            {
-                try
+            // 4. Truy vấn sản phẩm từ cơ sở dữ liệu
+            // Lấy tất cả sản phẩm có trạng thái Available và chưa bị xóa
+            var products = await _unitOfWork.GetRepository<Product>().GetListAsync(
+                selector: p => new ProductRecommendation
                 {
-                    var powerValue = filter.Power; // Sử dụng cột power
-                    if (powerValue >= filterPower * 0.7 && powerValue <= filterPower * 1.3) // 70%–130% của filterPower
+                    Id = p.Id,
+                    ProductName = p.ProductName,
+                    Description = p.Description,
+                    Price = p.Price,
+                    Size = p.Size,
+                    SubCategoryName = p.SubCategory.SubCategoryName,
+                    CategoryName = p.SubCategory.Category.CategoryName,
+                    Images = p.Images.Select(i => i.LinkImage).ToList(),
+                    Power = p.Power ?? 0 // Nếu Power null, gán mặc định là 0
+                },
+                predicate: p => p.Status.Equals(ProductStatusEnum.Available.GetDescriptionFromEnum()) &&
+                                p.IsDelete == false,
+                include: q => q.Include(p => p.SubCategory)
+                    .ThenInclude(sc => sc.Category)
+                    .Include(p => p.Images)
+            );
+
+            // Chuyển danh sách sản phẩm sang dạng List để xử lý
+            var productList = products.ToList();
+            _logger.LogInformation($"Tổng số sản phẩm tìm thấy: {productList.Count}");
+
+            // 5. Phân loại sản phẩm theo danh mục
+            // Lọc các sản phẩm thuộc danh mục "lọc", "đèn", "phân nền" (so sánh không phân biệt hoa thường)
+            var filters = productList.Where(p => p.CategoryName.ToLower().Contains("lọc")).ToList();
+            var lights = productList.Where(p => p.CategoryName.ToLower().Contains("đèn")).ToList();
+            var substrates = productList.Where(p => p.CategoryName.ToLower().Contains("phân nền")).ToList();
+
+            // Ghi log số lượng sản phẩm trong từng danh mục
+            _logger.LogInformation(
+                $"Số lượng lọc tìm thấy: {filters.Count}, Đèn: {lights.Count}, Phân nền: {substrates.Count}");
+
+            // 6. Gợi ý sản phẩm cho bộ lọc
+            if (filters.Any())
+            {
+                var filtersWithPower = new List<ProductRecommendation>();
+                // Xác định loại bể dựa trên thể tích
+                var tankType = volume < 50 ? "Mini" : volume > 200 ? "Hồ lớn" : "Trung bình";
+
+                foreach (var filter in filters)
+                {
+                    try
                     {
-                        filtersWithPower.Add(filter);
-                        _logger.LogDebug($"Lọc {filter.ProductName}: công suất {powerValue}L/h, chênh lệch {Math.Abs(powerValue - filterPower)}L/h");
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError($"Lỗi khi xử lý công suất lọc: {ex.Message}");
-                    continue;
-                }
-            }
-
-            if (filtersWithPower.Any())
-            {
-                resultData.Recommendations.Filters = filtersWithPower
-                    .OrderBy(x => Math.Abs(x.Power - filterPower))
-                    .Take(5)
-                    .ToList();
-                _logger.LogInformation($"Đã chọn {resultData.Recommendations.Filters.Count} bộ lọc phù hợp");
-            }
-            else
-            {
-                _logger.LogWarning("Không tìm thấy lọc phù hợp, chọn sản phẩm rẻ nhất");
-                resultData.Recommendations.Filters = filters
-                    .OrderBy(x => x.Price)
-                    .Take(3)
-                    .ToList();
-                if (resultData.Recommendations.Filters.Any())
-                    _logger.LogInformation($"Đã chọn {resultData.Recommendations.Filters.Count} bộ lọc rẻ nhất");
-            }
-        }
-
-        // Chọn đèn
-        if (lights.Any())
-        {
-            var suitableLights = new List<ProductRecommendation>();
-            var requiredLightPower = length * 0.5f; // Công suất đèn tối thiểu (W)
-
-            foreach (var light in lights)
-            {
-                try
-                {
-                    var powerValue = light.Power; // Sử dụng cột power
-                    if (powerValue >= requiredLightPower * 0.5 && powerValue <= requiredLightPower * 1.5)
-                    {
-                        suitableLights.Add(light);
-                        _logger.LogDebug($"Đèn {light.ProductName}: công suất {powerValue}W, phù hợp cho bể dài {length}cm");
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError($"Lỗi khi xử lý công suất đèn: {ex.Message}");
-                    continue;
-                }
-            }
-
-            if (suitableLights.Any())
-            {
-                resultData.Recommendations.Lights = suitableLights
-                    .OrderBy(l => Math.Abs(l.Power - requiredLightPower))
-                    .Take(5)
-                    .ToList();
-                _logger.LogInformation($"Đã chọn {resultData.Recommendations.Lights.Count} đèn phù hợp");
-            }
-            else
-            {
-                _logger.LogWarning("Không tìm thấy đèn phù hợp, chọn sản phẩm rẻ nhất");
-                resultData.Recommendations.Lights = lights
-                    .OrderBy(x => x.Price)
-                    .Take(3)
-                    .ToList();
-                if (resultData.Recommendations.Lights.Any())
-                    _logger.LogInformation($"Đã chọn {resultData.Recommendations.Lights.Count} đèn rẻ nhất");
-            }
-        }
-
-        // Chọn phân nền
-        if (substrates.Any())
-        {
-            var suitableSubstrates = new List<ProductRecommendation>();
-            foreach (var substrate in substrates)
-            {
-                var volumeStr = substrate.Size ?? "";
-                try
-                {
-                    var volumeMatch = Regex.Match(volumeStr, @"(\d+\.?\d*)\s*L");
-                    if (volumeMatch.Success && float.TryParse(volumeMatch.Groups[1].Value, out var substrateVol))
-                    {
-                        if (Math.Abs(substrateVol - substrateVolume) <= 2)
+                        // Lấy công suất của bộ lọc
+                        var powerValue = filter.Power;
+                        // Kiểm tra nếu công suất của bộ lọc nằm trong khoảng 70%-130% công suất yêu cầu
+                        if (powerValue >= filterPower * 0.7 && powerValue <= filterPower * 1.3)
                         {
-                            suitableSubstrates.Add(substrate);
-                            _logger.LogDebug($"Phân nền phù hợp: {substrate.ProductName} cho thể tích {volumeStr}");
+                            filtersWithPower.Add(filter);
+                            _logger.LogDebug(
+                                $"Lọc {filter.ProductName}: công suất {powerValue}L/h, chênh lệch {Math.Abs(powerValue - filterPower)}L/h");
                         }
                     }
-                    else if (string.Equals(volumeStr, "all", StringComparison.OrdinalIgnoreCase))
+                    catch (Exception ex)
                     {
-                        suitableSubstrates.Add(substrate);
-                        _logger.LogDebug($"Phân nền phù hợp: {substrate.ProductName} cho mọi thể tích");
+                        // Ghi log lỗi nếu có vấn đề khi xử lý công suất
+                        _logger.LogError($"Lỗi khi xử lý công suất lọc: {ex.Message}");
+                        continue;
                     }
                 }
-                catch
+
+                if (filtersWithPower.Any())
                 {
-                    continue;
+                    // Chọn tối đa 5 bộ lọc có công suất gần nhất với yêu cầu
+                    resultData.Recommendations.Filters = filtersWithPower
+                        .OrderBy(x => Math.Abs(x.Power - filterPower))
+                        .Take(5)
+                        .ToList();
+                    _logger.LogInformation($"Đã chọn {resultData.Recommendations.Filters.Count} bộ lọc phù hợp");
+                }
+                else
+                {
+                    // Nếu không tìm thấy bộ lọc phù hợp, chọn 3 bộ lọc rẻ nhất
+                    _logger.LogWarning("Không tìm thấy lọc phù hợp, chọn sản phẩm rẻ nhất");
+                    resultData.Recommendations.Filters = filters
+                        .OrderBy(x => x.Price)
+                        .Take(3)
+                        .ToList();
+                    if (resultData.Recommendations.Filters.Any())
+                        _logger.LogInformation($"Đã chọn {resultData.Recommendations.Filters.Count} bộ lọc rẻ nhất");
                 }
             }
 
-            if (suitableSubstrates.Any())
+            // 7. Gợi ý sản phẩm cho đèn
+            if (lights.Any())
             {
-                resultData.Recommendations.Substrates = suitableSubstrates
-                    .Take(5)
-                    .ToList();
-                _logger.LogInformation($"Đã chọn {resultData.Recommendations.Substrates.Count} phân nền phù hợp");
-            }
-            else
-            {
-                _logger.LogWarning("Không tìm thấy phân nền phù hợp, chọn sản phẩm rẻ nhất");
-                resultData.Recommendations.Substrates = substrates
-                    .OrderBy(x => x.Price)
-                    .Take(3)
-                    .ToList();
-                if (resultData.Recommendations.Substrates.Any())
-                    _logger.LogInformation($"Đã chọn {resultData.Recommendations.Substrates.Count} phân nền rẻ nhất");
-            }
-        }
+                var suitableLights = new List<ProductRecommendation>();
+                // Tính công suất đèn tối thiểu dựa trên chiều dài bể (0.5W/cm)
+                var requiredLightPower = length * 0.5f;
 
-        // Kiểm tra nếu không tìm thấy sản phẩm nào
-        if (!resultData.Recommendations.Filters.Any() &&
-            !resultData.Recommendations.Lights.Any() &&
-            !resultData.Recommendations.Substrates.Any())
-        {
-            _logger.LogWarning("Không tìm thấy sản phẩm phù hợp chính xác");
+                foreach (var light in lights)
+                {
+                    try
+                    {
+                        // Lấy công suất của đèn
+                        var powerValue = light.Power;
+                        // Kiểm tra nếu công suất đèn nằm trong khoảng 50%-150% công suất yêu cầu
+                        if (powerValue >= requiredLightPower * 0.5 && powerValue <= requiredLightPower * 1.5)
+                        {
+                            suitableLights.Add(light);
+                            _logger.LogDebug(
+                                $"Đèn {light.ProductName}: công suất {powerValue}W, phù hợp cho bể dài {length}cm");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        // Ghi log lỗi nếu có vấn đề khi xử lý công suất
+                        _logger.LogError($"Lỗi khi xử lý công suất đèn: {ex.Message}");
+                        continue;
+                    }
+                }
+
+                if (suitableLights.Any())
+                {
+                    // Chọn tối đa 5 đèn có công suất gần nhất với yêu cầu
+                    resultData.Recommendations.Lights = suitableLights
+                        .OrderBy(l => Math.Abs(l.Power - requiredLightPower))
+                        .Take(5)
+                        .ToList();
+                    _logger.LogInformation($"Đã chọn {resultData.Recommendations.Lights.Count} đèn phù hợp");
+                }
+                else
+                {
+                    // Nếu không tìm thấy đèn phù hợp, chọn 3 đèn rẻ nhất
+                    _logger.LogWarning("Không tìm thấy đèn phù hợp, chọn sản phẩm rẻ nhất");
+                    resultData.Recommendations.Lights = lights
+                        .OrderBy(x => x.Price)
+                        .Take(3)
+                        .ToList();
+                    if (resultData.Recommendations.Lights.Any())
+                        _logger.LogInformation($"Đã chọn {resultData.Recommendations.Lights.Count} đèn rẻ nhất");
+                }
+            }
+
+            // 8. Gợi ý sản phẩm cho phân nền
+            if (substrates.Any())
+            {
+                var suitableSubstrates = new List<ProductRecommendation>();
+                foreach (var substrate in substrates)
+                {
+                    var volumeStr = substrate.Size ?? "";
+                    try
+                    {
+                        // Kiểm tra thể tích phân nền từ trường Size (dạng "X L")
+                        var volumeMatch = Regex.Match(volumeStr, @"(\d+\.?\d*)\s*L");
+                        if (volumeMatch.Success && float.TryParse(volumeMatch.Groups[1].Value, out var substrateVol))
+                        {
+                            // Kiểm tra nếu thể tích phân nền gần với thể tích yêu cầu (chênh lệch tối đa 2L)
+                            if (Math.Abs(substrateVol - substrateVolume) <= 2)
+                            {
+                                suitableSubstrates.Add(substrate);
+                                _logger.LogDebug($"Phân nền phù hợp: {substrate.ProductName} cho thể tích {volumeStr}");
+                            }
+                        }
+                        else if (string.Equals(volumeStr, "all", StringComparison.OrdinalIgnoreCase))
+                        {
+                            // Nếu Size là "all", coi như phù hợp với mọi thể tích
+                            suitableSubstrates.Add(substrate);
+                            _logger.LogDebug($"Phân nền phù hợp: {substrate.ProductName} cho mọi thể tích");
+                        }
+                    }
+                    catch
+                    {
+                        continue;
+                    }
+                }
+
+                if (suitableSubstrates.Any())
+                {
+                    // Chọn tối đa 5 phân nền phù hợp
+                    resultData.Recommendations.Substrates = suitableSubstrates
+                        .Take(5)
+                        .ToList();
+                    _logger.LogInformation($"Đã chọn {resultData.Recommendations.Substrates.Count} phân nền phù hợp");
+                }
+                else
+                {
+                    // Nếu không tìm thấy phân nền phù hợp, chọn 3 phân nền rẻ nhất
+                    _logger.LogWarning("Không tìm thấy phân nền phù hợp, chọn sản phẩm rẻ nhất");
+                    resultData.Recommendations.Substrates = substrates
+                        .OrderBy(x => x.Price)
+                        .Take(3)
+                        .ToList();
+                    if (resultData.Recommendations.Substrates.Any())
+                        _logger.LogInformation(
+                            $"Đã chọn {resultData.Recommendations.Substrates.Count} phân nền rẻ nhất");
+                }
+            }
+
+            // 9. Xử lý trường hợp không tìm thấy sản phẩm phù hợp
+            if (!resultData.Recommendations.Filters.Any() &&
+                !resultData.Recommendations.Lights.Any() &&
+                !resultData.Recommendations.Substrates.Any())
+            {
+                _logger.LogWarning("Không tìm thấy sản phẩm phù hợp chính xác");
+                // Trả về các sản phẩm rẻ nhất trong mỗi danh mục
+                return new ApiResponse
+                {
+                    status = StatusCodes.Status200OK.ToString(),
+                    message = "Không tìm thấy sản phẩm phù hợp chính xác. Gợi ý các sản phẩm gần phù hợp:",
+                    data = new RecommendationResponse
+                    {
+                        Recommendations = new Recommendations
+                        {
+                            Filters = filters.OrderBy(x => x.Price).Take(3).ToList(),
+                            Lights = lights.OrderBy(x => x.Price).Take(3).ToList(),
+                            Substrates = substrates.OrderBy(x => x.Price).Take(3).ToList()
+                        }
+                    }
+                };
+            }
+
+            // 10. Trả về kết quả thành công
+            _logger.LogInformation("=== Hoàn thành xử lý ===");
             return new ApiResponse
             {
                 status = StatusCodes.Status200OK.ToString(),
-                message = "Không tìm thấy sản phẩm phù hợp chính xác. Gợi ý các sản phẩm gần phù hợp:",
-                data = new RecommendationResponse
-                {
-                    Recommendations = new Recommendations
-                    {
-                        Filters = filters.OrderBy(x => x.Price).Take(3).ToList(),
-                        Lights = lights.OrderBy(x => x.Price).Take(3).ToList(),
-                        Substrates = substrates.OrderBy(x => x.Price).Take(3).ToList()
-                    }
-                }
+                message = "Gợi ý sản phẩm thành công.",
+                data = resultData
             };
         }
+        catch (BadHttpRequestException ex)
+        {
+            // Xử lý lỗi xác thực (ví dụ: định dạng kích thước không hợp lệ)
+            _logger.LogError($"Lỗi xác thực: {ex.Message}");
+            return new ApiResponse
+            {
+                status = StatusCodes.Status400BadRequest.ToString(),
+                message = ex.Message,
+                data = null
+            };
+        }
+        catch (Exception ex)
+        {
+            // Xử lý lỗi hệ thống chung
+            _logger.LogError($"Lỗi không xác định: {ex.Message}");
+            return new ApiResponse
+            {
+                status = StatusCodes.Status500InternalServerError.ToString(),
+                message = $"Lỗi hệ thống: {ex.Message}",
+                data = null
+            };
+        }
+    }
 
-        _logger.LogInformation("=== Hoàn thành xử lý ===");
-        return new ApiResponse
+    #endregion
+
+    public async Task<ApiResponse> GetTopSellingProducts(int page, int size, bool? isAscending, string? subcategoryName,
+        string? productName, string? cateName, decimal? minPrice, decimal? maxPrice)
+    {
+        page = page > 0 ? page : 1;
+        size = size > 0 ? size : 10;
+
+        // Tạo cache key
+        var cacheKey =
+            $"GetTopSellingProducts_{page}_{size}_{isAscending}_{subcategoryName}_{productName}_{cateName}_{minPrice}_{maxPrice}"
+                .GetHashCode();
+        if (_memoryCache.TryGetValue(cacheKey, out ApiResponse cachedResponse))
+        {
+            return cachedResponse;
+        }
+
+        var products = await _unitOfWork.GetRepository<Product>().GetPagingListAsync(
+            selector: s => new GetProductResponse
+            {
+                Id = s.Id,
+                SubCategoryName = s.SubCategory != null ? s.SubCategory.SubCategoryName : null,
+                CategoryName = s.SubCategory != null && s.SubCategory.Category != null
+                    ? s.SubCategory.Category.CategoryName
+                    : null,
+                Description = s.Description,
+                Images = s.Images.Where(i => i.IsDelete == false)
+                    .OrderBy(i => i.CreateDate)
+                    .Select(i => i.LinkImage)
+                    .Take(1)
+                    .ToList(),
+                ProductName = s.ProductName,
+                Quantity = s.Quantity,
+                Price = s.Price,
+                Size = s.Size,
+                Power = s.Power,
+                Status = s.Status,
+                TotalSold = s.OrderDetails
+                    .Where(od => od.Order.Status.Equals(OrderStatus.COMPLETED.GetDescriptionFromEnum())) // Sử dụng enum
+                    .Sum(od => od.Quantity) // Tính tổng số lượng đã bán
+            },
+            include: i => i.Include(p => p.Images)
+                .Include(p => p.SubCategory)
+                .ThenInclude(sc => sc.Category)
+                .Include(p => p.OrderDetails)
+                .ThenInclude(od => od.Order), // Bao gồm Order để kiểm tra trạng thái
+            predicate: p =>
+                (string.IsNullOrEmpty(productName) || EF.Functions.Like(p.ProductName, $"%{productName}%")) &&
+                (string.IsNullOrEmpty(cateName) ||
+                 EF.Functions.Like(p.SubCategory.Category.CategoryName, $"%{cateName}%")) &&
+                (string.IsNullOrEmpty(subcategoryName) ||
+                 EF.Functions.Like(p.SubCategory.SubCategoryName, $"%{subcategoryName}%")) &&
+                (!minPrice.HasValue || p.Price >= minPrice.Value) &&
+                (!maxPrice.HasValue || p.Price <= maxPrice.Value) &&
+                p.IsDelete == false &&
+                p.Quantity > 0 &&
+                p.Status.Equals(ProductStatusEnum.Available.GetDescriptionFromEnum()),
+            orderBy: q => isAscending.HasValue
+                ? (isAscending.Value
+                    ? q.OrderBy(p =>
+                        p.OrderDetails
+                            .Where(od => od.Order.Status.Equals(OrderStatus.COMPLETED.GetDescriptionFromEnum()))
+                            .Sum(od => od.Quantity))
+                    : q.OrderByDescending(p =>
+                        p.OrderDetails
+                            .Where(od => od.Order.Status.Equals(OrderStatus.COMPLETED.GetDescriptionFromEnum()))
+                            .Sum(od => od.Quantity)))
+                : q.OrderByDescending(p =>
+                    p.OrderDetails.Where(od => od.Order.Status.Equals(OrderStatus.COMPLETED.GetDescriptionFromEnum()))
+                        .Sum(od => od.Quantity)),
+            page: page,
+            size: size
+        );
+
+        int totalItems = products.Total;
+        int totalPages = (int)Math.Ceiling((double)totalItems / size);
+
+        var response = new ApiResponse
         {
             status = StatusCodes.Status200OK.ToString(),
-            message = "Gợi ý sản phẩm thành công.",
-            data = resultData
+            message = totalItems > 0 ? "Top selling products retrieved successfully." : "No products found.",
+            data = new Paginate<GetProductResponse>
+            {
+                Page = page,
+                Size = size,
+                Total = totalItems,
+                TotalPages = totalPages,
+                Items = products.Items.ToList()
+            }
         };
-    }
-    catch (BadHttpRequestException ex)
-    {
-        _logger.LogError($"Lỗi xác thực: {ex.Message}");
-        return new ApiResponse
-        {
-            status = StatusCodes.Status400BadRequest.ToString(),
-            message = ex.Message,
-            data = null
-        };
-    }
-    catch (Exception ex)
-    {
-        _logger.LogError($"Lỗi không xác định: {ex.Message}");
-        return new ApiResponse
-        {
-            status = StatusCodes.Status500InternalServerError.ToString(),
-            message = $"Lỗi hệ thống: {ex.Message}",
-            data = null
-        };
-    }
-}
-    #endregion
-public async Task<ApiResponse> GetTopSellingProducts(int page, int size, bool? isAscending, string? subcategoryName, string? productName, string? cateName, decimal? minPrice, decimal? maxPrice)
-{
-    page = page > 0 ? page : 1;
-    size = size > 0 ? size : 10;
 
-    // Tạo cache key
-    var cacheKey = $"GetTopSellingProducts_{page}_{size}_{isAscending}_{subcategoryName}_{productName}_{cateName}_{minPrice}_{maxPrice}".GetHashCode();
-    if (_memoryCache.TryGetValue(cacheKey, out ApiResponse cachedResponse))
-    {
-        return cachedResponse;
+        _memoryCache.Set(cacheKey, response, TimeSpan.FromMinutes(10));
+        return response;
     }
 
-    var products = await _unitOfWork.GetRepository<Product>().GetPagingListAsync(
-        selector: s => new GetProductResponse
-        {
-            Id = s.Id,
-            SubCategoryName = s.SubCategory != null ? s.SubCategory.SubCategoryName : null,
-            CategoryName = s.SubCategory != null && s.SubCategory.Category != null ? s.SubCategory.Category.CategoryName : null,
-            Description = s.Description,
-            Images = s.Images.Where(i => i.IsDelete == false)
-                            .OrderBy(i => i.CreateDate)
-                            .Select(i => i.LinkImage)
-                            .Take(1)
-                            .ToList(),
-            ProductName = s.ProductName,
-            Quantity = s.Quantity,
-            Price = s.Price,
-            Size = s.Size,
-            Power = s.Power,
-            Status = s.Status,
-            TotalSold = s.OrderDetails
-                .Where(od => od.Order.Status.Equals(OrderStatus.COMPLETED.GetDescriptionFromEnum())) // Sử dụng enum
-                .Sum(od => od.Quantity) // Tính tổng số lượng đã bán
-        },
-        include: i => i.Include(p => p.Images)
-                       .Include(p => p.SubCategory)
-                           .ThenInclude(sc => sc.Category)
-                       .Include(p => p.OrderDetails)
-                           .ThenInclude(od => od.Order), // Bao gồm Order để kiểm tra trạng thái
-        predicate: p =>
-            (string.IsNullOrEmpty(productName) || EF.Functions.Like(p.ProductName, $"%{productName}%")) &&
-            (string.IsNullOrEmpty(cateName) || EF.Functions.Like(p.SubCategory.Category.CategoryName, $"%{cateName}%")) &&
-            (string.IsNullOrEmpty(subcategoryName) || EF.Functions.Like(p.SubCategory.SubCategoryName, $"%{subcategoryName}%")) &&
-            (!minPrice.HasValue || p.Price >= minPrice.Value) &&
-            (!maxPrice.HasValue || p.Price <= maxPrice.Value) &&
-            p.IsDelete == false &&
-            p.Quantity > 0 &&
-            p.Status.Equals(ProductStatusEnum.Available.GetDescriptionFromEnum()),
-        orderBy: q => isAscending.HasValue
-            ? (isAscending.Value
-                ? q.OrderBy(p => p.OrderDetails.Where(od => od.Order.Status.Equals(OrderStatus.COMPLETED.GetDescriptionFromEnum())).Sum(od => od.Quantity))
-                : q.OrderByDescending(p => p.OrderDetails.Where(od => od.Order.Status.Equals(OrderStatus.COMPLETED.GetDescriptionFromEnum())).Sum(od => od.Quantity)))
-            : q.OrderByDescending(p => p.OrderDetails.Where(od => od.Order.Status.Equals(OrderStatus.COMPLETED.GetDescriptionFromEnum())).Sum(od => od.Quantity)),
-        page: page,
-        size: size
-    );
-
-    int totalItems = products.Total;
-    int totalPages = (int)Math.Ceiling((double)totalItems / size);
-
-    var response = new ApiResponse
-    {
-        status = StatusCodes.Status200OK.ToString(),
-        message = totalItems > 0 ? "Top selling products retrieved successfully." : "No products found.",
-        data = new Paginate<GetProductResponse>
-        {
-            Page = page,
-            Size = size,
-            Total = totalItems,
-            TotalPages = totalPages,
-            Items = products.Items.ToList()
-        }
-    };
-
-    _memoryCache.Set(cacheKey, response, TimeSpan.FromMinutes(10));
-    return response;
-}
     public Task<ApiResponse> UpImageForDescription(IFormFile formFile)
     {
         throw new NotImplementedException();
