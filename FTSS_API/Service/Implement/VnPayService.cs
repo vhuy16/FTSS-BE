@@ -193,7 +193,7 @@ public class VnPayService : BaseService<VnPayService>, IVnPayService
             var products = await _unitOfWork.GetRepository<Product>()
                 .GetListAsync(predicate: p => productIds.Contains(p.Id));
             var cartItems = await _unitOfWork.GetRepository<CartItem>()
-                .GetListAsync(predicate: ci => ci.CartId == cart.Id && productIds.Contains(ci.ProductId));
+                .GetListAsync(predicate: ci => ci.CartId == cart.Id && productIds.Contains(ci.ProductId)&& ci.Status == CartItemEnum.Odd.GetDescriptionFromEnum() && ci.IsDelete == false);
 
             foreach (var od in order.OrderDetails)
             {

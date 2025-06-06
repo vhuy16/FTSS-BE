@@ -287,10 +287,10 @@ public class StatisticsService : BaseService<StatisticsService>, IStatisticsServ
     {
         response.Statistics = new List<FinancialStatisticItem>
         {
-            new FinancialStatisticItem { Name = "Doanh thu thực tế", Value = 100 },
-            new FinancialStatisticItem { Name = "Tổng tiền đã hoàn trả", Value = 100 },
-            new FinancialStatisticItem { Name = "Tổng tiền thu được từ bán sản phẩm", Value = 100 },
-            new FinancialStatisticItem { Name = "Tổng tiền từ dịch vụ", Value = 100 }
+            new FinancialStatisticItem { Name = "Doanh thu thực tế", Value = 0 },
+            new FinancialStatisticItem { Name = "Tổng tiền đã hoàn trả", Value = 0 },
+            new FinancialStatisticItem { Name = "Tổng tiền thu được từ bán sản phẩm", Value = 0 },
+            new FinancialStatisticItem { Name = "Tổng tiền từ dịch vụ", Value = 0 }
         };
     }
 
